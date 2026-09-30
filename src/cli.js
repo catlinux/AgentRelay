@@ -20,6 +20,7 @@ import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { advise, appendRecord, comparison, displayLabel, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
+import { canOpenBrowser } from './platform.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -64,9 +65,14 @@ Opciones de review:
 Opciones de setup:
   --uninstall             Retira el bloque de AgentRelay
   --yes                   Aplica sin pedir confirmación
+  --login                 Conecta la cuenta de ChatGPT sin preguntar
   --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
 
   --executors <lista>     Instala ejecutores opcionales separados por comas
+
+Opciones de login:
+  --device                Usa el código de dispositivo
+  --browser               Fuerza el inicio de sesión con navegador
   --type --size --kind --model --effort --level --outcome --run --note --signals  Opciones de triage
 
 Opciones de init:
@@ -100,6 +106,8 @@ const OPTIONS = {
   project: { type: 'boolean' },
   local: { type: 'boolean' },
   device: { type: 'boolean' },
+  browser: { type: 'boolean' },
+  login: { type: 'boolean' },
   executors: { type: 'string' },
   type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' },
   effort: { type: 'string' }, outcome: { type: 'string' }, run: { type: 'string' }, note: { type: 'string' }, signals: { type: 'string' },
@@ -518,6 +526,27 @@ async function installOptionalExecutor(name, dir = executorsDir()) {
   return 0;
 }
 
+async function signIn(adapter, executor, { device = false, browser = false, showAccountHint = true } = {}) {
+  const browserStatus = canOpenBrowser();
+  const useDevice = device || (!browser && !browserStatus.ok);
+  if (showAccountHint && adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
+  if (!device && !browser && !browserStatus.ok) {
+    process.stdout.write(`No se puede abrir un navegador en este equipo (${browserStatus.reason}): se usará el código de dispositivo.\n`);
+  }
+  process.stdout.write(useDevice
+    ? 'Se mostrará un código para iniciar sesión con tu cuenta de ChatGPT.\n'
+    : 'Se abrirá el navegador para iniciar sesión con tu cuenta de ChatGPT…\n');
+  await adapter.login(executor, { device: useDevice });
+  const result = adapter.authStatus ? await adapter.authStatus(executor) : { ok: true };
+  if (result.ok) {
+    process.stdout.write('✔ Sesión iniciada\n');
+    return 0;
+  }
+  process.stderr.write(`No se pudo iniciar sesión: ${result.message} Prueba "agentrelay login --device".\n`);
+  if (adapter.accountHint && !result.message?.includes(adapter.accountHint)) process.stderr.write(`${adapter.accountHint}\n`);
+  return 1;
+}
+
 async function cmdLogin(values) {
   const cwd = path.resolve(values.cwd || process.cwd());
   const { config } = loadConfig({ cwd, configPath: values.config });
@@ -532,19 +561,7 @@ async function cmdLogin(values) {
     process.stdout.write(`Sesión activa: ${current.message}. Para cambiar de cuenta ejecuta "codex logout" y vuelve a ejecutar este comando.\n`);
     return 0;
   }
-  if (adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
-  process.stdout.write(values.device
-    ? 'Se mostrará un código para iniciar sesión con tu cuenta de ChatGPT.\n'
-    : 'Se abrirá el navegador para iniciar sesión con tu cuenta de ChatGPT…\n');
-  await adapter.login(executor, { device: values.device });
-  const result = adapter.authStatus ? await adapter.authStatus(executor) : { ok: true };
-  if (result.ok) {
-    process.stdout.write('✔ Sesión iniciada\n');
-    return 0;
-  }
-  process.stderr.write(`No se pudo iniciar sesión: ${result.message} Prueba "agentrelay login --device".\n`);
-  if (adapter.accountHint && !result.message?.includes(adapter.accountHint)) process.stderr.write(`${adapter.accountHint}\n`);
-  return 1;
+  return signIn(adapter, executor, { device: values.device, browser: values.browser });
 }
 
 async function cmdSetup(values) {
@@ -598,6 +615,33 @@ async function cmdSetup(values) {
         }
       } else if (answer && await installOptionalExecutor(entry.name, dir) !== 0) {
         return 1;
+      }
+    }
+    let config;
+    try {
+      config = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config }).config;
+    } catch {
+      // Setup sigue siendo útil aunque no se pueda cargar la configuración.
+      return 0;
+    }
+    const executor = config.executor;
+    const adapter = getExecutor(executor.type);
+    if (adapter.login && adapter.authStatus) {
+      const current = await adapter.authStatus(executor);
+      if (current.ok) {
+        process.stdout.write(`✔ Sesión activa: ${current.message}\n`);
+      } else {
+        if (adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
+        let answer;
+        if (values.login) answer = true;
+        else if (values.yes) answer = null;
+        else answer = await confirm('¿Conectar ahora tu cuenta de ChatGPT?', { yes: false });
+        if (answer === true) {
+          const result = await signIn(adapter, executor, { showAccountHint: false });
+          if (values.login && result !== 0) return 1;
+        } else {
+          process.stdout.write('Puedes hacerlo más tarde con: agentrelay login\n');
+        }
       }
     }
   }

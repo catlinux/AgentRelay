@@ -26,7 +26,12 @@ function cli(dir, args, extra = {}) {
   return spawnSync(process.execPath, [BIN, '--cwd', dir, ...args], {
     cwd: dir,
     encoding: 'utf8',
-    env: { ...process.env, FAKE_CODEX_LOG: path.join(dir, 'calls.log'), ...extra },
+    env: {
+      ...process.env,
+      SSH_CONNECTION: '', SSH_TTY: '', DISPLAY: '', WAYLAND_DISPLAY: '', WSL_DISTRO_NAME: '',
+      FAKE_CODEX_LOG: path.join(dir, 'calls.log'),
+      ...extra,
+    },
   });
 }
 
@@ -54,6 +59,33 @@ test('login conecta y doctor informa del estado de sesión', () => {
     const doctor = cli(dir, ['doctor'], env);
     assert.equal(doctor.status, 0, doctor.stdout + doctor.stderr);
     assert.match(doctor.stdout, /Sesión: Logged in using ChatGPT/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('login usa el código de dispositivo automáticamente en SSH', () => {
+  const { dir, log } = setup();
+  try {
+    const res = cli(dir, ['login'], { SSH_CONNECTION: 'host 1 2 3', FAKE_CODEX_SESSION_FILE: path.join(dir, 'session') });
+    assert.equal(res.status, 0, res.stderr);
+    if (process.platform === 'win32') {
+      assert.match(res.stdout, /Se abrirá el navegador/);
+      assert.equal(readFileSync(log, 'utf8').trim(), '["login"]');
+    } else {
+      assert.match(res.stdout, /No se puede abrir un navegador en este equipo \(sesión SSH\): se usará el código de dispositivo/);
+      assert.match(res.stdout, /Se mostrará un código/);
+      assert.equal(readFileSync(log, 'utf8').trim(), '["login","--device-auth"]');
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('login --browser fuerza el navegador incluso en SSH', () => {
+  const { dir, log } = setup();
+  try {
+    const res = cli(dir, ['login', '--browser'], { SSH_CONNECTION: 'host 1 2 3', FAKE_CODEX_SESSION_FILE: path.join(dir, 'session') });
+    assert.equal(res.status, 0, res.stderr);
+    assert.doesNotMatch(res.stdout, /se usará el código de dispositivo/);
+    assert.match(res.stdout, /Se abrirá el navegador/);
+    assert.equal(readFileSync(log, 'utf8').trim(), '["login"]');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

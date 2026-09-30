@@ -8,20 +8,35 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js';
-import { git, makeRepo } from './helpers.js';
+import { FAKE_CODEX, git, makeRepo } from './helpers.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
-function run(args, cwd) {
-  return spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: 'utf8' });
+function run(args, cwd, extra = {}) {
+  return spawnSync(process.execPath, [BIN, ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      SSH_CONNECTION: '', SSH_TTY: '', DISPLAY: '', WAYLAND_DISPLAY: '', WSL_DISTRO_NAME: '',
+      ...extra,
+    },
+  });
+}
+
+function fakeCodexConfig(dir) {
+  writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({
+    executor: { type: 'codex', command: [process.execPath, FAKE_CODEX] },
+  }));
 }
 
 test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-'));
   try {
+    fakeCodexConfig(dir);
     const claude = path.join(dir, 'CLAUDE.md');
 
-    const r1 = run(['setup', '--yes', '--claude-dir', dir]);
+    const r1 = run(['setup', '--yes', '--claude-dir', dir], dir);
     assert.equal(r1.status, 0, r1.stderr);
     assert.match(r1.stdout, /<!-- agentrelay:start -->/);
     assert.match(r1.stdout, /<!-- agentrelay:end -->/);
@@ -31,16 +46,17 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
 
     // Repetirlo no cambia nada.
     const before = readFileSync(claude, 'utf8');
-    const r2 = run(['setup', '--yes', '--claude-dir', dir]);
+    const r2 = run(['setup', '--yes', '--claude-dir', dir], dir);
     assert.equal(r2.status, 0, r2.stderr);
     assert.equal(readFileSync(claude, 'utf8'), before);
 
     // Con contenido previo lo conserva.
     const dir2 = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-'));
     try {
+      fakeCodexConfig(dir2);
       const claude2 = path.join(dir2, 'CLAUDE.md');
       writeFileSync(claude2, 'Contenido propio\n');
-      const r3 = run(['setup', '--yes', '--claude-dir', dir2]);
+      const r3 = run(['setup', '--yes', '--claude-dir', dir2], dir2);
       assert.equal(r3.status, 0, r3.stderr);
       assert.equal(readFileSync(claude2, 'utf8'), 'Contenido propio\n\n' + GLOBAL_BLOCK + '\n');
     } finally {
@@ -48,7 +64,7 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     }
 
     // --uninstall retira el bloque y borra el archivo si solo tenía el bloque.
-    const r4 = run(['setup', '--uninstall', '--yes', '--claude-dir', dir]);
+    const r4 = run(['setup', '--uninstall', '--yes', '--claude-dir', dir], dir);
     assert.equal(r4.status, 0, r4.stderr);
     assert.match(r4.stdout, /<!-- agentrelay:start -->/);
     assert.equal(existsSync(claude), false);
@@ -60,13 +76,65 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
 test('setup sin --yes y sin TTY no escribe y sale con código 1', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-'));
   try {
+    fakeCodexConfig(dir);
     const claude = path.join(dir, 'CLAUDE.md');
-    const r = run(['setup', '--claude-dir', dir]);
+    const r = run(['setup', '--claude-dir', dir], dir);
     assert.equal(r.status, 1);
     assert.equal(existsSync(claude), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('setup --yes sugiere la cuenta y el login posterior sin iniciar sesión', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-login-'));
+  const log = path.join(dir, 'calls.log');
+  try {
+    fakeCodexConfig(dir);
+    const result = run(['setup', '--yes', '--claude-dir', dir], dir, { FAKE_CODEX_LOG: log, FAKE_CODEX_LOGGED_IN: '0' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /https:\/\/chatgpt\.com/);
+    assert.match(result.stdout, /Puedes hacerlo más tarde con: agentrelay login/);
+    assert.equal(existsSync(log) && readFileSync(log, 'utf8').includes('["login"]'), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('setup --login inicia sesión con Codex y muestra el resultado', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-login-'));
+  const log = path.join(dir, 'calls.log');
+  const session = path.join(dir, 'session');
+  try {
+    fakeCodexConfig(dir);
+    const result = run(['setup', '--yes', '--login', '--claude-dir', dir], dir, {
+      FAKE_CODEX_LOG: log, FAKE_CODEX_LOGGED_IN: '0', FAKE_CODEX_SESSION_FILE: session,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /✔ Sesión iniciada/);
+    const browserPlatform = process.platform === 'win32' || process.platform === 'darwin';
+    assert.equal(readFileSync(log, 'utf8').trim(), browserPlatform ? '["login"]' : '["login","--device-auth"]');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('setup con sesión activa la reconoce sin ejecutar login', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-login-'));
+  const log = path.join(dir, 'calls.log');
+  try {
+    fakeCodexConfig(dir);
+    const result = run(['setup', '--yes', '--claude-dir', dir], dir, { FAKE_CODEX_LOG: log, FAKE_CODEX_LOGGED_IN: '1' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /✔ Sesión activa: Logged in using ChatGPT/);
+    assert.equal(existsSync(log) && readFileSync(log, 'utf8').includes('["login"]'), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('setup omite el login para un ejecutor que no lo ofrece', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-login-'));
+  try {
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline' } }));
+    const result = run(['setup', '--yes', '--claude-dir', dir], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /Conectar ahora|Sesión activa|Puedes hacerlo más tarde/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('init --yes en repo limpio crea CLAUDE.md y hace un commit solo de CLAUDE.md', () => {
