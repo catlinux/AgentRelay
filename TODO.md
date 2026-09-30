@@ -9,6 +9,8 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Errores de credenciales del ejecutor (p. ej. "Authentication Fails"): detenerse sin reintentos, marcar la ejecución como fallida (no escalada) y mostrar un mensaje claro con el comando para configurar el proveedor (`npx cline auth …`) (0.0.3).
 - [ ] `agentrelay doctor`: comprobar que el ejecutor tiene un proveedor y una credencial configurados (0.0.3).
 - [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado. Windows: clon limpio probado (0.0.2). Linux (Debian): en prueba.
+- [ ] Versión mínima de Node: las dependencias de Cline piden Node >= 22 (avisos `EBADENGINE` con Node 20.20.2 en Debian). Comprobar si Cline funciona con Node 20 y, según el resultado, subir `engines` y la documentación a Node 22.
+- [ ] Revisar las vulnerabilidades que `npm install` reporta (21 en 0.0.2: 6 bajas, 14 moderadas, 1 alta), procedentes de las dependencias de Cline; evaluar si afectan a AgentRelay y actualizar Cline cuando corresponda.
 - [ ] README: explicar desde el principio que la tarea JSON la escribe el orquestador y que la conversación se hace con él (el JSON manual queda como prueba técnica).
 
 ### Integración con VS Code (opción A: panel, sin chat propio)
