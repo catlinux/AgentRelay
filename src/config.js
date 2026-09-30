@@ -12,6 +12,10 @@ import { COMPLEXITIES, POLICY_REVIEWS, SELF_REVIEW_MODES } from './policy.js';
 export const CONFIG_FILE = 'agentrelay.config.json';
 export const LOCAL_CONFIG_FILE = 'agentrelay.config.local.json';
 
+export function agentrelayHome() {
+  return process.env.AGENTRELAY_HOME || path.join(os.homedir(), '.agentrelay');
+}
+
 export const DEFAULT_CONFIG = Object.freeze({
   level: 3,
   executor: {
@@ -148,8 +152,7 @@ function leaves(value, prefix = '', result = {}) {
 
 export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } = {}) {
   const root = path.resolve(cwd);
-  const agentrelayHome = home || process.env.AGENTRELAY_HOME || path.join(os.homedir(), '.agentrelay');
-  const userFile = path.join(agentrelayHome, 'config.json');
+  const userFile = path.join(home || agentrelayHome(), 'config.json');
   const projectFiles = configPath ? [path.resolve(root, configPath)] : [path.join(root, CONFIG_FILE), path.join(root, LOCAL_CONFIG_FILE)];
   const layers = [{ data: {}, origin: 'defecto' }];
   const sources = [];

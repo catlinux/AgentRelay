@@ -1,10 +1,9 @@
 // Interfaz de línea de comandos.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from './config.js';
+import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
@@ -20,6 +19,9 @@ import { latestRunId, listRunIds, loadState, runDir } from './store.js';
 import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
+import { advise, appendRecord, comparison, displayLabel, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
+
+const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -39,6 +41,9 @@ Uso:
 
   agentrelay executors              Lista los ejecutores disponibles e instalados
   agentrelay executors add <nombre> Instala un ejecutor opcional
+  agentrelay triage record      Guarda el resultado de una elección
+  agentrelay triage advise      Recomienda modelo y esfuerzo
+  agentrelay triage stats       Resume el historial de triaje
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -62,6 +67,7 @@ Opciones de setup:
   --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
 
   --executors <lista>     Instala ejecutores opcionales separados por comas
+  --type --size --kind --model --effort --level --outcome --run --note --signals  Opciones de triage
 
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)
@@ -95,6 +101,8 @@ const OPTIONS = {
   local: { type: 'boolean' },
   device: { type: 'boolean' },
   executors: { type: 'string' },
+  type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' },
+  effort: { type: 'string' }, outcome: { type: 'string' }, run: { type: 'string' }, note: { type: 'string' }, signals: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -276,9 +284,7 @@ async function cmdDoctor(values) {
   return ok ? 0 : 1;
 }
 
-function configHome() {
-  return process.env.AGENTRELAY_HOME || path.join(os.homedir(), '.agentrelay');
-}
+function configHome() { return agentrelayHome(); }
 
 function configLeaves(value, prefix = '', result = {}) {
   if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length) {
@@ -368,6 +374,122 @@ async function cmdExecutors(positionals, values) {
     return 0;
   }
   return installOptionalExecutor(name, dir);
+}
+
+function requiredTriage(values, field) {
+  if (values[field] === undefined) throw new Error(`Indica --${field}.`);
+  return validateLabel(field, values[field]);
+}
+
+async function cmdTriage(positionals, values) {
+  const action = positionals[0];
+  const file = triageFile();
+  const records = readRecords(file);
+  const kind = values.kind === undefined ? 'orchestrator' : validateLabel('kind', values.kind);
+  if (action === 'record') {
+    const record = { kind, type: null, size: null, effort: null, outcome: null, signals: [] };
+    let runState;
+    if (values.run && kind === 'executor') {
+      const root = await resolveRoot(values);
+      runState = loadState(root, values.run);
+      const task = runState.task || {};
+      record.type = ({ feature: 'implementation', refactor: 'implementation', fix: 'debugging', docs: 'docs', test: 'implementation' })[task.type] || 'implementation';
+      record.size = ({ trivial: 'small', normal: 'normal', complex: 'large' })[task.complexity] || 'normal';
+      record.effort = normalizeLabel('effort', runState.config?.executor?.thinking || 'medium');
+      if (!['low', 'medium', 'high', 'xhigh'].includes(record.effort)) record.effort = 'medium';
+      record.level = Number(runState.policy?.level) || 3;
+      const attempts = runState.attempts || [];
+      record.signals.push(`intentos:${attempts.length}`, `reintentos:${runState.retriesUsed || 0}`);
+      const escalated = runState.status === 'escalated';
+      if (escalated) record.signals.push('escalado');
+      if (attempts.some((a) => a.kind === 'fix' || a.check?.passed === false || a.validationPassed === false)
+        || runState.lastCheck?.validations?.some((v) => !v.passed)) record.signals.push('validación-fallida');
+      record.outcome = runState.status === 'accepted' && attempts.length === 1 && !runState.retriesUsed && !escalated ? 'ok' : 'under';
+    }
+    if (values.type !== undefined) record.type = validateLabel('type', values.type);
+    if (values.size !== undefined) record.size = validateLabel('size', values.size);
+    if (values.effort !== undefined) record.effort = validateLabel('effort', values.effort);
+    if (values.outcome !== undefined) record.outcome = validateLabel('outcome', values.outcome);
+    if (values.signals !== undefined) record.signals = values.signals.split(',').map((x) => x.trim().slice(0, 60)).filter(Boolean);
+    record.type ||= requiredTriage(values, 'type');
+    record.size ||= requiredTriage(values, 'size');
+    record.outcome ||= requiredTriage(values, 'outcome');
+    if (kind === 'orchestrator') {
+      record.model = requiredTriage(values, 'model');
+      record.effort = record.effort || requiredTriage(values, 'effort');
+    } else {
+      if (values.level !== undefined) {
+        if (!/^[1-5]$/.test(values.level)) throw new Error('--level debe ser un entero entre 1 y 5.');
+        record.level = Number(values.level);
+      }
+      record.level ||= requiredTriage(values, 'level');
+      record.effort ||= requiredTriage(values, 'effort');
+    }
+    if (values.run) record.run = values.run;
+    if (values.note !== undefined) record.note = String(values.note).slice(0, 200);
+    const saved = appendRecord(record, file);
+    const choice = kind === 'orchestrator' ? `${saved.model} · esfuerzo ${displayLabel('effort', saved.effort)}` : `nivel ${saved.level}/esfuerzo ${displayLabel('effort', saved.effort)}`;
+    process.stdout.write(`Anotado: ${kind === 'orchestrator' ? 'orquestador' : 'ejecutor'} · ${displayLabel('type', saved.type)} · ${displayLabel('size', saved.size)} · ${choice} · ${displayLabel('outcome', saved.outcome)}\n`);
+    return 0;
+  }
+  if (action === 'advise') {
+    const type = requiredTriage(values, 'type'), size = requiredTriage(values, 'size');
+    const result = advise(records, { kind, type, size });
+    const compare = kind === 'orchestrator' && values.model !== undefined && values.effort !== undefined
+      ? comparison(result, validateLabel('model', values.model), validateLabel('effort', values.effort)) : null;
+    const output = { ...result, comparison: compare };
+    if (values.json) process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+    else {
+      const effortEs = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo' };
+      if (kind === 'orchestrator') process.stdout.write(`Recomendación (orquestador): ${result.step.model} · esfuerzo ${effortEs[result.step.effort]}\n`);
+      else process.stdout.write(`Recomendación (ejecutor): esfuerzo ${effortEs[result.step.effort]} · nivel ${result.step.level}\n`);
+      process.stdout.write(`Motivo: ${result.reason}\nMuestras: ${result.samples} · confianza ${result.confidence}\n`);
+      if (compare) {
+        const current = `${values.model} · ${effortEs[normalizeLabel('effort', values.effort)]}`;
+        const recommended = `${result.step.model} · ${effortEs[result.step.effort]}`;
+        process.stdout.write(compare === 'keep' ? `Modelo actual: ${current} · el modelo actual es adecuado\n` : `Modelo actual: ${current} → conviene ${compare === 'down' ? 'bajar' : 'subir'} a ${recommended}\n`);
+      }
+    }
+    return 0;
+  }
+  if (action === 'stats') {
+    const selected = values.kind === undefined ? records : records.filter((r) => r.kind === kind);
+    if (values.json) {
+      const groups = new Map();
+      for (const r of selected) { const key = `${r.kind}|${r.type}|${r.size}`; groups.set(key, [...(groups.get(key) || []), r]); }
+      const rows = [...groups].map(([key, group]) => {
+        const [groupKind, type, size] = key.split('|');
+        const counts = Object.fromEntries(['over', 'ok', 'under'].map((o) => [o, group.filter((r) => r.outcome === o).length]));
+        const steps = new Map();
+        for (const r of group) { const step = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(step, (steps.get(step) || 0) + 1); }
+        const mostUsedStep = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+        const rec = advise(records, { kind: groupKind, type, size }).step;
+        return { kind: groupKind, type, size, records: group.length, counts, mostUsedStep, recommendation: groupKind === 'orchestrator' ? `${rec.model}-${rec.effort}` : `${rec.effort}/n${rec.level}` };
+      });
+      process.stdout.write(`${JSON.stringify({ file, total: selected.length, groups: rows }, null, 2)}\n`);
+    }
+    else if (!selected.length) process.stdout.write(`Sin datos todavía\nArchivo: ${file}\nTotal: 0\n`);
+    else {
+      process.stdout.write(`Clase        Tipo             Tamaño     Registros  Sobró/Bien/Corto  Paso más usado  Recomendación\n`);
+      const groups = new Map();
+      for (const r of selected) { const key = `${r.kind}|${r.type}|${r.size}`; groups.set(key, [...(groups.get(key) || []), r]); }
+      for (const [key, group] of groups) {
+        const [groupKind, type, size] = key.split('|');
+        const counts = TRIAGE_OUTCOMES.map((o) => group.filter((r) => r.outcome === o).length);
+        const steps = new Map(); for (const r of group) { const s = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(s, (steps.get(s) || 0) + 1); }
+        const popular = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+        const rec = advise(records, { kind: groupKind, type, size }).step;
+        const recommendation = groupKind === 'orchestrator' ? `${rec.model}-${displayLabel('effort', rec.effort)}` : `${displayLabel('effort', rec.effort)}/n${rec.level}`;
+        const popularDisplay = groupKind === 'orchestrator'
+          ? popular.replace(/-(low|medium|high|xhigh)$/, (_, e) => `-${displayLabel('effort', e)}`)
+          : popular.replace(/^(low|medium|high|xhigh)/, (e) => displayLabel('effort', e));
+        process.stdout.write(`${(groupKind === 'orchestrator' ? 'orquestador' : 'ejecutor').padEnd(12)} ${displayLabel('type', type).padEnd(15)} ${displayLabel('size', size).padEnd(10)} ${String(group.length).padEnd(10)} ${counts.join('/').padEnd(17)} ${popularDisplay.padEnd(15)} ${recommendation}\n`);
+      }
+      process.stdout.write(`Archivo: ${file}\nTotal: ${selected.length}\n`);
+    }
+    return 0;
+  }
+  throw new Error('Uso: agentrelay triage record|advise|stats');
 }
 
 async function installOptionalExecutor(name, dir = executorsDir()) {
@@ -579,6 +701,7 @@ export async function main(argv) {
       case 'doctor': return await cmdDoctor(values);
       case 'config': return await cmdConfig(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
+      case 'triage': return await cmdTriage(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
