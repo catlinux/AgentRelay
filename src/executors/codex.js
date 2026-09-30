@@ -130,7 +130,7 @@ export function buildArgs(executor, instruction, schemaFile) {
   // Sin comillas: proc.js rechaza comillas dobles en los argumentos de cmd.exe
   // (Windows) por seguridad. Codex parsea el valor como TOML y, si falla, usa la
   // cadena tal cual, así que `model_reasoning_effort=high` equivale a "high".
-  if (executor.thinking) args.push('-c', `model_reasoning_effort=${executor.thinking}`);
+  if (executor.thinking && executor.thinking !== 'none') args.push('-c', `model_reasoning_effort=${executor.thinking}`);
   args.push(...(executor.extraArgs || []), instruction);
   return args;
 }

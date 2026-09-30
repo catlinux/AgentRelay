@@ -57,7 +57,7 @@ Configuración y comandos:
 
 - [x] Centralizar toda la configuración en un solo archivo, fácil de modificar, entendible y explicado: plantilla con todas las opciones y comentarios en español (formato que admita comentarios, p. ej. JSONC o TOML; hoy es JSON sin comentarios), valores por defecto visibles, una sola ubicación para el usuario (y otra, opcional, por proyecto) y validación con mensajes claros. Incluir ejecutor, modelo, esfuerzo, nivel de orquestación, reintentos, timeouts, validaciones y política de revisión. `agentrelay config` para crearlo, mostrarlo y abrirlo.
 - [ ] Sistema de comandos con `/`, al estilo de Claude Code (`/model`, `/config`, `/level`, `/status`…), para configurar y cambiar de modelo o de ejecutor sin editar archivos. Decidir dónde vive: en terminal (`agentrelay` interactivo o `agentrelay /model …`) y, más adelante, en el panel de VS Code.
-- [ ] Investigar si, además del modelo, se puede cambiar el esfuerzo de razonamiento: Codex (`model_reasoning_effort`, ya soportado con `executor.thinking`; comprobar los valores válidos por modelo) y DeepSeek/Cline (`--thinking`). Exponerlo en la configuración central y en los comandos `/`.
+- [x] (Comprobado el 2026-10-01: Codex con GPT-6 Luna admite los esfuerzos `low`, `medium` (por defecto), `high`, `xhigh` y `max`, y no admite `none`; `executor.thinking` ya los acepta y AgentRelay no envía `none` a Codex. Falta exponerlo en los comandos `/`.) Investigar si, además del modelo, se puede cambiar el esfuerzo de razonamiento: Codex (`model_reasoning_effort`, ya soportado con `executor.thinking`; comprobar los valores válidos por modelo) y DeepSeek/Cline (`--thinking`). Exponerlo en la configuración central y en los comandos `/`.
 
 Salida de `agentrelay watch`:
 

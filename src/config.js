@@ -24,7 +24,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     command: 'codex',
     provider: null,
     model: 'gpt-6-luna',
-    // none | low | medium | high | xhigh; null deja el valor por defecto del proveedor.
+    // low | medium | high | xhigh | max (Codex con GPT-6 Luna; Cline también admite none); null deja el valor por defecto del ejecutor.
     thinking: null,
     timeoutSeconds: 1200,
     extraArgs: [],
@@ -198,7 +198,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (!Number.isInteger(config.level) || config.level < 1 || config.level > 5) invalid('level', 'debe ser un entero entre 1-5');
   for (const key of ['executor', 'validation', 'policy', 'report']) if (!isObject(config[key])) invalid(key, 'debe ser un objeto');
   if (!Object.hasOwn(EXECUTOR_DEFAULTS, config.executor.type)) throw new Error(`Ejecutor no soportado: ${config.executor.type} (disponibles: ${Object.keys(EXECUTOR_DEFAULTS).join(', ')})`);
-  if (!(config.executor.thinking === null || ['none', 'low', 'medium', 'high', 'xhigh'].includes(config.executor.thinking))) invalid('executor.thinking', 'debe ser null, none, low, medium, high o xhigh');
+  if (!(config.executor.thinking === null || ['none', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.executor.thinking))) invalid('executor.thinking', 'debe ser null, none, low, medium, high, xhigh o max');
   for (const key of ['executor.timeoutSeconds', 'validation.timeoutSeconds']) { const n = config[key.split('.')[0]][key.split('.')[1]]; if (typeof n !== 'number' || !(n > 0)) invalid(key, 'debe ser un número positivo'); }
   if (!Array.isArray(config.executor.extraArgs) || !config.executor.extraArgs.every((v) => typeof v === 'string')) invalid('executor.extraArgs', 'debe ser una lista de textos');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
