@@ -1,0 +1,30 @@
+# Integración continua en macOS (no tenemos ningún Mac: esta es nuestra prueba
+# principal): Apple Silicon e Intel, 4 versiones de Node.js.
+name: CI macOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest        # macOS arm64 (Apple Silicon)
+          - macos-15-intel      # macOS x64 (Intel)
+        node: ['20', '22', '24', 'node']   # 'node' = la última versión publicada
+    uses: ./.github/workflows/_test.yml
+    with:
+      os: ${{ matrix.os }}
+      node: ${{ matrix.node }}

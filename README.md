@@ -266,7 +266,26 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 
 ## Configuración
 
-`agentrelay.config.json` en la raíz del repositorio (opcional) y `agentrelay.config.local.json` para ajustes locales que no deben versionarse. Las opciones de línea de comandos tienen prioridad.
+Toda la configuración se puede hacer en archivos de texto con **comentarios** (`//` y `/* */`) y comas finales (JSON con comentarios). Hay tres sitios, de menor a mayor prioridad:
+
+| Archivo | Para qué |
+|---|---|
+| `~/.agentrelay/config.json` (o `AGENTRELAY_HOME/config.json`) | **Tus ajustes personales**, válidos en todos los proyectos: ejecutor, modelo, esfuerzo de razonamiento (`thinking`), nivel, tiempos. |
+| `agentrelay.config.json` en la raíz del repositorio (opcional) | Lo propio del proyecto: comandos de validación, política, nivel. Se puede versionar. |
+| `agentrelay.config.local.json` (opcional) | Ajustes locales del proyecto que no deben versionarse. |
+
+Las opciones de línea de comandos tienen prioridad sobre todos.
+
+```sh
+agentrelay config init            # crea tu archivo personal, explicado opción por opción
+agentrelay config init --project  # crea el del proyecto
+agentrelay config                 # muestra la configuración efectiva y de dónde viene cada valor
+agentrelay config path            # muestra dónde están los archivos y cuáles existen
+```
+
+El archivo creado por `config init` contiene **todas las opciones comentadas** con su explicación, valores válidos y valor por defecto: descomenta solo lo que quieras cambiar, y lo que dejes comentado seguirá el valor por defecto aunque este cambie en futuras versiones. AgentRelay valida los valores con mensajes claros y avisa de las erratas («¿quisiste decir `model`?»).
+
+Valores por defecto:
 
 ```json
 {
@@ -370,6 +389,8 @@ npm test
 ```
 
 Los tests usan un simulador del ejecutor y no llaman a ningún modelo.
+
+La **integración continua** (GitHub Actions, carpeta `.github/workflows/`) instala AgentRelay con `npm ci` y ejecuta los tests en Windows, Linux (x64 y arm64, y varias distribuciones) y macOS (Apple Silicon e Intel) con Node 20, 22, 24 y la última versión. No puede comprobar el inicio de sesión de ChatGPT ni una delegación real, que requieren una cuenta.
 
 ## Créditos y licencia
 

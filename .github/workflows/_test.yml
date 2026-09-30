@@ -1,0 +1,70 @@
+# Pasos comunes de la integración continua (los llaman ci-windows, ci-linux y
+# ci-macos). No se ejecuta por sí solo.
+#
+# No puede comprobar el inicio de sesión de ChatGPT ni una delegación real (no
+# hay cuenta en los servidores de GitHub): valida la instalación, el binario de
+# Codex de cada plataforma, los tests y el arranque de la CLI.
+
+name: Pruebas (reutilizable)
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: Runner de GitHub (por ejemplo ubuntu-latest)
+        required: true
+        type: string
+      node:
+        description: Versión de Node.js
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ inputs.os }} · Node ${{ inputs.node }}
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node }}
+          cache: npm
+
+      - name: Versiones
+        run: |
+          node --version
+          npm --version
+          git --version
+
+      # La misma orden que documentamos para instalar y actualizar.
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Comando agentrelay (npm link)
+        run: |
+          npm link
+          agentrelay --version
+          agentrelay --help > /dev/null
+
+      - name: Binario de Codex de esta plataforma
+        run: node node_modules/@openai/codex/bin/codex.js --version
+
+      - name: Ejecutores y configuración
+        run: |
+          agentrelay executors
+          agentrelay config path
+
+      # Sin sesión de ChatGPT, doctor debe fallar solo en la línea de la sesión.
+      - name: doctor (se espera fallo de sesión)
+        run: agentrelay doctor || echo "doctor terminó con código $? (esperado sin sesión de ChatGPT)"

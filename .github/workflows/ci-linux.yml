@@ -1,0 +1,73 @@
+# Integración continua en Linux: x64 y arm64 con 4 versiones de Node.js, y varias
+# distribuciones en contenedor.
+name: CI Linux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest        # Linux x64
+          - ubuntu-24.04-arm     # Linux arm64
+        node: ['20', '22', '24', 'node']   # 'node' = la última versión publicada
+    uses: ./.github/workflows/_test.yml
+    with:
+      os: ${{ matrix.os }}
+      node: ${{ matrix.node }}
+
+  # Distribuciones en contenedor (glibc). Node se instala con setup-node para
+  # tener la misma versión en todas.
+  distros:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - debian:12
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - fedora:latest
+          - archlinux:latest
+    steps:
+      - name: Instalar git y herramientas básicas
+        run: |
+          . /etc/os-release
+          case "$ID" in
+            debian|ubuntu) apt-get update && apt-get install -y git curl ca-certificates xz-utils ;;
+            fedora)        dnf install -y git curl xz ;;
+            arch)          pacman -Syu --noconfirm git curl xz ;;
+            *) echo "Distribución no contemplada: $ID"; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar y probar
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          npm ci
+          npm test
+          node node_modules/@openai/codex/bin/codex.js --version
+          node bin/agentrelay.js executors

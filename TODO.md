@@ -38,9 +38,16 @@ Instalación modular de ejecutores (acordado el 2026-10-01):
 - [x] Registro de ejecutores con la información de instalación de cada uno (paquete npm, cómo conectar la cuenta), para que los futuros ejecutores (Gemini, Qwen, etc.) se añadan sin aumentar el peso de la instalación base.
 - [ ] Instalador gráfico multiplataforma: sustituir el script manual por paquetes nativos que hagan la misma pregunta de ejecutores con interfaz gráfica. Windows: instalador `.exe` (Inno Setup o NSIS). Linux: paquetes `.deb` y `.rpm` (con `nfpm` o `fpm`) y/o AppImage, con un asistente gráfico sencillo (p. ej. Zenity o una pequeña aplicación multiplataforma tipo Tauri) para la selección de ejecutores y la conexión de la cuenta. macOS: `.pkg`. Calamares, que se propuso como referencia, es un instalador de sistemas operativos (particiones, distribuciones) y no de aplicaciones: no encaja; se toma solo como inspiración de la experiencia de asistente paso a paso. Todos los instaladores llaman a los mismos comandos (`agentrelay executors`, `login`, `setup`).
 
+Triaje del orquestador (prioridad alta):
+
+- [x] Fase A: bloque «Triaje antes de trabajar» en las instrucciones globales (`agentrelay setup`): ante peticiones de envergadura, valoración breve antes de empezar (tamaño y riesgo, reparto entre orquestador y ejecutor, nivel 1-5), recomendación de modelo (Haiku, Sonnet u Opus) y esfuerzo de razonamiento, avisando antes del trabajo pesado para que el usuario lo cambie con `/model`, y subagentes de modelo más barato para las partes mecánicas. Se aplica ahora a Claude; las estimaciones no inventan costes.
+- [ ] Fase B: `agentrelay triage`, con datos reales. Registrar por cada tarea el coste real (intentos, escaladas, tokens, duración) y calibrar con ese histórico qué nivel, ejecutor y revisión corresponde a cada tipo de tarea y tamaño de proyecto; sugerirlo automáticamente al delegar («la regla de oro»). Enlaza con el registro y el resumen de consumo (`agentrelay usage`).
+- [ ] Extender el triaje a los demás orquestadores y ejecutores cuando se admitan (Codex, Cline, etc.), con sus propios modelos y niveles de esfuerzo.
+- [ ] Medir si el triaje compensa su propio coste en tokens y ajustar el umbral de envergadura a partir de los datos.
+
 Configuración y comandos:
 
-- [ ] Centralizar toda la configuración en un solo archivo, fácil de modificar, entendible y explicado: plantilla con todas las opciones y comentarios en español (formato que admita comentarios, p. ej. JSONC o TOML; hoy es JSON sin comentarios), valores por defecto visibles, una sola ubicación para el usuario (y otra, opcional, por proyecto) y validación con mensajes claros. Incluir ejecutor, modelo, esfuerzo, nivel de orquestación, reintentos, timeouts, validaciones y política de revisión. `agentrelay config` para crearlo, mostrarlo y abrirlo.
+- [x] Centralizar toda la configuración en un solo archivo, fácil de modificar, entendible y explicado: plantilla con todas las opciones y comentarios en español (formato que admita comentarios, p. ej. JSONC o TOML; hoy es JSON sin comentarios), valores por defecto visibles, una sola ubicación para el usuario (y otra, opcional, por proyecto) y validación con mensajes claros. Incluir ejecutor, modelo, esfuerzo, nivel de orquestación, reintentos, timeouts, validaciones y política de revisión. `agentrelay config` para crearlo, mostrarlo y abrirlo.
 - [ ] Sistema de comandos con `/`, al estilo de Claude Code (`/model`, `/config`, `/level`, `/status`…), para configurar y cambiar de modelo o de ejecutor sin editar archivos. Decidir dónde vive: en terminal (`agentrelay` interactivo o `agentrelay /model …`) y, más adelante, en el panel de VS Code.
 - [ ] Investigar si, además del modelo, se puede cambiar el esfuerzo de razonamiento: Codex (`model_reasoning_effort`, ya soportado con `executor.thinking`; comprobar los valores válidos por modelo) y DeepSeek/Cline (`--thinking`). Exponerlo en la configuración central y en los comandos `/`.
 
@@ -96,7 +103,9 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 
 - [x] Probar el flujo completo en Linux: Debian (Node 20.20.2) con Claude Code en VS Code y DeepSeek, proyecto de prueba (calculadora) completado.
 - [ ] Probar el flujo completo en macOS.
-- [ ] Integración continua con tests en Windows, Linux y macOS.
+- [x] Integración continua con tests en Windows, Linux y macOS (tres flujos en `.github/workflows/`; pendiente ver la primera ejecución real tras el push y corregir lo que falle, especialmente en macOS).
+- [ ] Insignias (badges) en la cabecera de README.md y README.en.md, como en AzerothCore: estado de CI de Windows, Linux y macOS (una insignia por flujo), licencia (WNCL-CU-1.0, enlazada a LICENSE), Node >= 20, versión (desde package.json), último commit y ejecutor por defecto (Codex). Añadirlas cuando los tres flujos hayan corrido en verde al menos una vez, para no mostrar «failing» ni «no status».
+- [ ] Arreglar la prueba de timeout de procesos (`proc:`) y revisar el resto de pruebas para que pasen también dentro del sandbox de Codex y en todos los sistemas del CI.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
 - [ ] Recuperación de ejecuciones interrumpidas (estado `running` huérfano).
 - [ ] Mejorar el aviso cuando el ejecutor no devuelve el informe estructurado.

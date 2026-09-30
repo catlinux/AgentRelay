@@ -17,6 +17,17 @@ export const GLOBAL_BLOCK = [
   '',
   '- En un proyecto que todavía no tenga el bloque de AgentRelay en su `CLAUDE.md`, ejecuta `agentrelay init` antes de delegar (si el directorio no es un repositorio git, pide antes confirmación al usuario y usa `agentrelay init --yes`).',
   '- Las instrucciones detalladas de uso están en el bloque de AgentRelay del `CLAUDE.md` del proyecto; ejecuta `agentrelay --help` si necesitas recordar los comandos.',
+  '',
+  '### Triaje antes de trabajar',
+  '',
+  'Ante una petición de envergadura (varios pasos o archivos, una decisión de diseño o un riesgo real) haz, antes de empezar, un triaje de 3-5 líneas para el usuario. No lo hagas en conversaciones ni en cambios pequeños: gastaría tokens sin aportar.',
+  '',
+  '1. **Tamaño y riesgo:** trivial, normal o compleja, y qué la hace difícil (arquitectura, seguridad, datos irrecuperables, mucho contexto).',
+  '2. **Reparto:** qué delegas con AgentRelay y qué haces tú, y el nivel de orquestación (1-5) si conviene uno distinto del configurado.',
+  '3. **Tu modelo y esfuerzo:** recomienda Haiku, Sonnet u Opus y el esfuerzo de razonamiento más bajos que no pongan en riesgo el resultado. Sube solo para diseño difícil, depuración sin pistas o revisión crítica; baja para cambios mecánicos, consultas o documentación. Si difiere del modelo actual, dilo ANTES del trabajo pesado para que el usuario lo cambie con `/model` (tú no puedes cambiar tu propio modelo).',
+  '4. Las partes mecánicas (buscar en el código, leer muchos archivos, resumir) hazlas con subagentes de un modelo más barato, como Haiku, en lugar de con el tuyo.',
+  '',
+  'Son estimaciones razonadas: no inventes costes ni cifras. Si el usuario ya fijó modelo o esfuerzo, respétalo y no repitas el triaje.',
   '<!-- agentrelay:end -->',
 ].join('\n');
 

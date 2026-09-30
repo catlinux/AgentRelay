@@ -266,7 +266,26 @@ Self-review does not replace the orchestrator's review: the executor checks whet
 
 ## Configuration
 
-`agentrelay.config.json` at the repository root (optional) and `agentrelay.config.local.json` for local settings that should not be versioned. Command-line options take precedence.
+All configuration can be done in text files with **comments** (`//` and `/* */`) and trailing commas (JSON with comments). There are three places, from lowest to highest priority:
+
+| File | Purpose |
+|---|---|
+| `~/.agentrelay/config.json` (or `AGENTRELAY_HOME/config.json`) | **Your personal settings**, valid in every project: executor, model, reasoning effort (`thinking`), level, timeouts. |
+| `agentrelay.config.json` at the repository root (optional) | Project-specific things: validation commands, policy, level. It can be versioned. |
+| `agentrelay.config.local.json` (optional) | Local project settings that should not be versioned. |
+
+Command-line options take precedence over all of them.
+
+```sh
+agentrelay config init            # creates your personal file, explained option by option
+agentrelay config init --project  # creates the project one
+agentrelay config                 # shows the effective configuration and where each value comes from
+agentrelay config path            # shows where the files are and which exist
+```
+
+The file created by `config init` contains **every option commented out** with its explanation, valid values and default: uncomment only what you want to change, and whatever you leave commented keeps following the default even if it changes in future versions. AgentRelay validates the values with clear messages and warns about typos ("did you mean `model`?").
+
+Default values:
 
 ```json
 {
@@ -371,6 +390,8 @@ npm test
 ```
 
 Tests use an executor simulator and do not call any model.
+
+**Continuous integration** (GitHub Actions, `.github/workflows/` folder) installs AgentRelay with `npm ci` and runs the tests on Windows, Linux (x64 and arm64, and several distributions) and macOS (Apple Silicon and Intel) with Node 20, 22, 24 and the latest version. It cannot check the ChatGPT sign-in or a real delegation, which require an account.
 
 ## Credits and license
 
