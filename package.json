@@ -11,6 +11,8 @@
     "src/",
     "README.md",
     "README.en.md",
+    "INSTALL.md",
+    "INSTALL.en.md",
     "CHANGELOG.md",
     "LICENSE"
   ],

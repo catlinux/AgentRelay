@@ -35,6 +35,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
   - [x] `agentrelay init`: prepara el proyecto. Crea `CLAUDE.md` con el bloque de AgentRelay o, si existe, lo añade sin tocar el resto; al repetirlo solo actualiza lo que hay entre las marcas. Obligatorio por ahora. (La creación de `agentrelay.config.json` pasa a `init --with-config`.)
   - [x] `init` en una carpeta sin git: `git init`, `.gitignore` con patrones de secretos si no existe y primer commit, pidiendo confirmación y mostrando qué archivos entrarán; avisar si la carpeta parece servida públicamente (`/var/www`, `public_html`…) porque `.agentrelay/` no debe quedar expuesto. Sin confirmación interactiva (p. ej. lo ejecuta el orquestador) requiere `--yes`.
   - [x] `run`, `watch`, `show`, `review`, `check` y `list` en una carpeta sin git: mensaje que indique ejecutar `agentrelay init`.
+- [x] Guías de instalación paso a paso (`INSTALL.md` / `INSTALL.en.md`) para Windows, Linux y macOS. Pendiente: verificar la de macOS y la de Linux con una instalación limpia.
 - [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja (evita mezclar sus cambios con el diff de la tarea).
 ### Otros
 

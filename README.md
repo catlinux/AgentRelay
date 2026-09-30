@@ -1,6 +1,6 @@
 # AgentRelay
 
-**Español** · [English](README.en.md)
+**Español** · [English](README.en.md) · [Guía de instalación](INSTALL.md)
 
 Orquestador multiplataforma de agentes de IA para desarrollo de software. Permite que un modelo de alta capacidad (el **orquestador**) delegue tareas concretas a un agente más económico (el **ejecutor**), valide el resultado de forma objetiva y lo revise antes de aceptarlo.
 
@@ -50,6 +50,8 @@ El diseño permite añadir otros ejecutores y proveedores más adelante.
 Windows, Linux y macOS.
 
 ## Instalación
+
+> **Guía paso a paso para Windows, Linux y macOS: [INSTALL.md](INSTALL.md).** Lo que sigue es un resumen.
 
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git

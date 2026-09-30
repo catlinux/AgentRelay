@@ -1,6 +1,6 @@
 # AgentRelay
 
-[Español](README.md) · **English**
+[Español](README.md) · **English** · [Installation guide](INSTALL.en.md)
 
 Cross-platform AI agent orchestrator for software development. It lets a high-capability model (the **orchestrator**) delegate concrete tasks to a cheaper agent (the **executor**), validate the result objectively and review it before accepting it.
 
@@ -50,6 +50,8 @@ The design allows adding other executors and providers later.
 Windows, Linux and macOS.
 
 ## Installation
+
+> **Step-by-step guide for Windows, Linux and macOS: [INSTALL.en.md](INSTALL.en.md).** What follows is a summary.
 
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
