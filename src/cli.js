@@ -8,7 +8,7 @@ import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
-import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
+import { applyBlockToFile, blockStatus, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository } from './prepare.js';
@@ -280,6 +280,18 @@ async function cmdDoctor(values) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
       line(false, `Ejecutor ${executor.type} no disponible (${error.message})${error.message.includes(hint) ? '' : `. ${hint}`}`);
     }
+  }
+
+  // Instrucciones del orquestador: tras actualizar AgentRelay pueden haber cambiado.
+  const globalStatus = blockStatus(globalInstructionsPath(values['claude-dir']), GLOBAL_BLOCK);
+  if (globalStatus === 'current') line(true, 'Instrucciones globales del orquestador: al día');
+  else if (globalStatus === 'outdated') warn('Las instrucciones globales del orquestador están desactualizadas. Ejecuta "agentrelay setup".');
+  else warn('Las instrucciones globales del orquestador no están instaladas. Ejecuta "agentrelay setup".');
+  if (root) {
+    const projectStatus = blockStatus(path.join(root, 'CLAUDE.md'), PROJECT_BLOCK);
+    if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
+    else if (projectStatus === 'outdated') warn('Las instrucciones de AgentRelay de este proyecto están desactualizadas. Ejecuta "agentrelay init".');
+    else warn('Este proyecto no tiene las instrucciones de AgentRelay. Ejecuta "agentrelay init".');
   }
   return ok ? 0 : 1;
 }

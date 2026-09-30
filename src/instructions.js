@@ -49,6 +49,18 @@ export const PROJECT_BLOCK = [
   '<!-- agentrelay:end -->',
 ].join('\n');
 
+/**
+ * Estado del bloque de AgentRelay en un archivo, sin modificarlo:
+ * 'nofile' (no existe el archivo), 'missing' (sin bloque), 'outdated' (el bloque
+ * difiere del actual, p. ej. tras actualizar AgentRelay) o 'current'.
+ */
+export function blockStatus(file, block) {
+  if (!existsSync(file)) return 'nofile';
+  const { action } = upsertBlock(readFileSync(file, 'utf8'), block);
+  if (action === 'unchanged') return 'current';
+  return action === 'updated' ? 'outdated' : 'missing';
+}
+
 // Separador de líneas detectado en el texto (CRLF si aparece, si no LF).
 function newlineOf(text) {
   return text.includes('\r\n') ? '\r\n' : '\n';

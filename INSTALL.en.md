@@ -207,7 +207,16 @@ git pull
 npm ci
 ```
 
-If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
+Then check that everything is in order:
+
+```sh
+agentrelay doctor
+```
+
+- If you see `[aviso] Las instrucciones globales del orquestador están desactualizadas` (the orchestrator's global instructions are out of date), run `agentrelay setup`: a new version has changed those instructions (for example, the triage). Do it once per machine.
+- If you see `[aviso] Las instrucciones de AgentRelay de este proyecto están desactualizadas` (the project's instructions are out of date), run `agentrelay init` inside that project. Do it once per project.
+- If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code.
+- There is no need to repeat `agentrelay login` or recreate your configuration. The CHANGELOG lists the changes of each version.
 
 **Uninstall:**
 
