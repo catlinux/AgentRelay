@@ -1,0 +1,17 @@
+{
+  "title": "Añadir slugify a las utilidades de texto",
+  "objective": "Añade y exporta una función slugify(text) en src/text.js que convierta un texto en un slug para URLs.",
+  "context": "Proyecto Node.js con módulos ES. Los tests usan node:test y se ejecutan con npm test.",
+  "type": "feature",
+  "complexity": "normal",
+  "files": ["src/text.js", "test/text.test.js"],
+  "constraints": ["Sin dependencias externas"],
+  "acceptanceCriteria": [
+    "slugify('Hola Mundo') devuelve 'hola-mundo'",
+    "Elimina acentos: slugify('Canción Española') devuelve 'cancion-espanola'",
+    "slugify('') devuelve ''",
+    "Hay tests para slugify y pasan"
+  ],
+  "validation": ["npm test"],
+  "doNotModify": ["package.json"]
+}

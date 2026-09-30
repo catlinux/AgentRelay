@@ -1,0 +1,30 @@
+{
+  "name": "agentrelay",
+  "version": "0.0.1",
+  "description": "Orquestador multiplataforma de agentes de IA: delega tareas de desarrollo a un agente ejecutor, valida el resultado y lo devuelve al orquestador para su revisión.",
+  "type": "module",
+  "bin": {
+    "agentrelay": "bin/agentrelay.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "CatLinux",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/catlinux/AgentRelay.git"
+  },
+  "private": true
+}
