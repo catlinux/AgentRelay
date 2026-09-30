@@ -4,6 +4,8 @@
 // estructurado del ejecutor, el recorte de textos, la relativización de rutas y
 // el procesado de stdout línea a línea.
 
+import { realpathSync } from 'node:fs';
+
 const toArray = (value) => (Array.isArray(value) ? value : value ? [value] : []);
 
 /** Busca el último bloque JSON del texto final con el informe del ejecutor. */
@@ -44,12 +46,31 @@ export function clip(text, max = 160) {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
-/** Sustituye el directorio `cwd` (con "\\" o "/") por "." y normaliza a "/". */
+/** Ruta real de `dir` (sin enlaces simbólicos) o null si no se puede resolver. */
+function realPath(dir) {
+  try {
+    return realpathSync(dir);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sustituye el directorio `cwd` (con "\\" o "/") por "." y normaliza a "/".
+ * Tiene en cuenta también su ruta real: en macOS, por ejemplo, /var/... es un
+ * enlace a /private/var/... y el ejecutor puede informar de cualquiera de las
+ * dos. Se sustituyen primero las más largas para no dejar restos como "/private.".
+ */
 export function relativize(text, cwd) {
   if (!cwd || !text) return text;
-  const variants = [...new Set([cwd, cwd.replace(/\\/g, '/'), cwd.replace(/\//g, '\\')])];
+  const variants = new Set();
+  for (const base of [cwd, realPath(cwd)].filter(Boolean)) {
+    variants.add(base);
+    variants.add(base.replace(/\\/g, '/'));
+    variants.add(base.replace(/\//g, '\\'));
+  }
   let out = text;
-  for (const v of variants) out = out.split(v).join('.');
+  for (const v of [...variants].sort((a, b) => b.length - a.length)) out = out.split(v).join('.');
   return out.replace(/\\/g, '/');
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
@@ -13,6 +13,7 @@ import {
 import { appendEvent, describeCommand, formatEvent, readEvents, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
+import { relativize } from '../src/executors/common.js';
 import { FAKE_CODEX } from './helpers.js';
 import { loadTask, normalizeTask } from '../src/task.js';
 import { scopeViolations } from '../src/validate.js';
@@ -507,4 +508,23 @@ test('proc: onStdout recibe los fragmentos de stdout', async () => {
   assert.equal(res.stdout, 'hola mundo');
   assert.equal(chunks.join(''), 'hola mundo');
   assert.ok(chunks.length >= 1);
+});
+
+test('relativize: acorta la ruta aunque el ejecutor informe de la ruta real (enlace simbólico, como /var en macOS)', () => {
+  const base = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-rel-'));
+  try {
+    const real = path.join(base, 'real');
+    const link = path.join(base, 'enlace');
+    mkdirSync(real);
+    try {
+      symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return; // sin permisos para crear enlaces en este sistema
+    }
+    const reportedByExecutor = path.join(realpathSync(link), 'hello.txt');
+    assert.equal(relativize(reportedByExecutor, link), './hello.txt');
+    assert.equal(relativize(path.join(link, 'hello.txt'), link), './hello.txt');
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

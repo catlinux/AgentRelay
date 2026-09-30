@@ -140,6 +140,11 @@ test('init --yes sin identidad de git deja el repositorio creado y explica cómo
     delete env.GIT_AUTHOR_EMAIL;
     delete env.GIT_COMMITTER_NAME;
     delete env.GIT_COMMITTER_EMAIL;
+    // En macOS (y en algunos Linux) git deduce una identidad del usuario del sistema:
+    // useConfigOnly obliga a que venga de la configuración, como en una instalación nueva.
+    env.GIT_CONFIG_COUNT = '1';
+    env.GIT_CONFIG_KEY_0 = 'user.useConfigOnly';
+    env.GIT_CONFIG_VALUE_0 = 'true';
     const r = runCli(['init', '--yes'], dir, { env });
     assert.equal(r.status, 1);
     assert.ok(existsSync(path.join(dir, '.git')));
