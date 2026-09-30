@@ -1,5 +1,7 @@
 # AgentRelay
 
+[![Windows](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-windows.yml?branch=main&label=Windows)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-windows.yml) [![Linux](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-linux.yml?branch=main&label=Linux)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-linux.yml) [![macOS](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-macos.yml?branch=main&label=macOS)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-macos.yml) [![License](https://img.shields.io/badge/license-WNCL--CU--1.0-blue)](LICENSE) ![Node](https://img.shields.io/badge/node-%E2%89%A520-339933) ![Version](https://img.shields.io/github/package-json/v/catlinux/AgentRelay) [![Last commit](https://img.shields.io/github/last-commit/catlinux/AgentRelay)](https://github.com/catlinux/AgentRelay/commits/main) ![Ejecutor](https://img.shields.io/badge/default%20executor-Codex%20%2B%20GPT--6%20Luna-black)
+
 [Español](README.md) · **English** · [Installation guide](INSTALL.en.md)
 
 Cross-platform AI agent orchestrator for software development. It lets a high-capability model (the **orchestrator**) delegate concrete tasks to a cheaper agent (the **executor**), validate the result objectively and review it before accepting it.

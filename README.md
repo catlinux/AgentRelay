@@ -1,5 +1,7 @@
 # AgentRelay
 
+[![Windows](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-windows.yml?branch=main&label=Windows)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-windows.yml) [![Linux](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-linux.yml?branch=main&label=Linux)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-linux.yml) [![macOS](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-macos.yml?branch=main&label=macOS)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-macos.yml) [![Licencia](https://img.shields.io/badge/license-WNCL--CU--1.0-blue)](LICENSE) ![Node](https://img.shields.io/badge/node-%E2%89%A520-339933) ![Versión](https://img.shields.io/github/package-json/v/catlinux/AgentRelay) [![Último commit](https://img.shields.io/github/last-commit/catlinux/AgentRelay)](https://github.com/catlinux/AgentRelay/commits/main) ![Ejecutor](https://img.shields.io/badge/ejecutor%20por%20defecto-Codex%20%2B%20GPT--6%20Luna-black)
+
 **Español** · [English](README.en.md) · [Guía de instalación](INSTALL.md)
 
 Orquestador multiplataforma de agentes de IA para desarrollo de software. Permite que un modelo de alta capacidad (el **orquestador**) delegue tareas concretas a un agente más económico (el **ejecutor**), valide el resultado de forma objetiva y lo revise antes de aceptarlo.
