@@ -4,7 +4,7 @@
 
 Pick your system: [Windows](#windows) · [Linux](#linux) · [macOS](#macos).
 
-Before you start you need a **DeepSeek API key** (or one from another provider that Cline supports). It is used by the agent that does the work. Do not share it or paste it in screenshots.
+Before you start you need a **ChatGPT account** (the free one is enough). AgentRelay includes **Codex**, the agent that does the work, and uses the **GPT-6 Luna** model, which is included in the free plan. You do not need any API key.
 
 ---
 
@@ -31,11 +31,13 @@ npm install
 npm link
 ```
 
-**3. Configure your provider** (only if you do not already use Cline in VS Code with your key; if you do, it is already done):
+**3. Connect your ChatGPT account** (once; the browser opens to sign in):
 
 ```powershell
-npx cline auth --provider deepseek --apikey YOUR_KEY --modelid deepseek-v4-pro
+agentrelay login
 ```
+
+If you already use Codex in VS Code with your account, the session is shared and this step is already done.
 
 **4. Check that everything is fine:**
 
@@ -43,7 +45,7 @@ npx cline auth --provider deepseek --apikey YOUR_KEY --modelid deepseek-v4-pro
 agentrelay doctor
 ```
 
-Every line should show `[ok]`.
+Every line should show `[ok]`, including the `Sesión` one.
 
 **5. Set up your orchestrator** (once; it asks for confirmation):
 
@@ -87,13 +89,13 @@ If `npm link` fails with a permissions error, do not use `sudo`: create an alias
 alias agentrelay='node ~/AgentRelay/bin/agentrelay.js'
 ```
 
-**3. Configure your provider** (from the `~/AgentRelay` folder):
+**3. Connect your ChatGPT account** (once; the browser opens to sign in):
 
 ```sh
-npx cline auth --provider deepseek --apikey YOUR_KEY --modelid deepseek-v4-pro
+agentrelay login
 ```
 
-If `npx cline` says `cline: not found`, try `./node_modules/.bin/cline auth …` instead.
+If the machine has no browser (for example over SSH), use `agentrelay login --device`: it shows a code you enter from another device. If you already use Codex in VS Code with your account, the session is shared and this step is already done.
 
 **4. Check that everything is fine:**
 
@@ -139,11 +141,13 @@ If `npm link` fails with a permissions error, create an alias (add it to `~/.zsh
 alias agentrelay='node ~/AgentRelay/bin/agentrelay.js'
 ```
 
-**3. Configure your provider** (from the `~/AgentRelay` folder):
+**3. Connect your ChatGPT account** (once; the browser opens to sign in):
 
 ```sh
-npx cline auth --provider deepseek --apikey YOUR_KEY --modelid deepseek-v4-pro
+agentrelay login
 ```
+
+If the machine has no browser (for example over SSH), use `agentrelay login --device`: it shows a code you enter from another device. If you already use Codex in VS Code with your account, the session is shared and this step is already done.
 
 **4. Check that everything is fine:**
 
@@ -179,7 +183,8 @@ Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes
 | `agentrelay: command not found` | Repeat `npm link` in the AgentRelay folder, or open a new terminal. On Linux and macOS you can use the alias shown above. |
 | `agentrelay doctor` reports a failure for the executor | Run `npm install` again in the AgentRelay folder and repeat `doctor`. |
 | `EBADENGINE` warnings during `npm install` | They are warnings: some dependencies prefer Node 22. It works with Node 20. To avoid them, upgrade to Node 22. |
-| "Authentication Fails" when delegating | The provider key is not configured or is wrong: repeat step 3. |
+| "Authentication Fails" when delegating (Cline only) | The provider key is not configured or is wrong: repeat the Cline setup described in the README. |
+| `doctor` or `run` say there is no session | Run `agentrelay login` and sign in with your ChatGPT account. On a machine without a browser (for example over SSH), use `agentrelay login --device`. |
 | "no es un repositorio git" (not a git repository) | Run `agentrelay init` in the project folder. |
 
 ## Updating and uninstalling

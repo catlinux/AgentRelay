@@ -36,8 +36,8 @@ AgentRelay nunca hace commits, stash ni push: los cambios quedan en el árbol de
 
 | Papel | Integración | Estado |
 |---|---|---|
-| Ejecutor | [Cline CLI](https://www.npmjs.com/package/cline) con cualquier proveedor que Cline soporte (por defecto, DeepSeek `deepseek-v4-pro`) | disponible |
-| Ejecutor | [Codex CLI](https://github.com/openai/codex) de OpenAI con la sesión de tu cuenta de ChatGPT, sin clave de API (p. ej. `gpt-6-luna`) | disponible |
+| Ejecutor (por defecto) | [Codex CLI](https://github.com/openai/codex) de OpenAI con la sesión de tu cuenta de ChatGPT, sin clave de API; modelo `gpt-6-luna`, incluido en el plan gratuito | disponible |
+| Ejecutor | [Cline CLI](https://www.npmjs.com/package/cline) con cualquier proveedor que Cline soporte (p. ej. DeepSeek `deepseek-v4-pro`) | disponible |
 | Orquestador | Cualquier agente o persona capaz de ejecutar comandos; pensado para Claude Code | disponible (vía CLI) |
 
 El diseño permite añadir otros ejecutores y proveedores más adelante.
@@ -46,7 +46,7 @@ El diseño permite añadir otros ejecutores y proveedores más adelante.
 
 - Node.js 20 o superior (se recomienda 22 o superior: con Node 20, Cline avisa de que no puede leer el almacén de certificados del sistema; solo afecta a redes con certificados corporativos o autofirmados).
 - Git. El directorio de trabajo debe ser un repositorio git.
-- Un proveedor configurado en Cline (por ejemplo, una API key de DeepSeek).
+- Una cuenta de ChatGPT (vale la gratuita) para el ejecutor por defecto, Codex. Con Cline como ejecutor, en su lugar, un proveedor configurado (por ejemplo, una API key de DeepSeek).
 
 Windows, Linux y macOS.
 
@@ -57,13 +57,18 @@ Windows, Linux y macOS.
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
 cd AgentRelay
-npm install         # instala también Cline CLI, el ejecutor
+npm install         # instala también Codex CLI (el ejecutor por defecto) y Cline CLI
 npm link            # deja disponible el comando "agentrelay"
+agentrelay login    # conecta tu cuenta de ChatGPT (se abre el navegador)
 ```
 
 Sin `npm link` también puedes usar `node <ruta>/bin/agentrelay.js`.
 
-Cline CLI se instala como dependencia de AgentRelay y se usa esa copia. Comparte la configuración con la extensión de Cline para VS Code (`~/.cline/data`): si ya la tienes configurada, no hay que hacer nada más. Si no, configura el proveedor una vez:
+`agentrelay login` se hace una sola vez. Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y no hace falta. En un equipo sin navegador (por ejemplo, por SSH), usa `agentrelay login --device`: muestra un código que introduces desde otro dispositivo. `agentrelay doctor` comprueba que la sesión está activa, y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no la hay.
+
+La copia de Codex se instala como dependencia de AgentRelay y se usa antes que cualquier otra que tengas en el `PATH` o en la extensión de VS Code.
+
+**Usar Cline en lugar de Codex** (opcional): Cline CLI también se instala como dependencia y comparte su configuración con la extensión de Cline para VS Code (`~/.cline/data`). Si no la tienes configurada, configura el proveedor una vez y elige el ejecutor en la configuración (`{ "executor": { "type": "cline" } }`):
 
 ```sh
 npx cline auth --provider deepseek --apikey <tu-api-key> --modelid deepseek-v4-pro
@@ -75,7 +80,7 @@ Para actualizar más adelante: `git pull` y `npm install` en la carpeta de Agent
 
 ## Probar AgentRelay en 5 minutos
 
-El repositorio incluye un pequeño proyecto de demostración (`examples/demo`) y una tarea para él (`examples/demo-task.json`): añadir una función `slugify` con sus tests. El coste con DeepSeek es de menos de un céntimo.
+El repositorio incluye un pequeño proyecto de demostración (`examples/demo`) y una tarea para él (`examples/demo-task.json`): añadir una función `slugify` con sus tests. Con el ejecutor por defecto (Codex y GPT-6 Luna, plan gratuito de ChatGPT) no tiene coste por token.
 
 **1. Crea una copia de la demo como repositorio git** (fuera de la carpeta de AgentRelay).
 
@@ -113,7 +118,7 @@ agentrelay run "$AR\examples\demo-task.json"
 
 En Bash: `agentrelay run "$AR/examples/demo-task.json"`.
 
-Verás en directo cada paso del ejecutor:
+Verás en directo cada paso del ejecutor (ejemplo con Cline; con Codex las líneas son parecidas):
 
 ```
 [00:00] ▶ Intento 1 (implement) · deepseek/deepseek-v4-pro
@@ -263,10 +268,10 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 {
   "level": 3,
   "executor": {
-    "type": "cline",
-    "command": "cline",
-    "provider": "deepseek",
-    "model": "deepseek-v4-pro",
+    "type": "codex",
+    "command": "codex",
+    "provider": null,
+    "model": "gpt-6-luna",
     "thinking": null,
     "timeoutSeconds": 1200,
     "extraArgs": []
@@ -280,6 +285,7 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 }
 ```
 
+- `executor.type`: `codex` (por defecto) o `cline`. Al elegir uno, `command`, `provider` y `model` toman sus valores por defecto (con `cline`: `cline`, `deepseek`, `deepseek-v4-pro`), que puedes sobrescribir.
 - `executor.command`: programa a ejecutar; también admite un array, p. ej. `["node", "/ruta/a/cline"]`.
 - `executor.thinking`: `none`, `low`, `medium`, `high` o `xhigh`; `null` usa el valor del proveedor.
 - `validation.commands`: comandos que se ejecutan en todas las tareas, además de los de la tarea.
@@ -289,13 +295,13 @@ Las credenciales no se guardan en la configuración de AgentRelay: las gestiona 
 
 ### Usar Codex (cuenta de ChatGPT)
 
-Codex CLI puede trabajar con la sesión de tu cuenta de ChatGPT, sin API de pago por uso. AgentRelay lo busca en el `PATH` (`npm i -g @openai/codex`) y, si no está, usa el que incluye la extensión de OpenAI para VS Code. Inicia sesión una vez con `codex login` (o desde la extensión) y elige el ejecutor en `agentrelay.config.local.json`:
+Es el ejecutor por defecto y trabaja con la sesión de tu cuenta de ChatGPT, sin API de pago por uso. AgentRelay usa la copia instalada con él (`@openai/codex`) y, si no existe, busca una en el `PATH` y, por último, la que incluye la extensión de OpenAI para VS Code. Conecta tu cuenta una vez con `agentrelay login`. Para usar otro modelo de los que ofrezca tu cuenta, cámbialo en `agentrelay.config.local.json`:
 
 ```json
-{ "executor": { "type": "codex", "model": "gpt-6-luna" } }
+{ "executor": { "model": "gpt-5.5" } }
 ```
 
-Sin `model`, Codex usa el de su propia configuración (`~/.codex/config.toml`). Los modelos disponibles dependen de tu cuenta; `agentrelay doctor` muestra el ejecutor y el modelo elegidos. Codex trabaja en su sandbox `workspace-write`: puede escribir en el repositorio, pero no fuera de él. Para volver a Cline, quita `type` o pon `"cline"`.
+Los modelos disponibles dependen de tu cuenta; `agentrelay doctor` muestra el ejecutor, el modelo y la sesión. Codex trabaja en su sandbox `workspace-write`: puede escribir en el repositorio, pero no fuera de él. Para usar Cline, pon `"type": "cline"`.
 
 ## Preparar el orquestador y los proyectos
 
@@ -345,7 +351,7 @@ Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosa
 
 ## Limitaciones de la versión 0.0.2
 
-- Dos ejecutores: Cline CLI y Codex CLI (este último, probado solo en Windows). Las tareas se ejecutan de una en una.
+- Dos ejecutores: Codex CLI (por defecto) y Cline CLI. Codex se ha probado solo en Windows. Las tareas se ejecutan de una en una.
 - Todavía no hay panel en VS Code: se usa desde el terminal (está en la hoja de ruta).
 - El informe estructurado del ejecutor depende de que el modelo lo devuelva; si no lo hace, se muestra su texto final. Los datos objetivos (diff, validaciones) los calcula siempre AgentRelay.
 - La self-review en pasada separada empieza una sesión nueva del ejecutor.
@@ -375,3 +381,4 @@ Las copias y los forks deben conservar esta atribución y enlazar a https://gith
 | Componente | Autor | Licencia | Enlace |
 | --- | --- | --- | --- |
 | Cline CLI (dependencia npm, no incluida en el repositorio) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |
+| Codex CLI (dependencia npm, no incluida en el repositorio) | OpenAI | Apache-2.0 | https://github.com/openai/codex |
