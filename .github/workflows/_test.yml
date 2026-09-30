@@ -31,9 +31,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node }}
           cache: npm
@@ -49,7 +49,17 @@ jobs:
         run: npm ci
 
       - name: Tests
-        run: npm test
+        run: |
+          set +e
+          npm test 2>&1 | tee test-output.txt
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            # Publica los fallos como anotación (visible sin abrir el log completo).
+            details=$(sed -n '/failing tests:/,$p' test-output.txt | head -120 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Tests fallidos en ${{ inputs.os }} con Node ${{ inputs.node }}::${details}"
+            { echo '### Tests fallidos'; echo '```'; sed -n '/failing tests:/,$p' test-output.txt | head -200; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$code"
 
       - name: Comando agentrelay (npm link)
         run: |
