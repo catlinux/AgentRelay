@@ -19,6 +19,40 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Codex en Windows ejecuta los comandos con PowerShell; si la política de ejecución bloquea `npm.ps1`, recurre a `npm.cmd` y lo declara como incidencia. Valorar indicarlo en el prompt para evitar el intento fallido.
 - [ ] Probar DeepSeek V4 Flash como ejecutor (`deepseek-v4-flash` en `agentrelay.config.local.json`) y compararlo con Pro en tareas reales. Primera tarea (ejecutor Codex, 8 archivos): código correcto y 88 tests en verde, pero 464 s, 5,46 M tokens de entrada (casi todos de caché) y sin el bloque JSON del informe final; Cline muestra coste 0 porque no conoce su precio.
 
+### Mejoras acordadas el 2026-10-01
+
+Conexión y primera experiencia:
+
+- [ ] Si el usuario no tiene cuenta de ChatGPT, `agentrelay login`, `doctor` y `run` (cuando no hay sesión) le avisan de que puede crear una cuenta gratuita, con el enlace, y de que GPT-6 Luna está incluido en el plan gratuito. También en INSTALL y README.
+- [ ] Que la instalación conecte la cuenta de la forma más fácil posible: proponer `agentrelay login` al final de `npm install` o del instalador (sin bloquear instalaciones automáticas ni CI) y, si ya hay sesión de Codex (extensión de VS Code), reutilizarla sin preguntar.
+- [ ] Explicar mejor, al ejecutar `setup` e `init`, qué se va a hacer: sustituir el texto genérico «Se añadirá/actualizará el bloque de AgentRelay en C:\…» por una explicación de qué es ese bloque, para qué sirve, dónde queda y cómo retirarlo (`setup --uninstall`).
+- [ ] Revisar los avisos de `npm install` en Windows y Linux. Windows: `node-domexception@1.0.0` deprecado, 329 paquetes, 47 piden financiación y 21 vulnerabilidades (6 bajas, 14 moderadas, 1 alta) que vienen de las dependencias de Cline (enlaza con la revisión de vulnerabilidades y con decidir si Cline sigue instalándose por defecto). En Linux también hay avisos: recogerlos, clasificarlos (los que se pueden corregir, los que no dependen de nosotros) y documentar o eliminar los que sea posible, incluidos los `EBADENGINE` de Node 20.
+- [ ] Instalador para Windows (por ejemplo un `.exe`/`.msi` o un script guiado) que instale Node.js y Git si faltan, AgentRelay, el comando `agentrelay`, y conecte la cuenta; valorar winget, un `.cmd` de una sola línea o un empaquetado con `pkg`/instalador Inno Setup antes de decidir.
+
+Configuración y comandos:
+
+- [ ] Centralizar toda la configuración en un solo archivo, fácil de modificar, entendible y explicado: plantilla con todas las opciones y comentarios en español (formato que admita comentarios, p. ej. JSONC o TOML; hoy es JSON sin comentarios), valores por defecto visibles, una sola ubicación para el usuario (y otra, opcional, por proyecto) y validación con mensajes claros. Incluir ejecutor, modelo, esfuerzo, nivel de orquestación, reintentos, timeouts, validaciones y política de revisión. `agentrelay config` para crearlo, mostrarlo y abrirlo.
+- [ ] Sistema de comandos con `/`, al estilo de Claude Code (`/model`, `/config`, `/level`, `/status`…), para configurar y cambiar de modelo o de ejecutor sin editar archivos. Decidir dónde vive: en terminal (`agentrelay` interactivo o `agentrelay /model …`) y, más adelante, en el panel de VS Code.
+- [ ] Investigar si, además del modelo, se puede cambiar el esfuerzo de razonamiento: Codex (`model_reasoning_effort`, ya soportado con `executor.thinking`; comprobar los valores válidos por modelo) y DeepSeek/Cline (`--thinking`). Exponerlo en la configuración central y en los comandos `/`.
+
+Salida de `agentrelay watch`:
+
+- [ ] Hora en cada línea (hoy solo se ve el tiempo transcurrido `[mm:ss]`): mostrar la hora local, y opcionalmente el tiempo transcurrido.
+- [ ] Salida mucho más amigable: agrupar por intento, resumir las acciones en lenguaje claro (qué archivo lee/edita, qué prueba ejecuta) en vez de mostrar el comando crudo (hoy, con Codex, aparece la llamada completa a PowerShell), colores y símbolos con opción para desactivarlos, y un resumen final. Comprobar que se ve bien en los terminales de VS Code, Windows, Linux y macOS.
+
+Precios y tarifas de DeepSeek:
+
+- [ ] Que los precios de DeepSeek sean reales: con Pro el coste mostrado no se parecía a la realidad y con Flash no se mostraba. Causa probable: Cline no tiene las tarifas de estos modelos y devuelve 0 o valores estimados. Calcularlo en AgentRelay con una tabla de precios propia y editable (entrada, entrada con caché y salida por millón de tokens), indicando que es una estimación y de dónde salen los precios.
+- [ ] DeepSeek tiene horas valle y horas caras: avisar al lanzar una tarea de qué tarifa se aplica en ese momento y mostrar los horarios (con la zona horaria del usuario). Comprobar primero el esquema vigente de descuentos en la documentación oficial de DeepSeek, porque cambia con el tiempo; guardar los horarios en la configuración para poder actualizarlos.
+
+Documentación y plataformas:
+
+- [ ] Indicar en el README y en INSTALL (es/en) que no disponemos de un Mac, por lo que macOS no está probado, y pedir feedback a quien lo use mediante issues de GitHub (con enlace y qué datos aportar: versión de macOS, de Node, salida de `agentrelay doctor`).
+
+Uso desde el móvil (Android):
+
+- [ ] Estudiar cómo usar AgentRelay desde el móvil. Hipótesis a comprobar: AgentRelay y Codex se ejecutan en el ordenador, así que basta controlar desde el móvil la sesión de Claude Code que lo orquesta (control remoto de Claude Code o de la extensión de VS Code, si el plan lo permite) con el ordenador encendido y con la sesión de ChatGPT iniciada. Probablemente haga falta además una forma de ver el estado en el móvil, porque `agentrelay watch` es una terminal: valorar una vista web o un resumen de estado enviado por el propio orquestador. Documentar requisitos, límites y condiciones de uso.
+
 ### Integración con VS Code (opción A: panel, sin chat propio)
 
 La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentrelay/` y llama a la CLI. El chat con el orquestador sigue siendo el del propio orquestador (p. ej. Claude Code).
