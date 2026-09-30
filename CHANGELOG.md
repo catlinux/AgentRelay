@@ -13,6 +13,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `init` en una carpeta sin repositorio git: `git init`, `.gitignore` con patrones de secretos (si no existía) y primer commit, con plan y confirmación previos, detección de archivos sensibles y aviso de carpetas servidas públicamente. Nunca modifica un `.gitignore` existente.
 - `run`, `watch`, `show`, `review`, `check` y `list` fuera de un repositorio indican ejecutar `agentrelay init`.
 - Codex con GPT-6 Luna es ahora el ejecutor por defecto, y `@openai/codex` se instala con AgentRelay (un solo `npm install`; se usa antes que el del `PATH` o el de la extensión de VS Code). Cline sigue disponible con `executor.type: "cline"`.
+- Si no hay sesión de ChatGPT, `login`, `doctor` y `run` avisan de que se puede crear una cuenta gratuita en chatgpt.com (GPT-6 Luna está incluido en el plan gratuito).
+- `agentrelay setup` e `init` explican qué es el bloque de instrucciones, dónde se instala, que solo se toca lo que hay entre las marcas y cómo retirarlo.
 - `agentrelay login [--device]`: conecta la cuenta de ChatGPT con Codex (abre el navegador; `--device` para equipos sin navegador). Si ya hay sesión, lo indica y no hace nada.
 - `agentrelay doctor` muestra el estado de la sesión del ejecutor y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no hay sesión iniciada.
 - Ejecutor Codex (`executor.type: "codex"`): usa Codex CLI de OpenAI con la sesión de la cuenta de ChatGPT, sin clave de API. Lo localiza en el `PATH` o en la extensión de OpenAI para VS Code, pide el informe final con un esquema JSON (`--output-schema`), trabaja en el sandbox `workspace-write` y registra los tokens sin inventar coste. Probado con `gpt-6-luna` en una tarea real.

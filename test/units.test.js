@@ -177,7 +177,9 @@ test('codex: authStatus y login usan la CLI configurada', async () => {
     process.env.FAKE_CODEX_LOGGED_IN = '1';
     assert.deepEqual(await codexAuthStatus({ command: [process.execPath, FAKE_CODEX] }), { ok: true, message: 'Logged in using ChatGPT' });
     process.env.FAKE_CODEX_LOGGED_IN = '0';
-    assert.equal((await codexAuthStatus({ command: [process.execPath, FAKE_CODEX] })).ok, false);
+    const auth = await codexAuthStatus({ command: [process.execPath, FAKE_CODEX] });
+    assert.equal(auth.ok, false);
+    assert.equal(auth.message.split('https://chatgpt.com').length - 1, 1);
     assert.equal(await codexLogin({ command: [process.execPath, FAKE_CODEX] }, { device: true }), 0);
     assert.equal(readFileSync(log, 'utf8').trim(), '["login","--device-auth"]');
   } finally {

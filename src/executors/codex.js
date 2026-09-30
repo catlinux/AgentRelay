@@ -18,13 +18,14 @@ export const name = 'codex';
 
 // Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
 export const installHint = 'Instala la extensión de OpenAI para VS Code o Codex CLI (npm i -g @openai/codex) e inicia sesión con "codex login".';
+export const accountHint = 'Si aún no tienes cuenta de ChatGPT, puedes crear una gratis en https://chatgpt.com (GPT-6 Luna está incluido en el plan gratuito).';
 
 // Esquema que se le pasa a Codex para el informe final; se escribe junto al prompt.
 const REPORT_FILE = 'codex-report.schema.json';
 
 const EXTENSION_PREFIX = 'openai.chatgpt-';
 const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-export const loginHint = 'Ejecuta "agentrelay login" para conectar tu cuenta de ChatGPT.';
+export const loginHint = `Ejecuta "agentrelay login" para conectar tu cuenta de ChatGPT. ${accountHint}`;
 
 /** Informe final esperado (el mismo que se pide en las instrucciones del prompt). */
 export const REPORT_SCHEMA = {

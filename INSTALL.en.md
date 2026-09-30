@@ -4,7 +4,7 @@
 
 Pick your system: [Windows](#windows) · [Linux](#linux) · [macOS](#macos).
 
-Before you start you need a **ChatGPT account** (the free one is enough). AgentRelay includes **Codex**, the agent that does the work, and uses the **GPT-6 Luna** model, which is included in the free plan. You do not need any API key.
+Before you start you need a **ChatGPT account** (the free one is enough; if you do not have one, you can create it at [chatgpt.com](https://chatgpt.com)). AgentRelay includes **Codex**, the agent that does the work, and uses the **GPT-6 Luna** model, which is included in the free plan. You do not need any API key.
 
 ---
 

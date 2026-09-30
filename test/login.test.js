@@ -47,6 +47,7 @@ test('login conecta y doctor informa del estado de sesión', () => {
     const env = { FAKE_CODEX_SESSION_FILE: session };
     const login = cli(dir, ['login', '--device'], env);
     assert.equal(login.status, 0, login.stderr);
+    assert.equal(login.stdout.indexOf('https://chatgpt.com') < login.stdout.indexOf('Se'), true);
     assert.match(login.stdout, /Se mostrará un código/);
     assert.match(login.stdout, /✔ Sesión iniciada/);
     assert.equal(readFileSync(log, 'utf8').trim(), '["login","--device-auth"]');
@@ -68,6 +69,7 @@ test('run falla antes de empezar cuando Codex no tiene sesión', () => {
       assert.equal(res.status, 1);
       assert.match(res.stderr, /no tiene sesión iniciada/);
       assert.match(res.stderr, /agentrelay login/);
+      assert.equal(res.stderr.split('https://chatgpt.com').length - 1, 1);
     } finally { rmSync(taskFile, { force: true }); }
   } finally { repo.cleanup(); }
 });
@@ -75,3 +77,22 @@ test('run falla antes de empezar cuando Codex no tiene sesión', () => {
 function requireCalls(file) {
   try { return readFileSync(file, 'utf8'); } catch { return ''; }
 }
+
+test('doctor ofrece crear una cuenta gratuita cuando no hay sesiÃ³n', () => {
+  const { dir } = setup();
+  try {
+    const doctor = cli(dir, ['doctor'], { FAKE_CODEX_LOGGED_IN: '0' });
+    assert.equal(doctor.status, 1);
+    assert.equal(doctor.stdout.split('https://chatgpt.com').length - 1, 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('login no muestra sugerencia de cuenta para Cline', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-login-cline-'));
+  try {
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline' } }));
+    const res = cli(dir, ['login']);
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.stdout.includes('https://chatgpt.com'), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

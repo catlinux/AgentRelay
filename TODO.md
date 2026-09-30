@@ -23,9 +23,9 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 
 Conexión y primera experiencia:
 
-- [ ] Si el usuario no tiene cuenta de ChatGPT, `agentrelay login`, `doctor` y `run` (cuando no hay sesión) le avisan de que puede crear una cuenta gratuita, con el enlace, y de que GPT-6 Luna está incluido en el plan gratuito. También en INSTALL y README.
+- [x] Si el usuario no tiene cuenta de ChatGPT, `agentrelay login`, `doctor` y `run` (cuando no hay sesión) le avisan de que puede crear una cuenta gratuita, con el enlace, y de que GPT-6 Luna está incluido en el plan gratuito. También en INSTALL y README.
 - [ ] Que la instalación conecte la cuenta de la forma más fácil posible: proponer `agentrelay login` al final de `npm install` o del instalador (sin bloquear instalaciones automáticas ni CI) y, si ya hay sesión de Codex (extensión de VS Code), reutilizarla sin preguntar.
-- [ ] Explicar mejor, al ejecutar `setup` e `init`, qué se va a hacer: sustituir el texto genérico «Se añadirá/actualizará el bloque de AgentRelay en C:\…» por una explicación de qué es ese bloque, para qué sirve, dónde queda y cómo retirarlo (`setup --uninstall`).
+- [x] Explicar mejor, al ejecutar `setup` e `init`, qué se va a hacer: sustituir el texto genérico «Se añadirá/actualizará el bloque de AgentRelay en C:\…» por una explicación de qué es ese bloque, para qué sirve, dónde queda y cómo retirarlo (`setup --uninstall`).
 - [ ] Revisar los avisos de `npm install` en Windows y Linux. Windows: `node-domexception@1.0.0` deprecado, 329 paquetes, 47 piden financiación y 21 vulnerabilidades (6 bajas, 14 moderadas, 1 alta) que vienen de las dependencias de Cline (enlaza con la revisión de vulnerabilidades y con decidir si Cline sigue instalándose por defecto). En Linux también hay avisos: recogerlos, clasificarlos (los que se pueden corregir, los que no dependen de nosotros) y documentar o eliminar los que sea posible, incluidos los `EBADENGINE` de Node 20.
 - [ ] Instalador para Windows (por ejemplo un `.exe`/`.msi` o un script guiado) que instale Node.js y Git si faltan, AgentRelay, el comando `agentrelay`, y conecte la cuenta; valorar winget, un `.cmd` de una sola línea o un empaquetado con `pkg`/instalador Inno Setup antes de decidir.
 

@@ -23,6 +23,10 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
 
     const r1 = run(['setup', '--yes', '--claude-dir', dir]);
     assert.equal(r1.status, 0, r1.stderr);
+    assert.match(r1.stdout, /<!-- agentrelay:start -->/);
+    assert.match(r1.stdout, /<!-- agentrelay:end -->/);
+    assert.ok(r1.stdout.includes(claude));
+    assert.match(r1.stdout, /agentrelay setup --uninstall/);
     assert.equal(readFileSync(claude, 'utf8'), GLOBAL_BLOCK + '\n');
 
     // Repetirlo no cambia nada.
@@ -46,6 +50,7 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     // --uninstall retira el bloque y borra el archivo si solo tenía el bloque.
     const r4 = run(['setup', '--uninstall', '--yes', '--claude-dir', dir]);
     assert.equal(r4.status, 0, r4.stderr);
+    assert.match(r4.stdout, /<!-- agentrelay:start -->/);
     assert.equal(existsSync(claude), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -69,6 +74,9 @@ test('init --yes en repo limpio crea CLAUDE.md y hace un commit solo de CLAUDE.m
   try {
     const r = run(['init', '--yes'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /<!-- agentrelay:start -->/);
+    assert.match(r.stdout, /<!-- agentrelay:end -->/);
+    assert.match(r.stdout, /el resto del archivo se conserva/);
     assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
     // Repo limpio tras el commit.
     assert.equal(git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim(), '');

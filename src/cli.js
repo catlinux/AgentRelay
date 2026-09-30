@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
 import { getExecutor } from './executors/index.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
-import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, PROJECT_BLOCK, removeBlockFromFile } from './instructions.js';
+import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository } from './prepare.js';
@@ -269,6 +269,7 @@ async function cmdLogin(values) {
     process.stdout.write(`Sesión activa: ${current.message}. Para cambiar de cuenta ejecuta "codex logout" y vuelve a ejecutar este comando.\n`);
     return 0;
   }
+  if (adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
   process.stdout.write(values.device
     ? 'Se mostrará un código para iniciar sesión con tu cuenta de ChatGPT.\n'
     : 'Se abrirá el navegador para iniciar sesión con tu cuenta de ChatGPT…\n');
@@ -279,13 +280,14 @@ async function cmdLogin(values) {
     return 0;
   }
   process.stderr.write(`No se pudo iniciar sesión: ${result.message} Prueba "agentrelay login --device".\n`);
+  if (adapter.accountHint && !result.message?.includes(adapter.accountHint)) process.stderr.write(`${adapter.accountHint}\n`);
   return 1;
 }
 
 async function cmdSetup(values) {
   const file = globalInstructionsPath(values['claude-dir']);
   const removing = Boolean(values.uninstall);
-  process.stdout.write(`Se ${removing ? 'eliminará' : 'añadirá/actualizará'} el bloque de AgentRelay en ${file}\n`);
+  for (const line of setupExplanation(file, removing)) process.stdout.write(`${line}\n`);
 
   const ok = await confirm(removing ? '¿Eliminar el bloque de AgentRelay?' : '¿Añadir el bloque de AgentRelay?', { yes: values.yes });
   if (ok === null) {
@@ -339,6 +341,7 @@ async function cmdInit(values) {
     }
 
     const file = path.join(dir, 'CLAUDE.md');
+    process.stdout.write(`${initExplanation(file)}\n`);
     const { action } = applyBlockToFile(file, PROJECT_BLOCK);
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
     process.stdout.write(`${label} ${file}\n`);
@@ -359,6 +362,7 @@ async function cmdInit(values) {
   const wasClean = await isClean(root);
   const ignored = await isIgnored(root, 'CLAUDE.md');
 
+  process.stdout.write(`${initExplanation(file)}\n`);
   const { action } = applyBlockToFile(file, PROJECT_BLOCK);
   const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
   process.stdout.write(`${label} ${file}\n`);

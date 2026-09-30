@@ -166,3 +166,25 @@ export function removeBlockFromFile(file) {
 export function globalInstructionsPath(claudeDir) {
   return path.join(claudeDir ?? path.join(os.homedir(), '.claude'), 'CLAUDE.md');
 }
+
+/** Explica dónde se instala el bloque global y cómo retirarlo. */
+export function setupExplanation(file, removing = false) {
+  if (removing) {
+    return [
+      `Se quitará el bloque de instrucciones de AgentRelay de ${file}.`,
+      `Solo se eliminará el contenido entre ${START_MARK} y ${END_MARK}; el resto del archivo se conserva.`,
+    ];
+  }
+  return [
+    `El bloque de instrucciones de AgentRelay son unas líneas entre ${START_MARK} y ${END_MARK} en el archivo global de instrucciones de Claude Code.`,
+    'Indica a Claude cuándo y cómo delegar tareas con AgentRelay en cualquier proyecto.',
+    `Se instalará en ${file}: si el archivo no existe se creará, y si ya tiene el bloque se actualizará.`,
+    'No se modifica nada fuera de las marcas.',
+    'Para quitarlo, ejecuta "agentrelay setup --uninstall".',
+  ];
+}
+
+/** Explica la instalación del bloque de instrucciones de AgentRelay en un proyecto. */
+export function initExplanation(file) {
+  return `Se añadirá o actualizará el bloque de instrucciones de AgentRelay en ${file} (solo entre ${START_MARK} y ${END_MARK}; el resto del archivo se conserva) para que el orquestador sepa cómo delegar en este proyecto. Para quitarlo, elimina a mano las líneas entre las marcas.`;
+}
