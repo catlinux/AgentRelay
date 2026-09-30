@@ -1,0 +1,35 @@
+WNCL-CU-1.0 — WarCrafted Non-Commercial License, Commercial-Use Variant
+
+Copyright (c) 2026 CatLinux
+Author: CatLinux <marc.catlinux@gmail.com>
+Project: AgentRelay
+Repository: https://github.com/catlinux/AgentRelay
+
+In this variant, "non-commercial" refers to the Software itself: anyone may use it, including for commercial purposes, but no one may charge for the Software or its use.
+
+1. Definitions.
+   "Covered Material" means material owned by CatLinux and identified with this project.
+   "Derivative" means any modified version, fork, or other work based on the Covered Material.
+   "Software" means the Covered Material and any Derivative, in any form.
+   "Fee" means any payment or other consideration, however named, including charges presented as costs, subscriptions, licenses, or access charges.
+   "Support and Implementation Services" means installation, configuration, integration, custom development, maintenance, troubleshooting, training, and consulting relating to the Software.
+   "Equivalent Product" means a product or service based on the Software whose main function is the same as the Software's and that can substitute for it, regardless of name, modifications, or packaging.
+2. Scope and ownership. This license covers only the Covered Material. Copyright is not transferred; all rights not expressly granted are reserved.
+3. Free use, including commercial use. You may use and study the Software without Fee for any purpose, including internal business use and income-generating activities such as performing work for clients.
+4. Modification and derivatives. You may modify the Software and create Derivatives. Any Derivative you distribute or make available must be licensed under this license and include its full text; you may not relicense the Software or any Derivative under other terms.
+5. Free redistribution. You may share copies of the Software free of charge, on any platform, provided you include this license and comply with the attribution requirements below.
+6. No charging for the Software. No one may be required to pay a Fee for the Software or its use. In particular, you may not:
+   (a) sell, resell, rent, or license the Software for a Fee;
+   (b) charge for downloading, accessing, copying, or distributing the Software, including as media, bandwidth, or distribution costs;
+   (c) charge for access to or use of the Software, including as a hosted, subscription, or pay-per-use service;
+   (d) sell an Equivalent Product;
+   (e) make access to the Software, or any of its features, conditional on paying for services, donating, or viewing advertising, or otherwise monetize its distribution through advertising, paywalls, or paid links.
+7. Other products. You may charge for a separate product or service that interacts with the Software, such as through its interfaces or as a plugin, only if it does not include or distribute the Software and recipients can obtain the Software separately and free of charge under this license. A product that includes or distributes the Software, in whole or in part, may be distributed only free of charge. Its own material may be under its own license; the included Software remains under this license.
+8. Permitted fees. You may charge for Support and Implementation Services, provided that the Fee is for the service and not for the Software, the Software remains obtainable free of charge without buying the service, and any Software delivered as part of the service, including custom modifications, remains under this license and may be freely redistributed by its recipient.
+9. Donations. Nothing in this license restricts CatLinux from accepting donations for the original project. Voluntary donations to the original project or to a Derivative are not Fees, provided no access, download, use, or feature of the Software depends on donating.
+10. Attribution and derivatives. Preserve author credits, copyright notices, and this license. Every published fork or Derivative must identify CatLinux as original author and provide a link to the original project at https://github.com/catlinux/AgentRelay. Clearly label your own modifications and do not imply endorsement. Do not remove or obscure the original attribution, conceal or falsify authorship, present a Derivative as a wholly independent original work, or remove the required link to the original project. A Derivative may state that it is based on AgentRelay but may not present itself as the official AgentRelay or use the project's name or logos in a way suggesting it is. This license grants no trademark rights.
+11. Third-party material excluded. Third-party code, libraries, dependencies, assets, fonts, images, sounds, examples, snippets, and any other third-party material are outside the scope of this license. They are not relicensed by this text; each retains its original license and applicable notices and obligations. Before distributing the combined project, verify that those licenses permit the intended modification, combination, and distribution. If a third-party license is unclear or incompatible with the restrictions here, do not use this license to override it and do not distribute the affected combination until reviewed.
+12. Termination. If you breach this license, your rights terminate unless you cure the breach within 30 days after receiving notice from the copyright holder or otherwise becoming aware of it. If your rights were previously kept by curing a breach, any later breach terminates them automatically. On termination, stop the noncompliant activity; applicable law governs remedies.
+13. Disclaimer. To the maximum extent permitted by law, the Software is provided “AS IS”, without express or implied warranties, including merchantability, fitness for a particular purpose, and non-infringement. The copyright holder disclaims liability for damages arising from use to the maximum extent permitted by law.
+
+This custom license is not an OSI-approved Open Source license or a standard SPDX license.

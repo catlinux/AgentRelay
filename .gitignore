@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------
+# Archivos internos: nunca se publican
+# ---------------------------------------------------------------
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
+.cline/
+.clinerules
+.clinerules/
+.continue/
+/internal/
+/prompts/
+*.internal.md
+
+# ---------------------------------------------------------------
+# Secretos y credenciales
+# ---------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ecdsa*
+id_ed25519*
+secrets.json
+credentials.json
+*.secret
+*.secrets
+
+# ---------------------------------------------------------------
+# Configuración local y estado de ejecución de AgentRelay
+# ---------------------------------------------------------------
+agentrelay.config.local.json
+.agentrelay/
+
+# ---------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+
+# ---------------------------------------------------------------
+# Node.js
+# ---------------------------------------------------------------
+node_modules/
+coverage/
+*.tgz
+
+# ---------------------------------------------------------------
+# Sistema operativo y editores
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
