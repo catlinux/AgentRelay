@@ -30,6 +30,7 @@
   },
   "private": true,
   "dependencies": {
+    "@openai/codex": "^0.159.2",
     "cline": "3.0.66"
   }
 }
