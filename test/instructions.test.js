@@ -15,7 +15,7 @@ test('bloques: GLOBAL_BLOCK y PROJECT_BLOCK tienen las marcas y el contenido', (
   assert.ok(GLOBAL_BLOCK.endsWith(`\n${END_MARK}`));
   assert.ok(GLOBAL_BLOCK.includes('## AgentRelay'));
   assert.ok(GLOBAL_BLOCK.includes('agentrelay init'));
-  assert.ok(GLOBAL_BLOCK.includes('### Triaje antes de trabajar'));
+  assert.ok(GLOBAL_BLOCK.includes('### Triaje en cada petición'));
   assert.ok(GLOBAL_BLOCK.includes('/model'));
   assert.ok(PROJECT_BLOCK.startsWith(`${START_MARK}\n`));
   assert.ok(PROJECT_BLOCK.endsWith(`\n${END_MARK}`));
