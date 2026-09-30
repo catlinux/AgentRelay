@@ -298,16 +298,17 @@ test('policy: cuándo revisa el orquestador', () => {
 test('config: valores por defecto, archivo, archivo local y opciones', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-'));
   try {
-    assert.equal(loadConfig({ cwd: dir }).config.executor.model, 'gpt-6-luna');
+    const home = path.join(dir, 'home');
+    assert.equal(loadConfig({ cwd: dir, home }).config.executor.model, 'gpt-6-luna');
     writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ level: 2, validation: { commands: ['npm test'] } }));
     writeFileSync(path.join(dir, 'agentrelay.config.local.json'), JSON.stringify({ executor: { command: ['node', 'cline.js'] } }));
-    const { config, sources } = loadConfig({ cwd: dir, overrides: { level: '4' } });
+    const { config, sources } = loadConfig({ cwd: dir, home, overrides: { level: '4' } });
     assert.equal(sources.length, 2);
     assert.equal(config.level, 4);
     assert.deepEqual(config.validation.commands, ['npm test']);
     assert.deepEqual(config.executor.command, ['node', 'cline.js']);
     assert.equal(config.executor.provider, null);
-    assert.throws(() => loadConfig({ cwd: dir, overrides: { level: 9 } }), /1-5/);
+    assert.throws(() => loadConfig({ cwd: dir, home, overrides: { level: 9 } }), /1-5/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -317,14 +318,15 @@ test('config: los valores por defecto de executor dependen del tipo', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
     // Sin archivos: Codex es el ejecutor predeterminado.
-    const byDefault = loadConfig({ cwd: dir }).config;
+    const home = path.join(dir, 'home');
+    const byDefault = loadConfig({ cwd: dir, home }).config;
     assert.equal(byDefault.executor.type, 'codex');
     assert.equal(byDefault.executor.command, 'codex');
     assert.equal(byDefault.executor.provider, null);
     assert.equal(byDefault.executor.model, 'gpt-6-luna');
 
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'cline' } }));
-    const cline = loadConfig({ cwd: dir }).config;
+    const cline = loadConfig({ cwd: dir, home }).config;
     assert.equal(cline.executor.type, 'cline');
     assert.equal(cline.executor.command, 'cline');
     assert.equal(cline.executor.provider, 'deepseek');
@@ -332,7 +334,7 @@ test('config: los valores por defecto de executor dependen del tipo', () => {
 
     // Codex usa la sesión de ChatGPT y el modelo Luna.
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex' } }));
-    const codex = loadConfig({ cwd: dir }).config;
+    const codex = loadConfig({ cwd: dir, home }).config;
     assert.equal(codex.executor.type, 'codex');
     assert.equal(codex.executor.command, 'codex');
     assert.equal(codex.executor.provider, null);
@@ -341,7 +343,7 @@ test('config: los valores por defecto de executor dependen del tipo', () => {
 
     // Un valor explícito del usuario siempre gana.
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex', model: 'gpt-6-luna' } }));
-    const custom = loadConfig({ cwd: dir }).config;
+    const custom = loadConfig({ cwd: dir, home }).config;
     assert.equal(custom.executor.model, 'gpt-6-luna');
     assert.equal(custom.executor.command, 'codex');
     assert.equal(custom.executor.provider, null);
@@ -354,7 +356,7 @@ test('config: rechaza un ejecutor no soportado', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
     writeFileSync(path.join(dir, CONFIG_FILE), JSON.stringify({ executor: { type: 'foo' } }));
-    assert.throws(() => loadConfig({ cwd: dir }), /Ejecutor no soportado: foo \(disponibles: cline, codex\)/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: cline, codex\)/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -367,7 +369,7 @@ test('config y tarea: aceptan archivos JSON con BOM', () => {
     const taskFile = path.join(dir, 't.json');
     writeFileSync(configFile, '﻿{"level":2}');
     writeFileSync(taskFile, '﻿{"objective":"x"}');
-    assert.equal(loadConfig({ cwd: dir, configPath: configFile }).config.level, 2);
+    assert.equal(loadConfig({ cwd: dir, configPath: configFile, home: path.join(dir, 'home') }).config.level, 2);
     assert.equal(loadTask(taskFile).objective, 'x');
   } finally {
     rmSync(dir, { recursive: true, force: true });

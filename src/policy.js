@@ -15,6 +15,7 @@
 
 export const SELF_REVIEW_MODES = ['none', 'inline', 'pass'];
 export const COMPLEXITIES = ['trivial', 'normal', 'complex'];
+export const POLICY_REVIEWS = ['on-failure', 'selective', 'always'];
 
 export const LEVELS = Object.freeze({
   1: {

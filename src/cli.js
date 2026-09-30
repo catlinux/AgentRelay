@@ -1,9 +1,11 @@
 // Interfaz de línea de comandos.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
+import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from './config.js';
+import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
@@ -30,6 +32,7 @@ Uso:
   agentrelay list                   Lista las ejecuciones del repositorio
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
+  agentrelay config [show|path|init] Muestra, localiza o crea la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
@@ -64,6 +67,11 @@ Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)
   --with-config           Crea además ${CONFIG_FILE}
 
+Opciones de config init:
+  --project               Crea ${CONFIG_FILE} en el proyecto
+  --local                 Crea ${LOCAL_CONFIG_FILE}
+  --force                 Sobrescribe el archivo de configuración existente
+
 Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
 `;
 
@@ -83,6 +91,8 @@ const OPTIONS = {
   uninstall: { type: 'boolean' },
   'claude-dir': { type: 'string' },
   'with-config': { type: 'boolean' },
+  project: { type: 'boolean' },
+  local: { type: 'boolean' },
   device: { type: 'boolean' },
   executors: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
@@ -149,7 +159,8 @@ async function cmdRun(positionals, values) {
   }
   const root = await resolveRoot(values);
   const overrides = values.level ? { level: values.level } : undefined;
-  const { config } = loadConfig({ cwd: root, configPath: values.config, overrides });
+  const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config, overrides });
+  for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
   return printResult(state, root, values.json);
@@ -223,6 +234,7 @@ async function cmdDoctor(values) {
     if (!good) ok = false;
     process.stdout.write(`${good ? '[ok]   ' : '[fallo]'} ${text}\n`);
   };
+  const warn = (text) => process.stdout.write(`[aviso] ${text}\n`);
   const major = Number(process.versions.node.split('.')[0]);
   line(major >= 20, `Node.js ${process.versions.node} (se necesita >= 20) · ${process.platform}/${process.arch}`);
 
@@ -238,6 +250,7 @@ async function cmdDoctor(values) {
     const loaded = loadConfig({ cwd: root || cwd, configPath: values.config });
     config = loaded.config;
     line(true, `Configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'valores por defecto'} · nivel ${config.level}`);
+    for (const warning of loaded.warnings) warn(warning);
   } catch (error) {
     line(false, error.message);
   }
@@ -261,6 +274,57 @@ async function cmdDoctor(values) {
     }
   }
   return ok ? 0 : 1;
+}
+
+function configHome() {
+  return process.env.AGENTRELAY_HOME || path.join(os.homedir(), '.agentrelay');
+}
+
+function configLeaves(value, prefix = '', result = {}) {
+  if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length) {
+    for (const [key, child] of Object.entries(value)) configLeaves(child, prefix ? `${prefix}.${key}` : key, result);
+  } else result[prefix] = value;
+  return result;
+}
+
+async function cmdConfig(positionals, values) {
+  const action = positionals[0] || 'show';
+  const requestedCwd = path.resolve(values.cwd || process.cwd());
+  const cwd = await repoRoot(requestedCwd) || requestedCwd;
+  const userFile = path.join(configHome(), 'config.json');
+  const projectFile = path.join(cwd, CONFIG_FILE);
+  const localFile = path.join(cwd, LOCAL_CONFIG_FILE);
+  if (action === 'path' && positionals.length === 1) {
+    for (const [label, file] of [['Usuario', userFile], ['Proyecto', projectFile], ['Local', localFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
+    return 0;
+  }
+  if (action === 'init' && positionals.length === 1) {
+    const target = values.local ? localFile : values.project ? projectFile : userFile;
+    if (values.local && values.project) throw new Error('Usa --project o --local, no ambos.');
+    if (existsSync(target) && !values.force) {
+      process.stdout.write(`${target} ya existe\n`);
+      return 1;
+    }
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, configTemplate({ scope: values.project || values.local ? 'project' : 'user' }), 'utf8');
+    process.stdout.write(`Creado ${target}\nDescomenta las opciones para cambiar sus valores.\n`);
+    return 0;
+  }
+  if ((action !== 'show' || positionals.length > 1) && positionals.length) {
+    process.stderr.write('Uso: agentrelay config [show|path|init [--project|--local] [--force]]\n');
+    return 1;
+  }
+  const loaded = loadConfig({ cwd, configPath: values.config });
+  const sections = new Map();
+  for (const [key, value] of Object.entries(configLeaves(loaded.config))) {
+    const section = key.split('.')[0];
+    if (!sections.has(section)) sections.set(section, []);
+    sections.get(section).push(`${key} = ${JSON.stringify(value)}   (${loaded.origins[key] || 'defecto'})`);
+  }
+  for (const [section, rows] of sections) process.stdout.write(`${section}\n${rows.join('\n')}\n`);
+  process.stdout.write(loaded.sources.length ? `Archivos leídos:\n${loaded.sources.map((file) => `  ${file}`).join('\n')}\n` : 'Archivos leídos: ninguno: se usan los valores por defecto\n');
+  for (const warning of loaded.warnings) process.stdout.write(`[aviso] ${warning}\n`);
+  return 0;
 }
 
 async function cmdExecutors(positionals, values) {
@@ -413,8 +477,7 @@ function writeConfigIfRequested(root, values) {
   if (existsSync(configFile)) {
     process.stdout.write(`${configFile} ya existe; se mantiene.\n`);
   } else {
-    const { level, executor, validation } = DEFAULT_CONFIG;
-    writeFileSync(configFile, `${JSON.stringify({ level, executor, validation }, null, 2)}\n`);
+    writeFileSync(configFile, configTemplate({ scope: 'project' }));
     process.stdout.write(`Creado ${configFile}\n`);
   }
 }
@@ -514,6 +577,7 @@ export async function main(argv) {
       case 'list': return await cmdList(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
+      case 'config': return await cmdConfig(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
