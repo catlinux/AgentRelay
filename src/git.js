@@ -1,5 +1,5 @@
-// Operaciones Git de solo lectura sobre el repositorio de trabajo.
-// AgentRelay nunca hace commits, stash, checkout ni push en el repositorio del usuario.
+// Operaciones Git sobre el repositorio de trabajo.
+// AgentRelay solo confirma CLAUDE.md (vía `init`) y nunca hace stash, checkout ni push.
 
 import { copyFileSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -60,5 +60,30 @@ export async function diffFromBase(cwd, base, tmpDir) {
     return { files, patch: patch.stdout };
   } finally {
     rmSync(tmpIndex, { force: true });
+  }
+}
+
+/** true si el repositorio está limpio (git status sin salida). */
+export async function isClean(cwd) {
+  const res = await git(cwd, ['status', '--porcelain', '--untracked-files=all']);
+  return res.stdout.trim() === '';
+}
+
+/** true si git ignora el archivo indicado. */
+export async function isIgnored(cwd, file) {
+  const res = await git(cwd, ['check-ignore', '-q', '--', file], { allowFail: true });
+  return res.code === 0;
+}
+
+/** Añade y confirma solo las rutas indicadas; devuelve { ok, error } sin lanzar. */
+export async function commitPaths(cwd, paths, message) {
+  try {
+    const addRes = await git(cwd, ['add', '--', ...paths], { allowFail: true });
+    if (addRes.code !== 0) return { ok: false, error: addRes.stderr.trim() };
+    const commitRes = await git(cwd, ['commit', '-m', message, '--', ...paths], { allowFail: true });
+    if (commitRes.code !== 0) return { ok: false, error: commitRes.stderr.trim() };
+    return { ok: true, error: '' };
+  } catch (error) {
+    return { ok: false, error: error.message };
   }
 }

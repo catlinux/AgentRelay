@@ -5,8 +5,10 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
 import { getExecutor } from './executors/index.js';
-import { repoRoot } from './git.js';
+import { commitPaths, isClean, isIgnored, repoRoot } from './git.js';
+import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, PROJECT_BLOCK, removeBlockFromFile } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
+import { confirm } from './prompt.js';
 import { formatEvent } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
@@ -26,7 +28,8 @@ Uso:
   agentrelay list                   Lista las ejecuciones del repositorio
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
-  agentrelay init                   Crea ${CONFIG_FILE} con los valores por defecto
+  agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
+  agentrelay init                   Instala el bloque de AgentRelay en el CLAUDE.md del proyecto
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -44,6 +47,15 @@ Opciones de review:
   --feedback-file <ruta>  Lee el feedback de un archivo
   --force                 Acepta sin superar la validación final, o corrige por encima del límite
 
+Opciones de setup:
+  --uninstall             Retira el bloque de AgentRelay
+  --yes                   Aplica sin pedir confirmación
+  --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
+
+Opciones de init:
+  --yes                   Crea el commit de CLAUDE.md sin preguntar
+  --with-config           Crea además ${CONFIG_FILE}
+
 Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
 `;
 
@@ -59,6 +71,10 @@ const OPTIONS = {
   feedback: { type: 'string' },
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
+  yes: { type: 'boolean' },
+  uninstall: { type: 'boolean' },
+  'claude-dir': { type: 'string' },
+  'with-config': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -229,13 +245,72 @@ async function cmdDoctor(values) {
   return ok ? 0 : 1;
 }
 
+async function cmdSetup(values) {
+  const file = globalInstructionsPath(values['claude-dir']);
+  const removing = Boolean(values.uninstall);
+  process.stdout.write(`Se ${removing ? 'eliminará' : 'añadirá/actualizará'} el bloque de AgentRelay en ${file}\n`);
+
+  const ok = await confirm(removing ? '¿Eliminar el bloque de AgentRelay?' : '¿Añadir el bloque de AgentRelay?', { yes: values.yes });
+  if (ok === null) {
+    process.stderr.write('Ejecuta de nuevo con --yes para aplicar el cambio.\n');
+    return 1;
+  }
+  if (ok === false) {
+    process.stdout.write('Cancelado.\n');
+    return 0;
+  }
+
+  if (removing) {
+    const { action } = removeBlockFromFile(file);
+    process.stdout.write(`${action === 'removed' ? 'eliminado' : 'no había bloque'} ${file}\n`);
+  } else {
+    const { action } = applyBlockToFile(file, GLOBAL_BLOCK);
+    const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
+    process.stdout.write(`${label} ${file}\n`);
+  }
+  return 0;
+}
+
 async function cmdInit(values) {
   const root = await resolveRoot(values);
-  const file = path.join(root, CONFIG_FILE);
-  if (existsSync(file)) throw new Error(`${file} ya existe`);
-  const { level, executor, validation } = DEFAULT_CONFIG;
-  writeFileSync(file, `${JSON.stringify({ level, executor, validation }, null, 2)}\n`);
-  process.stdout.write(`Creado ${file}\n`);
+  const file = path.join(root, 'CLAUDE.md');
+
+  // Estado del repositorio antes de tocar nada.
+  const wasClean = await isClean(root);
+  const ignored = await isIgnored(root, 'CLAUDE.md');
+
+  const { action } = applyBlockToFile(file, PROJECT_BLOCK);
+  const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
+  process.stdout.write(`${label} ${file}\n`);
+  const changed = action !== 'unchanged';
+
+  if (changed && wasClean && !ignored) {
+    const ok = await confirm('¿Crear un commit con CLAUDE.md?', { yes: values.yes });
+    if (ok === true) {
+      const res = await commitPaths(root, ['CLAUDE.md'], 'Añade las instrucciones de AgentRelay');
+      if (!res.ok) {
+        process.stderr.write(`No se pudo crear el commit de CLAUDE.md: ${res.error}\n`);
+      } else {
+        process.stdout.write('Commit de CLAUDE.md creado.\n');
+      }
+    } else if (ok === null) {
+      process.stderr.write('CLAUDE.md ha cambiado: confírmalo con git antes de delegar (AgentRelay necesita el repositorio limpio), o ejecuta de nuevo con --yes.\n');
+    }
+  } else if (changed && !wasClean) {
+    process.stderr.write('El repositorio tenía cambios pendientes: confirma CLAUDE.md con git antes de delegar (AgentRelay necesita el repositorio limpio).\n');
+  }
+
+  if (values['with-config']) {
+    const configFile = path.join(root, CONFIG_FILE);
+    if (existsSync(configFile)) {
+      process.stdout.write(`${configFile} ya existe; se mantiene.\n`);
+    } else {
+      const { level, executor, validation } = DEFAULT_CONFIG;
+      writeFileSync(configFile, `${JSON.stringify({ level, executor, validation }, null, 2)}\n`);
+      process.stdout.write(`Creado ${configFile}\n`);
+    }
+  }
+
   return 0;
 }
 
@@ -268,6 +343,7 @@ export async function main(argv) {
       case 'list': return await cmdList(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
+      case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
       default:
         process.stderr.write(`Comando desconocido: ${command}\n\n${HELP}`);
