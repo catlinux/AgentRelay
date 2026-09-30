@@ -1,6 +1,20 @@
 # AgentRelay
 
-[![Windows](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-windows.yml?branch=main&label=Windows)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-windows.yml) [![Linux](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-linux.yml?branch=main&label=Linux)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-linux.yml) [![macOS](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-macos.yml?branch=main&label=macOS)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-macos.yml) [![Licencia](https://img.shields.io/badge/license-WNCL--CU--1.0-blue)](LICENSE) ![Node](https://img.shields.io/badge/node-%E2%89%A520-339933) ![Versión](https://img.shields.io/github/package-json/v/catlinux/AgentRelay) [![Último commit](https://img.shields.io/github/last-commit/catlinux/AgentRelay)](https://github.com/catlinux/AgentRelay/commits/main) ![Ejecutor](https://img.shields.io/badge/ejecutor%20por%20defecto-Codex%20%2B%20GPT--6%20Luna-black)
+<div align="center">
+
+**Compilación**
+
+[![Windows](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-windows.yml?branch=main&label=Windows&style=flat-square&labelColor=24292f)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-windows.yml) [![Linux](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-linux.yml?branch=main&label=Linux&style=flat-square&labelColor=24292f)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-linux.yml) [![macOS](https://img.shields.io/github/actions/workflow/status/catlinux/AgentRelay/ci-macos.yml?branch=main&label=macOS&style=flat-square&labelColor=24292f)](https://github.com/catlinux/AgentRelay/actions/workflows/ci-macos.yml)
+
+**Agentes**
+
+![Orquestador](https://img.shields.io/badge/orquestador-Claude%20Code-D97757?style=flat-square&labelColor=24292f) ![Ejecutor](https://img.shields.io/badge/ejecutor%20por%20defecto-Codex%20%2B%20GPT--6%20Luna-10A37F?style=flat-square&labelColor=24292f) ![Ejecutor opcional](https://img.shields.io/badge/ejecutor%20opcional-Cline-6E56CF?style=flat-square&labelColor=24292f)
+
+**Proyecto**
+
+![Versión](https://img.shields.io/github/package-json/v/catlinux/AgentRelay?label=versi%C3%B3n&color=e8590c&style=flat-square&labelColor=24292f) [![Licencia](https://img.shields.io/badge/licencia-WNCL--CU--1.0-0969da?style=flat-square&labelColor=24292f)](LICENSE) ![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?style=flat-square&labelColor=24292f) [![Último commit](https://img.shields.io/github/last-commit/catlinux/AgentRelay?label=%C3%BAltimo%20commit&style=flat-square&labelColor=24292f)](https://github.com/catlinux/AgentRelay/commits/main)
+
+</div>
 
 **Español** · [English](README.en.md) · [Guía de instalación](INSTALL.md)
 
