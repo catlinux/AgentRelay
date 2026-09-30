@@ -189,7 +189,24 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 
 ## Actualizar y desinstalar
 
-**Actualizar:** dentro de la carpeta de AgentRelay, ejecuta `git pull` y `npm install`. Si tenías `agentrelay watch` abierto, ciérralo (Ctrl+C) y vuelve a lanzarlo. No hace falta repetir `init` ni `setup`, salvo que el CHANGELOG lo indique.
+**Actualizar:** dentro de la carpeta de AgentRelay:
+
+```sh
+git pull
+npm ci
+```
+
+Usa `npm ci` y no `npm install`: instala exactamente las versiones del `package-lock.json` sin modificarlo, mientras que `npm install` puede reescribirlo y hacer que el siguiente `git pull` falle.
+
+Si `git pull` responde *«Your local changes to the following files would be overwritten by merge: package-lock.json»*, descarta esos cambios (los genera npm; no pierdes nada) y repite:
+
+```sh
+git checkout -- package-lock.json
+git pull
+npm ci
+```
+
+Si tenías `agentrelay watch` abierto, ciérralo (Ctrl+C) y vuelve a lanzarlo. No hace falta repetir `init` ni `setup`, salvo que el CHANGELOG lo indique.
 
 **Desinstalar:**
 

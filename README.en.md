@@ -76,7 +76,7 @@ npx cline auth --provider deepseek --apikey <your-api-key> --modelid deepseek-v4
 
 (from the AgentRelay folder)
 
-To update later: `git pull` and `npm install` in the AgentRelay folder. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
+To update later, in the AgentRelay folder: `git pull` and then `npm ci` (it installs exactly the versions in `package-lock.json` without changing it; `npm install` may rewrite it and make the next `git pull` fail). If `git pull` says your local changes to `package-lock.json` would be overwritten, discard them with `git checkout -- package-lock.json` (npm regenerates them; you lose nothing) and run `git pull` again. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
 
 ## Try AgentRelay in 5 minutes
 

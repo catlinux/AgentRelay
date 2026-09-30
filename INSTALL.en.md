@@ -189,7 +189,24 @@ Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes
 
 ## Updating and uninstalling
 
-**Update:** inside the AgentRelay folder, run `git pull` and `npm install`. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
+**Update:** inside the AgentRelay folder:
+
+```sh
+git pull
+npm ci
+```
+
+Use `npm ci` rather than `npm install`: it installs exactly the versions in `package-lock.json` without changing it, while `npm install` may rewrite it and make the next `git pull` fail.
+
+If `git pull` answers *"Your local changes to the following files would be overwritten by merge: package-lock.json"*, discard those changes (npm generates them; you lose nothing) and repeat:
+
+```sh
+git checkout -- package-lock.json
+git pull
+npm ci
+```
+
+If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
 
 **Uninstall:**
 
