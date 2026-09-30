@@ -8,7 +8,8 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [x] Cline CLI como dependencia: instalación en un solo paso (0.0.2).
 - [ ] Errores de credenciales del ejecutor (p. ej. "Authentication Fails"): detenerse sin reintentos, marcar la ejecución como fallida (no escalada) y mostrar un mensaje claro con el comando para configurar el proveedor (`npx cline auth …`) (0.0.3).
 - [ ] `agentrelay doctor`: comprobar que el ejecutor tiene un proveedor y una credencial configurados (0.0.3).
-- [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado.
+- [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado. Windows: clon limpio probado (0.0.2). Linux (Debian): en prueba.
+- [ ] README: explicar desde el principio que la tarea JSON la escribe el orquestador y que la conversación se hace con él (el JSON manual queda como prueba técnica).
 
 ### Integración con VS Code (opción A: panel, sin chat propio)
 
@@ -21,7 +22,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Clave del proveedor guardada en el almacén seguro de VS Code y configuración guiada la primera vez.
 - [ ] Comando «AgentRelay: activar en este proyecto»: añade, con confirmación, las instrucciones de delegación al `CLAUDE.md`.
 - [ ] Decidir si la extensión vive en el mismo repositorio (`vscode/`) o en uno separado.
-- [ ] Estudiar más adelante una pestaña de chat propia (opción B): requiere un acceso programático al orquestador (API de pago o el agente en modo sin interfaz, comprobando antes sus condiciones de uso) y una interfaz de chat completa.
+- [ ] Aparcado: chat propio (`agentrelay chat` en terminal o pestaña de VS Code) para hablar con el orquestador a través de AgentRelay. Restricción: solo con la suscripción del usuario, sin API de pago por uso. Requiere el agente del orquestador en modo sin interfaz (comprobando antes las condiciones de uso de la suscripción), elegir el modo de permisos y depender de su instalación. Retomar cuando el resto esté estable.
 
 ### Seguridad y control del repositorio
 
