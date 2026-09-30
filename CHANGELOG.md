@@ -6,6 +6,13 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Añadido
+
+- `agentrelay setup`: instala (con confirmación) un bloque delimitado con marcas en las instrucciones globales de Claude Code (`~/.claude/CLAUDE.md`) para que delegue con AgentRelay en cualquier proyecto; `--uninstall` lo retira. Solo modifica lo que hay entre las marcas.
+- `agentrelay init`: prepara el proyecto añadiendo el bloque de instrucciones al `CLAUDE.md` (lo crea o lo añade sin tocar el resto, conservando finales de línea y BOM) y ofrece confirmar solo ese archivo.
+- `init` en una carpeta sin repositorio git: `git init`, `.gitignore` con patrones de secretos (si no existía) y primer commit, con plan y confirmación previos, detección de archivos sensibles y aviso de carpetas servidas públicamente. Nunca modifica un `.gitignore` existente.
+- `run`, `watch`, `show`, `review`, `check` y `list` fuera de un repositorio indican ejecutar `agentrelay init`.
+
 ### Corregido
 
 - AgentRelay localiza Cline por sí mismo aunque falte el enlace `node_modules/.bin/cline`, que con npm 10 en Linux no se creaba tras `npm install` («cline: not found»). Si no hay enlace, ejecuta el lanzador del paquete con el propio Node.
@@ -13,6 +20,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- `agentrelay init` ya no crea `agentrelay.config.json` por defecto: ahora se hace con `init --with-config`.
 - Validado el flujo completo en Linux (Debian, Node 20) con un proyecto real.
 - README: aclarado que la tarea JSON la redacta el orquestador y que la conversación se hace con él; indicada la versión de Node recomendada.
 

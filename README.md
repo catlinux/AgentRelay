@@ -151,9 +151,15 @@ Comprueba el entorno desde el repositorio en el que vas a trabajar:
 agentrelay doctor
 ```
 
+Prepara tu orquestador una sola vez:
+
+```sh
+agentrelay setup
+```
+
 ## Uso
 
-**Quién escribe qué.** En el uso normal tú conversas con tu orquestador (por ejemplo, Claude Code en VS Code) y le pides el trabajo en lenguaje natural; es el orquestador quien redacta la tarea en JSON y ejecuta `agentrelay`. Para que sepa hacerlo, añade las instrucciones de [«Uso con Claude Code como orquestador»](#uso-con-claude-code-como-orquestador) al `CLAUDE.md` de tu proyecto. Los pasos de abajo describen lo que ocurre por debajo y sirven también para usar AgentRelay a mano, por ejemplo para probarlo.
+**Quién escribe qué.** En el uso normal tú conversas con tu orquestador (por ejemplo, Claude Code en VS Code) y le pides el trabajo en lenguaje natural; es el orquestador quien redacta la tarea en JSON y ejecuta `agentrelay`. Para que sepa hacerlo, ejecuta una vez `agentrelay setup` y, en cada proyecto, `agentrelay init` (ver [«Preparar el orquestador y los proyectos»](#preparar-el-orquestador-y-los-proyectos)). Los pasos de abajo describen lo que ocurre por debajo y sirven también para usar AgentRelay a mano, por ejemplo para probarlo.
 
 ### 1. Describe la tarea
 
@@ -209,7 +215,7 @@ agentrelay review <id> --decision reject
 - `fix` envía el feedback al ejecutor, vuelve a validar y deja la tarea otra vez pendiente de revisión. Cuenta como reintento.
 - `escalate` marca la tarea para que la resuelva el orquestador. Después puede validarse con `agentrelay check <id>` y aceptarse con `accept`.
 
-Otros comandos: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay init` (crea `agentrelay.config.json`).
+Otros comandos: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay setup` y `agentrelay init` (ver más abajo).
 
 Códigos de salida: `0` correcto, `1` error, `2` tarea escalada.
 
@@ -278,20 +284,34 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 
 Las credenciales no se guardan en la configuración de AgentRelay: las gestiona el ejecutor.
 
-## Uso con Claude Code como orquestador
+## Preparar el orquestador y los proyectos
 
-Claude Code puede usar AgentRelay directamente desde su terminal. Un ejemplo de instrucciones para el `CLAUDE.md` de tu proyecto:
+AgentRelay puede dejar listas las instrucciones que necesita el orquestador, sin pegar nada a mano en cada proyecto. Hoy está pensado para Claude Code.
 
-```markdown
-## Delegación con AgentRelay
-- Delega las tareas de implementación bien acotadas con `agentrelay run - <<'EOF' … EOF`,
-  escribiendo una tarea JSON con objective, files, acceptanceCriteria, validation y doNotModify.
-- Lee el informe (diff, validaciones, informe del ejecutor) y decide con
-  `agentrelay review <id> --decision accept|fix|escalate|reject`.
-- Si la tarea queda escalada, resuélvela tú y cierra con `--decision accept`.
+**Una sola vez, al instalar:**
+
+```sh
+agentrelay setup
 ```
 
-Para ver en directo lo que hace el ejecutor mientras hablas con Claude Code, deja `agentrelay watch` abierto en un terminal de VS Code.
+Añade, tras pedir confirmación, un bloque delimitado con marcas `<!-- agentrelay:start -->` … `<!-- agentrelay:end -->` al archivo de instrucciones global de Claude Code (`~/.claude/CLAUDE.md`). Así, en cualquier proyecto, Claude sabe que puede delegar con AgentRelay y que debe preparar el proyecto con `agentrelay init` si hace falta. Solo toca lo que hay entre las marcas y se puede retirar con `agentrelay setup --uninstall`. Sin terminal interactivo, añade `--yes`.
+
+**En cada proyecto:**
+
+```sh
+agentrelay init
+```
+
+- Añade al `CLAUDE.md` del proyecto el bloque con las instrucciones de delegación. Si el archivo no existe lo crea; si existe, añade el bloque al final sin tocar nada más, y al repetirlo solo actualiza lo que hay entre las marcas. Puedes añadir tus propias instrucciones en el mismo archivo.
+- Si el repositorio estaba limpio, ofrece confirmar solo ese archivo con un commit (AgentRelay necesita el repositorio sin cambios pendientes para delegar).
+- Si la carpeta **no es un repositorio git**, lo prepara: muestra qué hará y qué archivos entrarán, y tras tu confirmación ejecuta `git init`, crea un `.gitignore` con patrones de secretos (`.env`, claves, `wp-config.php`…) si no existía y hace un primer commit. Nunca modifica un `.gitignore` existente ni hace push. Avisa si la carpeta parece servida públicamente por un servidor web (`/var/www`, `public_html`…), porque `.agentrelay/` no debe quedar accesible desde Internet.
+- `--with-config` crea además `agentrelay.config.json`.
+
+Claude puede ejecutar `agentrelay init` por ti cuando detecta que el proyecto no está preparado; si no hay terminal interactivo, necesita `--yes` (te pedirá confirmación antes en la conversación).
+
+Nota: `CLAUDE.md` suele versionarse. Si el repositorio es público, el bloque de AgentRelay será visible en él.
+
+Para ver en directo lo que hace el ejecutor mientras hablas con el orquestador, deja `agentrelay watch` abierto en un terminal de VS Code.
 
 ## Archivos que genera
 

@@ -151,9 +151,15 @@ Check the environment from the repository you will work on:
 agentrelay doctor
 ```
 
+Set up your orchestrator once:
+
+```sh
+agentrelay setup
+```
+
 ## Usage
 
-**Who writes what.** In normal use you talk to your orchestrator (for example, Claude Code in VS Code) and ask for the work in plain language; the orchestrator writes the JSON task and runs `agentrelay`. For it to know how, add the instructions from ["Using Claude Code as the orchestrator"](#using-claude-code-as-the-orchestrator) to your project's `CLAUDE.md`. The steps below describe what happens underneath and also let you use AgentRelay by hand, for example to try it out.
+**Who writes what.** In normal use you talk to your orchestrator (for example, Claude Code in VS Code) and ask for the work in plain language; the orchestrator writes the JSON task and runs `agentrelay`. For it to know how, run `agentrelay setup` once and, in each project, `agentrelay init` (see ["Preparing the orchestrator and projects"](#preparing-the-orchestrator-and-projects)). The steps below describe what happens underneath and also let you use AgentRelay by hand, for example to try it out.
 
 ### 1. Describe the task
 
@@ -209,7 +215,7 @@ agentrelay review <id> --decision reject
 - `fix` sends the feedback to the executor, validates again and leaves the task awaiting review again. It counts as a retry.
 - `escalate` marks the task for the orchestrator to solve. It can later be validated with `agentrelay check <id>` and accepted with `accept`.
 
-Other commands: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay init` (creates `agentrelay.config.json`).
+Other commands: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay setup` and `agentrelay init` (see below).
 
 Exit codes: `0` success, `1` error, `2` task escalated.
 
@@ -278,20 +284,34 @@ Self-review does not replace the orchestrator's review: the executor checks whet
 
 Credentials are not stored in AgentRelay's configuration: the executor manages them.
 
-## Using Claude Code as the orchestrator
+## Preparing the orchestrator and projects
 
-Claude Code can use AgentRelay directly from its terminal. Example instructions for your project's `CLAUDE.md`:
+AgentRelay can set up the instructions the orchestrator needs, so you do not paste anything by hand in each project. Today it is designed for Claude Code.
 
-```markdown
-## Delegation with AgentRelay
-- Delegate well-scoped implementation tasks with `agentrelay run - <<'EOF' … EOF`,
-  writing a JSON task with objective, files, acceptanceCriteria, validation and doNotModify.
-- Read the report (diff, validations, executor report) and decide with
-  `agentrelay review <id> --decision accept|fix|escalate|reject`.
-- If the task is escalated, solve it yourself and close it with `--decision accept`.
+**Once, when installing:**
+
+```sh
+agentrelay setup
 ```
 
-To see live what the executor does while you talk to Claude Code, keep `agentrelay watch` open in a VS Code terminal.
+After asking for confirmation, it adds a block delimited by `<!-- agentrelay:start -->` … `<!-- agentrelay:end -->` markers to Claude Code's global instructions file (`~/.claude/CLAUDE.md`). That way, in any project, Claude knows it can delegate with AgentRelay and that it should prepare the project with `agentrelay init` when needed. It only touches what is between the markers and can be removed with `agentrelay setup --uninstall`. Without an interactive terminal, add `--yes`.
+
+**In each project:**
+
+```sh
+agentrelay init
+```
+
+- Adds the block with the delegation instructions to the project's `CLAUDE.md`. If the file does not exist it is created; if it exists, the block is appended without touching anything else, and running it again only updates what is between the markers. You can add your own instructions in the same file.
+- If the repository was clean, it offers to commit only that file (AgentRelay needs a repository without pending changes to delegate).
+- If the folder is **not a git repository**, it prepares one: it shows what it will do and which files will be included, and after your confirmation runs `git init`, creates a `.gitignore` with secret patterns (`.env`, keys, `wp-config.php`…) if there was none, and makes a first commit. It never modifies an existing `.gitignore` and never pushes. It warns if the folder looks served publicly by a web server (`/var/www`, `public_html`…), because `.agentrelay/` must not be reachable from the Internet.
+- `--with-config` also creates `agentrelay.config.json`.
+
+Claude can run `agentrelay init` for you when it detects the project is not prepared; without an interactive terminal it needs `--yes` (it will ask you for confirmation first in the conversation).
+
+Note: `CLAUDE.md` is usually versioned. If the repository is public, the AgentRelay block will be visible in it.
+
+To see live what the executor does while you talk to the orchestrator, keep `agentrelay watch` open in a VS Code terminal.
 
 ## Generated files
 
