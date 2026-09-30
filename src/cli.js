@@ -5,10 +5,11 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
 import { getExecutor } from './executors/index.js';
-import { commitPaths, isClean, isIgnored, repoRoot } from './git.js';
+import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
 import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, PROJECT_BLOCK, removeBlockFromFile } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
+import { prepareRepository } from './prepare.js';
 import { formatEvent } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
@@ -29,7 +30,7 @@ Uso:
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
-  agentrelay init                   Instala el bloque de AgentRelay en el CLAUDE.md del proyecto
+  agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -53,7 +54,7 @@ Opciones de setup:
   --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
 
 Opciones de init:
-  --yes                   Crea el commit de CLAUDE.md sin preguntar
+  --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)
   --with-config           Crea además ${CONFIG_FILE}
 
 Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
@@ -82,7 +83,7 @@ const OPTIONS = {
 async function resolveRoot(values) {
   const cwd = path.resolve(values.cwd || process.cwd());
   const root = await repoRoot(cwd);
-  if (!root) throw new Error(`${cwd} no es un repositorio git. AgentRelay necesita git para calcular y revisar los cambios.`);
+  if (!root) throw new Error(`${cwd} no es un repositorio git. Ejecuta "agentrelay init" para prepararlo (hace git init, crea un .gitignore con patrones de secretos y un primer commit, pidiendo confirmación).`);
   return root;
 }
 
@@ -271,8 +272,51 @@ async function cmdSetup(values) {
   return 0;
 }
 
+/** Crea agentrelay.config.json si se pidió con --with-config y no existe. */
+function writeConfigIfRequested(root, values) {
+  if (!values['with-config']) return;
+  const configFile = path.join(root, CONFIG_FILE);
+  if (existsSync(configFile)) {
+    process.stdout.write(`${configFile} ya existe; se mantiene.\n`);
+  } else {
+    const { level, executor, validation } = DEFAULT_CONFIG;
+    writeFileSync(configFile, `${JSON.stringify({ level, executor, validation }, null, 2)}\n`);
+    process.stdout.write(`Creado ${configFile}\n`);
+  }
+}
+
 async function cmdInit(values) {
-  const root = await resolveRoot(values);
+  const dir = path.resolve(values.cwd || process.cwd());
+  const root = await repoRoot(dir);
+
+  // Sin repositorio: preparar la carpeta (git init, .gitignore y primer commit).
+  if (!root) {
+    const result = await prepareRepository(dir, {
+      yes: values.yes,
+      out: (line) => process.stdout.write(`${line}\n`),
+      err: (line) => process.stderr.write(`${line}\n`),
+    });
+    if (result.status === 'needs-confirmation') return 1;
+    if (result.status === 'cancelled') {
+      process.stdout.write('Cancelado.\n');
+      return 0;
+    }
+
+    const file = path.join(dir, 'CLAUDE.md');
+    const { action } = applyBlockToFile(file, PROJECT_BLOCK);
+    const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
+    process.stdout.write(`${label} ${file}\n`);
+
+    const res = await commitAll(dir, 'Estado inicial (AgentRelay)');
+    if (res.ok) {
+      process.stdout.write('Repositorio preparado con un primer commit.\n');
+      writeConfigIfRequested(dir, values);
+      return 0;
+    }
+    process.stderr.write(`El repositorio se ha creado pero no se pudo crear el primer commit: ${res.error}. Configura tu identidad (git config user.name / user.email) y confirma los archivos con git add -A && git commit.\n`);
+    return 1;
+  }
+
   const file = path.join(root, 'CLAUDE.md');
 
   // Estado del repositorio antes de tocar nada.
@@ -300,16 +344,7 @@ async function cmdInit(values) {
     process.stderr.write('El repositorio tenía cambios pendientes: confirma CLAUDE.md con git antes de delegar (AgentRelay necesita el repositorio limpio).\n');
   }
 
-  if (values['with-config']) {
-    const configFile = path.join(root, CONFIG_FILE);
-    if (existsSync(configFile)) {
-      process.stdout.write(`${configFile} ya existe; se mantiene.\n`);
-    } else {
-      const { level, executor, validation } = DEFAULT_CONFIG;
-      writeFileSync(configFile, `${JSON.stringify({ level, executor, validation }, null, 2)}\n`);
-      process.stdout.write(`Creado ${configFile}\n`);
-    }
-  }
+  writeConfigIfRequested(root, values);
 
   return 0;
 }

@@ -87,3 +87,23 @@ export async function commitPaths(cwd, paths, message) {
     return { ok: false, error: error.message };
   }
 }
+
+/** Inicializa un repositorio git en cwd; lanza Error con el stderr si falla. */
+export async function initRepository(cwd) {
+  const res = await git(cwd, ['init'], { allowFail: true });
+  if (res.code !== 0) throw new Error(res.stderr.trim());
+  return res;
+}
+
+/** Añade todos los cambios y crea un commit; devuelve { ok, error } sin lanzar. */
+export async function commitAll(cwd, message) {
+  try {
+    const addRes = await git(cwd, ['add', '-A'], { allowFail: true });
+    if (addRes.code !== 0) return { ok: false, error: addRes.stderr.trim() };
+    const commitRes = await git(cwd, ['commit', '-m', message], { allowFail: true });
+    if (commitRes.code !== 0) return { ok: false, error: commitRes.stderr.trim() };
+    return { ok: true, error: '' };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
