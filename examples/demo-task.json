@@ -4,13 +4,14 @@
   "context": "Proyecto Node.js con módulos ES. Los tests usan node:test y se ejecutan con npm test.",
   "type": "feature",
   "complexity": "normal",
-  "files": ["src/text.js", "test/text.test.js"],
-  "constraints": ["Sin dependencias externas"],
+  "files": ["src/text.js", "spec/text.spec.js"],
+  "constraints": ["Sin dependencias externas", "No cambies el comportamiento de capitalize"],
   "acceptanceCriteria": [
     "slugify('Hola Mundo') devuelve 'hola-mundo'",
-    "Elimina acentos: slugify('Canción Española') devuelve 'cancion-espanola'",
+    "Elimina acentos y diacríticos: slugify('Canción Española') devuelve 'cancion-espanola'",
+    "Sustituye cualquier secuencia de caracteres no alfanuméricos por un único guion y elimina los guiones de los extremos: slugify('  ¡Hola,   mundo!  ') devuelve 'hola-mundo'",
     "slugify('') devuelve ''",
-    "Hay tests para slugify y pasan"
+    "Hay tests para slugify en spec/text.spec.js y pasan"
   ],
   "validation": ["npm test"],
   "doNotModify": ["package.json"]

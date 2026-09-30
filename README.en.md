@@ -6,7 +6,7 @@ Cross-platform AI agent orchestrator for software development. It lets a high-ca
 
 The goal is to reduce premium model usage without giving up supervision: the orchestrator plans, decides and validates; the executor implements.
 
-> **Status:** version 0.0.1, working prototype. The interface may change before 0.1.0.
+> **Status:** version 0.0.2, working prototype. The interface may change before 0.1.0.
 
 ## How it works
 
@@ -66,6 +66,85 @@ Cline CLI is installed as a dependency of AgentRelay and that copy is used. It s
 npx cline auth --provider deepseek --apikey <your-api-key> --modelid deepseek-v4-pro
 ```
 
+(from the AgentRelay folder)
+
+To update later: `git pull` and `npm install` in the AgentRelay folder.
+
+## Try AgentRelay in 5 minutes
+
+The repository includes a small demo project (`examples/demo`) and a task for it (`examples/demo-task.json`): add a `slugify` function with its tests. It costs less than one cent with DeepSeek.
+
+**1. Create a copy of the demo as a git repository** (outside the AgentRelay folder).
+
+PowerShell (Windows):
+
+```powershell
+$AR = "C:\path\to\AgentRelay"
+Copy-Item -Recurse "$AR\examples\demo" "$HOME\agentrelay-demo"
+cd "$HOME\agentrelay-demo"
+git init
+git add -A
+git commit -m "demo"
+```
+
+Bash (Linux/macOS/Git Bash):
+
+```sh
+AR=/path/to/AgentRelay
+cp -r "$AR/examples/demo" ~/agentrelay-demo
+cd ~/agentrelay-demo
+git init && git add -A && git commit -m "demo"
+```
+
+**2. Check the environment:**
+
+```sh
+agentrelay doctor
+```
+
+**3. Delegate the task and watch it work.** In PowerShell:
+
+```powershell
+agentrelay run "$AR\examples\demo-task.json"
+```
+
+In Bash: `agentrelay run "$AR/examples/demo-task.json"`.
+
+You will see each executor step live:
+
+```
+[00:00] ▶ Intento 1 (implement) · deepseek/deepseek-v4-pro
+[00:07]   piensa: I need to add and export a `slugify(text)` function in `src/text.js`…
+[00:07]   lee: ./src/text.js, ./spec/text.spec.js, ./package.json
+[00:18]   edita: ./src/text.js
+[00:20]   ejecuta: npm test
+[00:22]   tokens 39080/1339 · 0.0056 USD
+[00:25] ✔ Intento 1 completado en 23 s (done)
+[00:25]   validando…
+[00:26]   validación `npm test`: correcta
+[00:26] ■ Estado: awaiting_review (el nivel 3 revisa siempre)
+```
+
+(The CLI output is currently in Spanish.) When it finishes, the full report is printed: diff, validations and executor report.
+
+**4. Review and decide.** Look at the changes with `git diff` or in your editor, then:
+
+```sh
+agentrelay review <id> --decision fix --feedback "slugify must throw TypeError when it does not receive a string"
+agentrelay review <id> --decision accept
+```
+
+The `<id>` appears on the first line of the run and in `agentrelay list`. With `fix` you will see the executor correct its work live; `accept` re-runs the validations before accepting.
+
+**5. Try another level:** `agentrelay run <task> --level 4` adds a self-review in a second run; `--level 1` accepts automatically when validations pass. First commit or discard the changes from the previous test (`git stash -u`, `git checkout .` or a commit), because AgentRelay needs a clean repository.
+
+## Watching the work live
+
+- `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, commands it runs, its summarized reasoning, tokens, cost and validations). `--quiet` turns it off.
+- `agentrelay watch` follows, from **another terminal**, runs started by another process, for example an orchestrator such as Claude Code. Without an id it follows the latest run and switches to each new one until you press Ctrl+C; with an id it shows that run and exits when it is no longer in progress.
+
+In VS Code: open a split terminal, run `agentrelay watch` in one and work in the other or in the orchestrator's chat.
+
 Check the environment from the repository you will work on:
 
 ```sh
@@ -76,7 +155,7 @@ agentrelay doctor
 
 ### 1. Describe the task
 
-A JSON file (see [`examples/task.example.json`](examples/task.example.json)):
+A JSON file (see [`examples/demo-task.json`](examples/demo-task.json)):
 
 ```json
 {
@@ -128,7 +207,7 @@ agentrelay review <id> --decision reject
 - `fix` sends the feedback to the executor, validates again and leaves the task awaiting review again. It counts as a retry.
 - `escalate` marks the task for the orchestrator to solve. It can later be validated with `agentrelay check <id>` and accepted with `accept`.
 
-Other commands: `agentrelay list`, `agentrelay check [id]`, `agentrelay init` (creates `agentrelay.config.json`).
+Other commands: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay init` (creates `agentrelay.config.json`).
 
 Exit codes: `0` success, `1` error, `2` task escalated.
 
@@ -210,9 +289,11 @@ Claude Code can use AgentRelay directly from its terminal. Example instructions 
 - If the task is escalated, solve it yourself and close it with `--decision accept`.
 ```
 
+To see live what the executor does while you talk to Claude Code, keep `agentrelay watch` open in a VS Code terminal.
+
 ## Generated files
 
-Each run is stored in `.agentrelay/runs/<id>/` inside the repository: task, state, prompts sent, executor output (NDJSON), `diff.patch` and `report.md`. The `.agentrelay/` directory ignores itself and does not show up in `git status`.
+Each run is stored in `.agentrelay/runs/<id>/` inside the repository: task, state, prompts sent, executor output (NDJSON), events (`events.ndjson`), `diff.patch` and `report.md`. The `.agentrelay/` directory ignores itself and does not show up in `git status`.
 
 ## Usage and costs
 
@@ -227,9 +308,11 @@ Keep in mind that pay-per-use API access and subscriptions are different things:
 - By default it refuses to delegate on a repository with uncommitted changes.
 - It detects whether the executor creates commits or modifies protected files.
 
-## Limitations of version 0.0.1
+## Limitations of version 0.0.2
 
 - A single executor (Cline CLI). Tasks run one at a time.
+- There is no VS Code panel yet: it is used from the terminal (it is on the roadmap).
+- The CLI output and reports are in Spanish.
 - The executor's structured report depends on the model returning it; otherwise its final text is shown. Objective data (diff, validations) is always computed by AgentRelay.
 - The separate self-review pass starts a new executor session.
 - Validated on Windows; Linux and macOS are supported by design but have not been tested on those systems yet.

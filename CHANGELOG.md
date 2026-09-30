@@ -4,11 +4,25 @@ Todos los cambios relevantes de AgentRelay se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
-## [Sin publicar]
+## [0.0.2] - 2026-09-30
+
+Actividad en directo e instalación en un solo paso.
+
+### Añadido
+
+- Salida en directo en `run` y `review`: fases, archivos que el ejecutor lee o edita, comandos que ejecuta, razonamiento resumido, tokens, coste estimado y validaciones, con marca de tiempo `[mm:ss]`. `--quiet` la desactiva.
+- Registro de eventos estructurados por ejecución en `.agentrelay/runs/<id>/events.ndjson`.
+- Comando `agentrelay watch [id]` para seguir en directo, desde otro terminal, las ejecuciones lanzadas por otro proceso.
+- Proyecto de demostración (`examples/demo`) y tarea de ejemplo (`examples/demo-task.json`) con una guía para probar AgentRelay en pocos minutos.
 
 ### Cambiado
 
 - Cline CLI pasa a ser una dependencia de AgentRelay (versión fijada 3.0.66): `npm install` instala todo lo necesario y AgentRelay usa esa copia por defecto.
+- `examples/task.example.json` se sustituye por `examples/demo-task.json`.
+
+### Corregido
+
+- Con Ctrl+C en Linux y macOS, los procesos hijos se terminan sin impedir que otros comandos (como `watch`) salgan limpiamente.
 
 ## [0.0.1] - 2026-09-30
 

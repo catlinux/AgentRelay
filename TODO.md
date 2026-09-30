@@ -4,6 +4,12 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 
 ## 0.0.x — Prototipo
 
+- [x] Salida en directo y comando `watch` (0.0.2).
+- [x] Cline CLI como dependencia: instalación en un solo paso (0.0.2).
+- [ ] Panel de AgentRelay en VS Code, solo lectura: lista de ejecuciones, actividad en directo, informe y diff en el editor de diferencias nativo (0.0.3).
+- [ ] Panel de VS Code: botones de revisión (aceptar, corregir, escalar, rechazar) que registran si decide el usuario o el orquestador, y barra de estado (0.0.4).
+- [ ] Comando para activar AgentRelay en un proyecto (añadir las instrucciones de delegación al `CLAUDE.md` con confirmación).
+- [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja.
 - [ ] Probar el flujo completo en Linux y macOS.
 - [ ] Integración continua con tests en Windows, Linux y macOS.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.

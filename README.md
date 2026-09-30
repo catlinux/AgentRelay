@@ -6,7 +6,7 @@ Orquestador multiplataforma de agentes de IA para desarrollo de software. Permit
 
 El objetivo es reducir el consumo de modelos premium sin renunciar a la supervisión: el orquestador planifica, decide y valida; el ejecutor implementa.
 
-> **Estado:** versión 0.0.1, prototipo funcional. La interfaz puede cambiar antes de la 0.1.0.
+> **Estado:** versión 0.0.2, prototipo funcional. La interfaz puede cambiar antes de la 0.1.0.
 
 ## Cómo funciona
 
@@ -66,6 +66,85 @@ Cline CLI se instala como dependencia de AgentRelay y se usa esa copia. Comparte
 npx cline auth --provider deepseek --apikey <tu-api-key> --modelid deepseek-v4-pro
 ```
 
+(desde la carpeta de AgentRelay)
+
+Para actualizar más adelante: `git pull` y `npm install` en la carpeta de AgentRelay.
+
+## Probar AgentRelay en 5 minutos
+
+El repositorio incluye un pequeño proyecto de demostración (`examples/demo`) y una tarea para él (`examples/demo-task.json`): añadir una función `slugify` con sus tests. El coste con DeepSeek es de menos de un céntimo.
+
+**1. Crea una copia de la demo como repositorio git** (fuera de la carpeta de AgentRelay).
+
+PowerShell (Windows):
+
+```powershell
+$AR = "C:\ruta\a\AgentRelay"
+Copy-Item -Recurse "$AR\examples\demo" "$HOME\agentrelay-demo"
+cd "$HOME\agentrelay-demo"
+git init
+git add -A
+git commit -m "demo"
+```
+
+Bash (Linux/macOS/Git Bash):
+
+```sh
+AR=/ruta/a/AgentRelay
+cp -r "$AR/examples/demo" ~/agentrelay-demo
+cd ~/agentrelay-demo
+git init && git add -A && git commit -m "demo"
+```
+
+**2. Comprueba el entorno:**
+
+```sh
+agentrelay doctor
+```
+
+**3. Delega la tarea y mira cómo trabaja.** En PowerShell:
+
+```powershell
+agentrelay run "$AR\examples\demo-task.json"
+```
+
+En Bash: `agentrelay run "$AR/examples/demo-task.json"`.
+
+Verás en directo cada paso del ejecutor:
+
+```
+[00:00] ▶ Intento 1 (implement) · deepseek/deepseek-v4-pro
+[00:07]   piensa: I need to add and export a `slugify(text)` function in `src/text.js`…
+[00:07]   lee: ./src/text.js, ./spec/text.spec.js, ./package.json
+[00:18]   edita: ./src/text.js
+[00:20]   ejecuta: npm test
+[00:22]   tokens 39080/1339 · 0.0056 USD
+[00:25] ✔ Intento 1 completado en 23 s (done)
+[00:25]   validando…
+[00:26]   validación `npm test`: correcta
+[00:26] ■ Estado: awaiting_review (el nivel 3 revisa siempre)
+```
+
+Al terminar se imprime el informe completo: diff, validaciones e informe del ejecutor.
+
+**4. Revisa y decide.** Mira los cambios con `git diff` o en tu editor y después:
+
+```sh
+agentrelay review <id> --decision fix --feedback "slugify debe lanzar TypeError si no recibe un string"
+agentrelay review <id> --decision accept
+```
+
+El `<id>` aparece en la primera línea de la ejecución y en `agentrelay list`. Con `fix` verás en directo cómo el ejecutor corrige; `accept` repite las validaciones antes de aceptar.
+
+**5. Prueba con otro nivel:** `agentrelay run <tarea> --level 4` añade una self-review en una segunda ejecución; `--level 1` acepta automáticamente si las validaciones pasan. Antes, confirma o descarta los cambios de la prueba anterior (`git stash -u`, `git checkout .` o un commit), porque AgentRelay necesita el repositorio limpio.
+
+## Ver el trabajo en directo
+
+- `agentrelay run` y `agentrelay review` muestran la actividad por la salida de error mientras ocurre (fases, archivos que lee o edita el ejecutor, comandos que ejecuta, su razonamiento resumido, tokens, coste y validaciones). `--quiet` la desactiva.
+- `agentrelay watch` sigue desde **otro terminal** las ejecuciones que lance otro proceso, por ejemplo un orquestador como Claude Code. Sin id sigue la más reciente y salta a cada ejecución nueva hasta que pulses Ctrl+C; con un id muestra esa ejecución y termina cuando deja de estar en curso.
+
+En VS Code: abre un terminal dividido, ejecuta `agentrelay watch` en uno y trabaja en el otro o en el chat del orquestador.
+
 Comprueba el entorno desde el repositorio en el que vas a trabajar:
 
 ```sh
@@ -76,7 +155,7 @@ agentrelay doctor
 
 ### 1. Describe la tarea
 
-Un archivo JSON (ver [`examples/task.example.json`](examples/task.example.json)):
+Un archivo JSON (ver [`examples/demo-task.json`](examples/demo-task.json)):
 
 ```json
 {
@@ -128,7 +207,7 @@ agentrelay review <id> --decision reject
 - `fix` envía el feedback al ejecutor, vuelve a validar y deja la tarea otra vez pendiente de revisión. Cuenta como reintento.
 - `escalate` marca la tarea para que la resuelva el orquestador. Después puede validarse con `agentrelay check <id>` y aceptarse con `accept`.
 
-Otros comandos: `agentrelay list`, `agentrelay check [id]`, `agentrelay init` (crea `agentrelay.config.json`).
+Otros comandos: `agentrelay list`, `agentrelay watch [id]`, `agentrelay check [id]`, `agentrelay init` (crea `agentrelay.config.json`).
 
 Códigos de salida: `0` correcto, `1` error, `2` tarea escalada.
 
@@ -210,9 +289,11 @@ Claude Code puede usar AgentRelay directamente desde su terminal. Un ejemplo de 
 - Si la tarea queda escalada, resuélvela tú y cierra con `--decision accept`.
 ```
 
+Para ver en directo lo que hace el ejecutor mientras hablas con Claude Code, deja `agentrelay watch` abierto en un terminal de VS Code.
+
 ## Archivos que genera
 
-Cada ejecución se guarda en `.agentrelay/runs/<id>/` dentro del repositorio: tarea, estado, prompts enviados, salida del ejecutor (NDJSON), `diff.patch` e `report.md`. El directorio `.agentrelay/` se ignora a sí mismo y no aparece en `git status`.
+Cada ejecución se guarda en `.agentrelay/runs/<id>/` dentro del repositorio: tarea, estado, prompts enviados, salida del ejecutor (NDJSON), eventos (`events.ndjson`), `diff.patch` y `report.md`. El directorio `.agentrelay/` se ignora a sí mismo y no aparece en `git status`.
 
 ## Consumo y costes
 
@@ -227,9 +308,10 @@ Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosa
 - Por defecto se niega a delegar sobre un repositorio con cambios sin confirmar.
 - Detecta si el ejecutor crea commits o modifica archivos protegidos.
 
-## Limitaciones de la versión 0.0.1
+## Limitaciones de la versión 0.0.2
 
 - Un único ejecutor (Cline CLI). Las tareas se ejecutan de una en una.
+- Todavía no hay panel en VS Code: se usa desde el terminal (está en la hoja de ruta).
 - El informe estructurado del ejecutor depende de que el modelo lo devuelva; si no lo hace, se muestra su texto final. Los datos objetivos (diff, validaciones) los calcula siempre AgentRelay.
 - La self-review en pasada separada empieza una sesión nueva del ejecutor.
 - Validado en Windows; Linux y macOS están soportados por diseño, pero todavía no se han probado en esos sistemas.
