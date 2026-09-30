@@ -187,10 +187,12 @@ async function cmdDoctor(values) {
   if (config) {
     const executor = config.executor;
     try {
-      const version = await getExecutor(executor.type).version(executor);
+      const adapter = getExecutor(executor.type);
+      const version = await adapter.version(executor);
       line(true, `Ejecutor ${executor.type} ${version} · ${executor.provider}/${executor.model}`);
+      process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
     } catch (error) {
-      line(false, `Ejecutor ${executor.type} no disponible (${error.message}). Instálalo con: npm install -g cline`);
+      line(false, `Ejecutor ${executor.type} no disponible (${error.message}). Ejecuta "npm install" en la carpeta de AgentRelay.`);
     }
   }
   return ok ? 0 : 1;

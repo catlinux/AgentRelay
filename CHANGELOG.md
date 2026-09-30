@@ -4,6 +4,12 @@ Todos los cambios relevantes de AgentRelay se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Cambiado
+
+- Cline CLI pasa a ser una dependencia de AgentRelay (versión fijada 3.0.66): `npm install` instala todo lo necesario y AgentRelay usa esa copia por defecto.
+
 ## [0.0.1] - 2026-09-30
 
 Primera versión: prototipo funcional del flujo de delegación.

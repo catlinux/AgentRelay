@@ -5,14 +5,26 @@
 // que le indica leerlo: así se evitan los límites y problemas de quoting de la
 // línea de comandos (en Windows, Cline no acepta el prompt por stdin).
 
-import { runProcess } from '../proc.js';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { IS_WINDOWS, runProcess } from '../proc.js';
 
 export const name = 'cline';
 
 // Margen sobre el timeout propio de Cline antes de terminar el proceso.
 const KILL_GRACE_MS = 60_000;
 
+// Cline CLI es una dependencia de AgentRelay: se instala con él.
+export const BUNDLED_CLINE = fileURLToPath(
+  new URL(`../../node_modules/.bin/cline${IS_WINDOWS ? '.cmd' : ''}`, import.meta.url),
+);
+
+/**
+ * "cline" (valor por defecto) usa la copia instalada con AgentRelay y, si no
+ * existe, la del PATH. Cualquier otro valor se usa tal cual.
+ */
 export function commandParts(command) {
+  if (command === 'cline' && existsSync(BUNDLED_CLINE)) return [BUNDLED_CLINE];
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
   if (!parts.length || !parts[0]) throw new Error('executor.command está vacío');
   return parts;
@@ -118,7 +130,7 @@ export async function run({ executor, cwd, promptFile }) {
   let error = null;
   if (res.error) {
     error = res.error.code === 'ENOENT'
-      ? `No se encuentra el ejecutor "${command}". Instala Cline CLI (npm install -g cline) o ajusta executor.command.`
+      ? `No se encuentra el ejecutor "${command}". Ejecuta "npm install" en la carpeta de AgentRelay o ajusta executor.command.`
       : res.error.message;
   } else if (res.timedOut) {
     error = `El ejecutor ha superado el tiempo máximo (${executor.timeoutSeconds} s)`;

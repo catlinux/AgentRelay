@@ -45,7 +45,7 @@ The design allows adding other executors and providers later.
 
 - Node.js 20 or later.
 - Git. The working directory must be a git repository.
-- Cline CLI installed with a configured provider.
+- A provider configured in Cline (for example, a DeepSeek API key).
 
 Windows, Linux and macOS.
 
@@ -54,19 +54,17 @@ Windows, Linux and macOS.
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
 cd AgentRelay
+npm install         # also installs Cline CLI, the executor
 npm link            # makes the "agentrelay" command available
 ```
 
 Without `npm link` you can also use `node <path>/bin/agentrelay.js`.
 
-Install and configure the executor:
+Cline CLI is installed as a dependency of AgentRelay and that copy is used. It shares its configuration with the Cline extension for VS Code (`~/.cline/data`): if you already configured it, there is nothing else to do. Otherwise, configure the provider once:
 
 ```sh
-npm install -g cline
-cline auth --provider deepseek --apikey <your-api-key> --modelid deepseek-v4-pro
+npx cline auth --provider deepseek --apikey <your-api-key> --modelid deepseek-v4-pro
 ```
-
-If you already use the Cline extension for VS Code, the CLI shares its configuration (`~/.cline/data`) and you may not need `cline auth`.
 
 Check the environment from the repository you will work on:
 
@@ -257,4 +255,6 @@ Copies and forks must keep this attribution and link to https://github.com/catli
 
 ### Third-party material
 
-This project contains no third-party material.
+| Component | Author | License | Link |
+| --- | --- | --- | --- |
+| Cline CLI (npm dependency, not included in the repository) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |

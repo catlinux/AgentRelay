@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.js';
-import { buildArgs, extractAgentReport, parseOutput } from '../src/executors/cline.js';
+import {
+  buildArgs, BUNDLED_CLINE, commandParts, extractAgentReport, parseOutput,
+} from '../src/executors/cline.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
 import { normalizeTask } from '../src/task.js';
@@ -51,6 +53,13 @@ test('cline: extrae el informe estructurado del texto final', () => {
 test('cline: argumentos de línea de comandos', () => {
   const args = buildArgs({ provider: 'deepseek', model: 'deepseek-v4-pro', thinking: 'high', timeoutSeconds: 60, extraArgs: ['-v'] }, 'instr');
   assert.deepEqual(args, ['--json', '--auto-approve', 'true', '-P', 'deepseek', '-m', 'deepseek-v4-pro', '--thinking', 'high', '-t', '60', '-v', 'instr']);
+});
+
+test('cline: usa la copia instalada con AgentRelay cuando existe', () => {
+  const expected = existsSync(BUNDLED_CLINE) ? [BUNDLED_CLINE] : ['cline'];
+  assert.deepEqual(commandParts('cline'), expected);
+  assert.deepEqual(commandParts(['node', 'x.js']), ['node', 'x.js']);
+  assert.deepEqual(commandParts('/opt/cline'), ['/opt/cline']);
 });
 
 test('proc: quoting seguro para cmd.exe', () => {
