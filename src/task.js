@@ -45,7 +45,7 @@ export function loadTask(source) {
   }
   let raw;
   try {
-    raw = JSON.parse(text);
+    raw = JSON.parse(text.replace(/^﻿/, ''));
   } catch (error) {
     throw new Error(`La tarea no es JSON válido: ${error.message}`);
   }

@@ -4,6 +4,17 @@ Todos los cambios relevantes de AgentRelay se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Corregido
+
+- AgentRelay localiza Cline por sí mismo aunque falte el enlace `node_modules/.bin/cline`, que con npm 10 en Linux no se creaba tras `npm install` («cline: not found»). Si no hay enlace, ejecuta el lanzador del paquete con el propio Node.
+- Los archivos JSON de configuración y de tarea con BOM (los que guardan el Bloc de notas o PowerShell en Windows) ya se aceptan.
+
+### Cambiado
+
+- README: aclarado que la tarea JSON la redacta el orquestador y que la conversación se hace con él; indicada la versión de Node recomendada.
+
 ## [0.0.2] - 2026-09-30
 
 Actividad en directo e instalación en un solo paso.

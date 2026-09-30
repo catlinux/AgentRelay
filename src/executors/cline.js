@@ -6,6 +6,7 @@
 // línea de comandos (en Windows, Cline no acepta el prompt por stdin).
 
 import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IS_WINDOWS, runProcess } from '../proc.js';
 
@@ -15,16 +16,31 @@ export const name = 'cline';
 const KILL_GRACE_MS = 60_000;
 
 // Cline CLI es una dependencia de AgentRelay: se instala con él.
-export const BUNDLED_CLINE = fileURLToPath(
-  new URL(`../../node_modules/.bin/cline${IS_WINDOWS ? '.cmd' : ''}`, import.meta.url),
-);
+const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * Localiza el Cline instalado con AgentRelay. No basta con el enlace de
+ * node_modules/.bin, que según la versión de npm puede no crearse (se ha visto
+ * en Linux con npm 10): en ese caso se ejecuta el lanzador del paquete con el
+ * propio Node. Devuelve null si no hay ninguna copia instalada.
+ */
+export function findBundledCline(root = PROJECT_ROOT, exists = existsSync) {
+  const link = path.join(root, 'node_modules', '.bin', `cline${IS_WINDOWS ? '.cmd' : ''}`);
+  if (exists(link)) return [link];
+  const launcher = path.join(root, 'node_modules', 'cline', 'bin', 'cline');
+  if (exists(launcher)) return [process.execPath, launcher];
+  return null;
+}
 
 /**
  * "cline" (valor por defecto) usa la copia instalada con AgentRelay y, si no
  * existe, la del PATH. Cualquier otro valor se usa tal cual.
  */
 export function commandParts(command) {
-  if (command === 'cline' && existsSync(BUNDLED_CLINE)) return [BUNDLED_CLINE];
+  if (command === 'cline') {
+    const bundled = findBundledCline();
+    if (bundled) return bundled;
+  }
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
   if (!parts.length || !parts[0]) throw new Error('executor.command está vacío');
   return parts;

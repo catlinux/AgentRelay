@@ -43,7 +43,7 @@ The design allows adding other executors and providers later.
 
 ## Requirements
 
-- Node.js 20 or later.
+- Node.js 20 or later (22 or later is recommended: with Node 20, Cline warns that it cannot read the system certificate store; this only matters on networks with corporate or self-signed certificates).
 - Git. The working directory must be a git repository.
 - A provider configured in Cline (for example, a DeepSeek API key).
 
@@ -152,6 +152,8 @@ agentrelay doctor
 ```
 
 ## Usage
+
+**Who writes what.** In normal use you talk to your orchestrator (for example, Claude Code in VS Code) and ask for the work in plain language; the orchestrator writes the JSON task and runs `agentrelay`. For it to know how, add the instructions from ["Using Claude Code as the orchestrator"](#using-claude-code-as-the-orchestrator) to your project's `CLAUDE.md`. The steps below describe what happens underneath and also let you use AgentRelay by hand, for example to try it out.
 
 ### 1. Describe the task
 

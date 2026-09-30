@@ -5,12 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.js';
 import {
-  buildArgs, BUNDLED_CLINE, commandParts, describeTool, extractAgentReport, parseOutput, toActivity,
+  buildArgs, commandParts, describeTool, extractAgentReport, findBundledCline, parseOutput, toActivity,
 } from '../src/executors/cline.js';
 import { appendEvent, formatEvent, readEvents } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
-import { normalizeTask } from '../src/task.js';
+import { loadTask, normalizeTask } from '../src/task.js';
 import { scopeViolations } from '../src/validate.js';
 
 // Salida real de Cline CLI 3.0.66 (recortada).
@@ -56,11 +56,21 @@ test('cline: argumentos de línea de comandos', () => {
   assert.deepEqual(args, ['--json', '--auto-approve', 'true', '-P', 'deepseek', '-m', 'deepseek-v4-pro', '--thinking', 'high', '-t', '60', '-v', 'instr']);
 });
 
-test('cline: usa la copia instalada con AgentRelay cuando existe', () => {
-  const expected = existsSync(BUNDLED_CLINE) ? [BUNDLED_CLINE] : ['cline'];
-  assert.deepEqual(commandParts('cline'), expected);
+test('cline: localiza la copia instalada aunque falte el enlace de .bin', () => {
+  const root = path.join('base');
+  const link = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'cline.cmd' : 'cline');
+  const launcher = path.join(root, 'node_modules', 'cline', 'bin', 'cline');
+  assert.deepEqual(findBundledCline(root, (p) => p === link || p === launcher), [link]);
+  // Caso de Linux con npm 10: sin enlace, se ejecuta el lanzador con el propio Node.
+  assert.deepEqual(findBundledCline(root, (p) => p === launcher), [process.execPath, launcher]);
+  assert.equal(findBundledCline(root, () => false), null);
+});
+
+test('cline: commandParts respeta los valores explícitos', () => {
   assert.deepEqual(commandParts(['node', 'x.js']), ['node', 'x.js']);
   assert.deepEqual(commandParts('/opt/cline'), ['/opt/cline']);
+  const parts = commandParts('cline');
+  assert.ok(parts.length >= 1 && parts.every((p) => typeof p === 'string'));
 });
 
 test('proc: quoting seguro para cmd.exe', () => {
@@ -130,6 +140,20 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
     assert.deepEqual(config.executor.command, ['node', 'cline.js']);
     assert.equal(config.executor.provider, 'deepseek');
     assert.throws(() => loadConfig({ cwd: dir, overrides: { level: 9 } }), /1-5/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('config y tarea: aceptan archivos JSON con BOM', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-bom-'));
+  try {
+    const configFile = path.join(dir, 'c.json');
+    const taskFile = path.join(dir, 't.json');
+    writeFileSync(configFile, '﻿{"level":2}');
+    writeFileSync(taskFile, '﻿{"objective":"x"}');
+    assert.equal(loadConfig({ cwd: dir, configPath: configFile }).config.level, 2);
+    assert.equal(loadTask(taskFile).objective, 'x');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

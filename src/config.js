@@ -50,7 +50,8 @@ export function merge(base, override) {
 
 function readJson(file) {
   try {
-    return JSON.parse(readFileSync(file, 'utf8'));
+    // Editores de Windows (Bloc de notas, PowerShell) pueden guardar con BOM.
+    return JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, ''));
   } catch (error) {
     throw new Error(`No se puede leer la configuración ${file}: ${error.message}`);
   }
