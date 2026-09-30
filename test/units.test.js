@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../src/config.js';
+import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
 import {
   buildArgs, commandParts, describeTool, extractAgentReport, findBundledCline, parseOutput, toActivity,
 } from '../src/executors/cline.js';
+import {
+  buildArgs as codexBuildArgs, findCodex, parseOutput as codexParseOutput, toActivity as codexToActivity,
+} from '../src/executors/codex.js';
 import { appendEvent, formatEvent, readEvents } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
@@ -21,6 +24,141 @@ const CLINE_OUTPUT = [
   '{"ts":"2026-09-30T16:40:50.545Z","type":"agent_event","event":{"type":"done","reason":"completed","text":"DONE","iterations":3,"usage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"totalCost":0.002883615}}}',
   '{"ts":"2026-09-30T16:40:50.781Z","type":"run_result","finishReason":"completed","iterations":3,"usage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"cacheWriteTokens":0,"totalCost":0.002883615},"aggregateUsage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"cacheWriteTokens":0,"totalCost":0.002883615},"durationMs":6763,"text":"DONE","model":{"id":"deepseek-v4-pro","provider":"deepseek"}}',
 ].join('\n');
+
+// Salida real de Codex CLI 0.155 (`codex exec --json`).
+const CODEX_OUTPUT = [
+  '{"type":"thread.started","thread_id":"01a0f42b-1e85-7773-8614-73c5f12db173"}',
+  '{"type":"turn.started"}',
+  '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Voy a crear b.txt."}}',
+  '{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"powershell.exe -Command \\"Set-Content b.txt adios\\"","status":"in_progress"}}',
+  '{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"powershell.exe -Command \\"Set-Content b.txt adios\\"","exit_code":0,"status":"completed"}}',
+  '{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"{\\"status\\":\\"done\\",\\"summary\\":\\"Creado b.txt.\\",\\"filesChanged\\":[\\"b.txt\\"]}"}}',
+  '{"type":"turn.completed","usage":{"input_tokens":27706,"cached_input_tokens":13056,"output_tokens":246,"reasoning_output_tokens":62}}',
+].join('\n');
+
+test('codex: interpreta el JSONL real', () => {
+  const parsed = codexParseOutput(CODEX_OUTPUT);
+  assert.equal(parsed.finishReason, 'completed');
+  assert.deepEqual(parsed.usage, { inputTokens: 27706, outputTokens: 246, cacheReadTokens: 13056 });
+  assert.equal(parsed.toolCalls, 1);
+  assert.equal(parsed.threadId, '01a0f42b-1e85-7773-8614-73c5f12db173');
+  assert.equal(parsed.model, null);
+  const report = extractAgentReport(parsed.text);
+  assert.equal(report.status, 'done');
+  assert.deepEqual(report.filesChanged, ['b.txt']);
+});
+
+test('codex: recoge los errores (turn.failed, error suelto y líneas no válidas)', () => {
+  const failed = codexParseOutput([
+    '{"type":"turn.started"}',
+    '{"type":"turn.failed","error":{"message":"límite de uso alcanzado"}}',
+    'texto suelto',
+    '{roto',
+  ].join('\n'));
+  assert.equal(failed.finishReason, 'failed');
+  assert.deepEqual(failed.errors, ['límite de uso alcanzado']);
+  assert.equal(failed.usage, null);
+
+  const errors = codexParseOutput(
+    '{"type":"error","message":"boom"}\n{"type":"item.completed","item":{"id":"i","type":"error","message":"ups"}}',
+  );
+  assert.deepEqual(errors.errors, ['boom', 'ups']);
+});
+
+test('codex: argumentos de línea de comandos', () => {
+  assert.deepEqual(
+    codexBuildArgs({ provider: null, model: null, thinking: null, extraArgs: [] }, 'instr', 'run/codex-report.schema.json'),
+    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 'run/codex-report.schema.json', 'instr'],
+  );
+  assert.deepEqual(
+    codexBuildArgs({ provider: 'openai', model: 'gpt-6-luna', thinking: 'high', extraArgs: ['--skip-git-repo-check'] }, 'instr', 's.json'),
+    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 's.json', '-m', 'gpt-6-luna', '-c', 'model_reasoning_effort=high', '--skip-git-repo-check', 'instr'],
+  );
+  // Sin modelo, sin thinking y sin extraArgs: solo el esquema y la instrucción.
+  const args = codexBuildArgs({}, 'hola', 's.json');
+  assert.deepEqual(args.slice(-2), ['s.json', 'hola']);
+  assert.equal(args.includes('-m'), false);
+  assert.equal(args.includes('-c'), false);
+  // El proveedor se ignora: Codex usa la sesión de ChatGPT.
+  assert.equal(codexBuildArgs({ provider: 'deepseek' }, 'i', 's.json').includes('-P'), false);
+
+  // Los argumentos que genera AgentRelay deben sobrevivir al quoting de cmd.exe
+  // (Windows rechaza las comillas dobles en los argumentos): por eso el valor de
+  // `-c` va sin comillas y Codex lo usa como cadena literal.
+  for (const arg of codexBuildArgs({ model: 'gpt-6-luna', thinking: 'xhigh' }, 'i', 's.json')) {
+    assert.doesNotThrow(() => quoteWindowsArg(arg));
+  }
+});
+
+test('codex: toActivity convierte los eventos JSONL en actividades', () => {
+  const cwd = 'C:\\repo';
+  assert.deepEqual(
+    codexToActivity({ type: 'item.started', item: { id: 'i', type: 'command_execution', command: 'powershell.exe -Command "Set-Content C:\\repo\\b.txt adios"' } }, cwd),
+    { kind: 'tool', tool: 'command', detail: 'powershell.exe -Command "Set-Content ./b.txt adios"' },
+  );
+  assert.deepEqual(
+    codexToActivity({ type: 'item.completed', item: { id: 'i', type: 'file_change', changes: [{ path: 'C:\\repo\\a.txt', kind: 'add' }, { path: 'C:\\repo\\b.txt', kind: 'update' }] } }, cwd),
+    { kind: 'tool', tool: 'edit', detail: './a.txt, ./b.txt' },
+  );
+  assert.deepEqual(
+    codexToActivity({ type: 'item.completed', item: { id: 'i', type: 'reasoning', text: 'Voy a crear b.txt.\n\nDespués lo reviso.' } }, cwd),
+    { kind: 'thinking', text: 'Voy a crear b.txt.' },
+  );
+  assert.deepEqual(
+    codexToActivity({ type: 'turn.completed', usage: { input_tokens: 100, cached_input_tokens: 20, output_tokens: 7, reasoning_output_tokens: 2 } }, cwd),
+    { kind: 'usage', inputTokens: 100, outputTokens: 7 },
+  );
+  assert.deepEqual(codexToActivity({ type: 'turn.failed', error: { message: 'boom' } }, cwd), { kind: 'error', message: 'boom' });
+  assert.deepEqual(codexToActivity({ type: 'error', message: 'boom' }, cwd), { kind: 'error', message: 'boom' });
+  assert.equal(codexToActivity({ type: 'turn.started' }, cwd), null);
+  assert.equal(codexToActivity({ type: 'item.completed', item: { id: 'i', type: 'agent_message', text: 'hola' } }, cwd), null);
+  assert.equal(codexToActivity({ type: 'item.started', item: { id: 'i', type: 'reasoning' } }, cwd), null);
+});
+
+test('codex: localiza el binario en el PATH o en la extensión de VS Code', () => {
+  const home = path.join('home', 'u');
+
+  // 1) El PATH tiene prioridad.
+  const pathDir = path.join('usr', 'local', 'bin');
+  const fromPath = path.join(pathDir, 'codex');
+  assert.deepEqual(
+    findCodex({
+      env: { PATH: `${path.join('otro', 'dir')}${path.delimiter}${pathDir}` },
+      home,
+      platform: 'linux',
+      exists: (p) => p === fromPath,
+      readdir: () => [],
+    }),
+    [fromPath],
+  );
+
+  // En Windows también vale la variable "Path" y los ejecutables .exe/.cmd.
+  const winDir = 'tools';
+  const fromCmd = path.join(winDir, 'codex.cmd');
+  assert.deepEqual(
+    findCodex({ env: { Path: winDir }, home, platform: 'win32', exists: (p) => p === fromCmd, readdir: () => [] }),
+    [fromCmd],
+  );
+
+  // 2) Sin PATH, la copia que trae la extensión (la versión más nueva primero).
+  const base = path.join(home, '.vscode', 'extensions');
+  const older = 'openai.chatgpt-26.1.0-win32-x64';
+  const newer = 'openai.chatgpt-26.917.62051-win32-x64';
+  const olderCodex = path.join(base, older, 'bin', 'windows-x86_64', 'codex.exe');
+  const newerCodex = path.join(base, newer, 'bin', 'windows-x86_64', 'codex.exe');
+  const readdir = (dir) => {
+    if (dir === base) return ['otra.extension-1.0.0', older, newer];
+    if (dir === path.join(base, newer, 'bin') || dir === path.join(base, older, 'bin')) return ['windows-x86_64'];
+    return [];
+  };
+  assert.deepEqual(
+    findCodex({ env: {}, home, platform: 'win32', exists: (p) => p === olderCodex || p === newerCodex, readdir }),
+    [newerCodex],
+  );
+
+  // 3) Nada instalado: null, y no falla aunque los directorios no existan.
+  assert.equal(findCodex({ env: {}, home, platform: 'linux', exists: () => false, readdir: () => { throw new Error('no existe'); } }), null);
+});
 
 test('cline: interpreta el NDJSON real', () => {
   const parsed = parseOutput(CLINE_OUTPUT);
@@ -145,6 +283,46 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
   }
 });
 
+test('config: los valores por defecto de executor dependen del tipo', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
+  try {
+    // Sin archivos: Cline con sus valores de siempre.
+    const byDefault = loadConfig({ cwd: dir }).config;
+    assert.equal(byDefault.executor.type, 'cline');
+    assert.equal(byDefault.executor.command, 'cline');
+    assert.equal(byDefault.executor.provider, 'deepseek');
+    assert.equal(byDefault.executor.model, 'deepseek-v4-pro');
+
+    // Codex: comando propio y sin proveedor ni modelo (usa la sesión de ChatGPT).
+    writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex' } }));
+    const codex = loadConfig({ cwd: dir }).config;
+    assert.equal(codex.executor.type, 'codex');
+    assert.equal(codex.executor.command, 'codex');
+    assert.equal(codex.executor.provider, null);
+    assert.equal(codex.executor.model, null);
+    assert.equal(codex.level, 3);
+
+    // Un valor explícito del usuario siempre gana.
+    writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex', model: 'gpt-6-luna' } }));
+    const custom = loadConfig({ cwd: dir }).config;
+    assert.equal(custom.executor.model, 'gpt-6-luna');
+    assert.equal(custom.executor.command, 'codex');
+    assert.equal(custom.executor.provider, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('config: rechaza un ejecutor no soportado', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
+  try {
+    writeFileSync(path.join(dir, CONFIG_FILE), JSON.stringify({ executor: { type: 'foo' } }));
+    assert.throws(() => loadConfig({ cwd: dir }), /Ejecutor no soportado: foo \(disponibles: cline, codex\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('config y tarea: aceptan archivos JSON con BOM', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-bom-'));
   try {
@@ -251,6 +429,9 @@ test('events: formatEvent da formato a los tipos de evento', () => {
   assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'run_commands', detail: 'npm test' }, t0), '  ejecuta: npm test');
   assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'write_to_file', detail: 'x' }, t0), '  write_to_file: x');
   assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: 0.0024 }, t0), '  tokens 5463/140 · 0.0024 USD');
+  // Sin coste (p. ej. Codex, que usa la sesión de ChatGPT) se muestran solo los tokens.
+  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140 }, t0), '  tokens 5463/140');
+  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: null }, t0), '  tokens 5463/140');
   assert.equal(formatEvent({ type: 'activity', kind: 'error', message: 'boom' }, t0), '  error: boom');
   assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: true, durationMs: 5000, agentStatus: 'done' }, t0), '✔ Intento 1 completado en 5 s (done)');
   assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: false, error: 'falló' }, t0), '✖ Intento 1 fallido: falló');

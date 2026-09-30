@@ -59,12 +59,16 @@ export function formatEvent(event, startedAtMs) {
     case 'run_start':
       return fmt(`Ejecución ${event.runId} · nivel ${event.level} (${event.levelName}) · self-review: ${event.selfReview} — ${event.title}`);
     case 'attempt_start':
-      return fmt(`▶ Intento ${event.attempt} (${event.kind}) · ${event.provider}/${event.model}`);
+      return fmt(`▶ Intento ${event.attempt} (${event.kind}) · ${[event.provider, event.model].filter(Boolean).join('/') || 'modelo por defecto'}`);
     case 'activity': {
       if (event.kind === 'iteration') return null;
       if (event.kind === 'thinking') return fmt(`  piensa: ${event.text}`);
       if (event.kind === 'tool') return fmt(`  ${TOOL_LABELS[event.tool] ?? event.tool}: ${event.detail}`);
-      if (event.kind === 'usage') return fmt(`  tokens ${event.inputTokens}/${event.outputTokens} · ${Number(event.cost ?? 0).toFixed(4)} USD`);
+      if (event.kind === 'usage') {
+        const tokens = `  tokens ${event.inputTokens}/${event.outputTokens}`;
+        // Codex no informa del coste en dinero: en ese caso se muestran solo los tokens.
+        return fmt(typeof event.cost === 'number' ? `${tokens} · ${event.cost.toFixed(4)} USD` : tokens);
+      }
       if (event.kind === 'error') return fmt(`  error: ${event.message}`);
       return null;
     }

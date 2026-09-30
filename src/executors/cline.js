@@ -9,8 +9,17 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IS_WINDOWS, runProcess } from '../proc.js';
+import {
+  clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, relativize, tail,
+} from './common.js';
 
 export const name = 'cline';
+
+// Se siguen reexportando desde aquí para no romper los imports existentes.
+export { extractAgentReport, instructionFor };
+
+// Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
+export const installHint = 'Ejecuta "npm install" en la carpeta de AgentRelay.';
 
 // Margen sobre el timeout propio de Cline antes de terminar el proceso.
 const KILL_GRACE_MS = 60_000;
@@ -44,10 +53,6 @@ export function commandParts(command) {
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
   if (!parts.length || !parts[0]) throw new Error('executor.command está vacío');
   return parts;
-}
-
-export function instructionFor(promptFile) {
-  return `Read the file ${promptFile} in the working directory and carry out the task it describes exactly. Do not modify or delete that file.`;
 }
 
 export function buildArgs(executor, instruction) {
@@ -100,54 +105,6 @@ export function parseOutput(output) {
   return parsed;
 }
 
-const toArray = (value) => (Array.isArray(value) ? value : value ? [value] : []);
-
-/** Busca el último bloque JSON del texto final con el informe del ejecutor. */
-export function extractAgentReport(text) {
-  if (!text) return null;
-  const blocks = [...text.matchAll(/```(?:json)?[^\n]*\n([\s\S]*?)```/g)].map((m) => m[1]);
-  const trimmed = text.trim();
-  if (trimmed.startsWith('{')) blocks.push(trimmed);
-  for (const block of blocks.reverse()) {
-    try {
-      const data = JSON.parse(block);
-      if (data && typeof data === 'object' && 'status' in data) {
-        return {
-          status: String(data.status),
-          summary: String(data.summary ?? ''),
-          filesChanged: toArray(data.filesChanged).map(String),
-          checks: toArray(data.checks),
-          issues: toArray(data.issues).map(String),
-          questions: toArray(data.questions).map(String),
-          needsEscalation: Boolean(data.needsEscalation),
-        };
-      }
-    } catch {
-      // Bloque no válido: probamos el anterior.
-    }
-  }
-  return null;
-}
-
-function tail(text, max = 2000) {
-  return text.length > max ? text.slice(-max) : text;
-}
-
-/** Recorta un texto a `max` caracteres, añadiendo "…" si se excede. */
-function clip(text, max = 160) {
-  const value = String(text ?? '');
-  return value.length > max ? `${value.slice(0, max)}…` : value;
-}
-
-/** Sustituye el directorio `cwd` (con "\\" o "/") por "." y normaliza a "/". */
-function relativize(text, cwd) {
-  if (!cwd || !text) return text;
-  const variants = [...new Set([cwd, cwd.replace(/\\/g, '/'), cwd.replace(/\//g, '\\')])];
-  let out = text;
-  for (const v of variants) out = out.split(v).join('.');
-  return out.replace(/\\/g, '/');
-}
-
 /** Describe brevemente la entrada de una llamada a herramienta de Cline. */
 export function describeTool(toolName, input, cwd) {
   const value = input ?? {};
@@ -157,15 +114,6 @@ export function describeTool(toolName, input, cwd) {
   else if (toolName === 'run_commands') text = (value.commands || []).join(' ; ');
   else text = JSON.stringify(value);
   return clip(relativize(text, cwd), 160);
-}
-
-/** Primera línea no vacía de un texto. */
-function firstLine(text) {
-  for (const line of String(text ?? '').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed) return trimmed;
-  }
-  return '';
 }
 
 /** Convierte una línea NDJSON ya parseada de Cline en un evento de actividad (o null). */
@@ -194,31 +142,6 @@ export function toActivity(clineEvent, cwd) {
   return null;
 }
 
-/** Procesa stdout línea a línea y avisa de cada actividad según llega. */
-function makeStdoutHandler(cwd, onActivity) {
-  let pending = '';
-  const handleLine = (raw) => {
-    if (!raw.startsWith('{')) return;
-    let event;
-    try {
-      event = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    const activity = toActivity(event, cwd);
-    if (activity) onActivity(activity);
-  };
-  return (chunk) => {
-    pending += chunk;
-    let nl;
-    while ((nl = pending.indexOf('\n')) !== -1) {
-      const raw = pending.slice(0, nl);
-      pending = pending.slice(nl + 1);
-      handleLine(raw.endsWith('\r') ? raw.slice(0, -1) : raw);
-    }
-  };
-}
-
 /** Ejecuta Cline sobre `cwd` con el prompt guardado en `promptFile` (ruta relativa). */
 export async function run({ executor, cwd, promptFile, onActivity }) {
   const [command, ...prefix] = commandParts(executor.command);
@@ -228,7 +151,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   const res = await runProcess(command, args, {
     cwd,
     timeoutMs,
-    onStdout: onActivity ? makeStdoutHandler(cwd, onActivity) : undefined,
+    onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
   });
   const parsed = parseOutput(`${res.stdout}\n${res.stderr}`);
   const ok = res.code === 0 && parsed.finishReason === 'completed';

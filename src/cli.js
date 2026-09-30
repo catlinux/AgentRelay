@@ -234,13 +234,16 @@ async function cmdDoctor(values) {
 
   if (config) {
     const executor = config.executor;
+    const model = [executor.provider, executor.model].filter(Boolean).join('/') || 'modelo por defecto del ejecutor';
+    let adapter = null;
     try {
-      const adapter = getExecutor(executor.type);
+      adapter = getExecutor(executor.type);
       const version = await adapter.version(executor);
-      line(true, `Ejecutor ${executor.type} ${version} · ${executor.provider}/${executor.model}`);
+      line(true, `Ejecutor ${executor.type} ${version} · ${model}`);
       process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
     } catch (error) {
-      line(false, `Ejecutor ${executor.type} no disponible (${error.message}). Ejecuta "npm install" en la carpeta de AgentRelay.`);
+      const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
+      line(false, `Ejecutor ${executor.type} no disponible (${error.message}). ${hint}`);
     }
   }
   return ok ? 0 : 1;

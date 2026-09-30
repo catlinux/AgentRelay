@@ -33,6 +33,14 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
 });
 
+// Valores por defecto de `executor` según el ejecutor elegido: cada CLI tiene su
+// propio comando y, a veces, no tiene proveedor ni modelo (Codex usa la sesión
+// de ChatGPT del usuario). El usuario siempre puede sobrescribirlos.
+export const EXECUTOR_DEFAULTS = Object.freeze({
+  cline: { command: 'cline', provider: 'deepseek', model: 'deepseek-v4-pro' },
+  codex: { command: 'codex', provider: null, model: null },
+});
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -58,27 +66,36 @@ function readJson(file) {
 }
 
 export function loadConfig({ cwd, configPath, overrides } = {}) {
-  let config = merge({}, DEFAULT_CONFIG);
   const sources = [];
 
   const files = configPath
     ? [path.resolve(cwd, configPath)]
     : [path.join(cwd, CONFIG_FILE), path.join(cwd, LOCAL_CONFIG_FILE)];
+
+  // Primero solo los ajustes del usuario: hacen falta para saber qué ejecutor se
+  // ha elegido y aplicar sus valores por defecto antes que los del ejecutor por
+  // defecto. El orden de capas no cambia (archivo, archivo local, opciones).
+  let userConfig = {};
   for (const file of files) {
     if (configPath || existsSync(file)) {
-      config = merge(config, readJson(file));
+      userConfig = merge(userConfig, readJson(file));
       sources.push(file);
     }
   }
-  config = merge(config, overrides);
+  userConfig = merge(userConfig, overrides);
+
+  const type = userConfig.executor?.type ?? DEFAULT_CONFIG.executor.type;
+  if (!Object.prototype.hasOwnProperty.call(EXECUTOR_DEFAULTS, type)) {
+    throw new Error(`Ejecutor no soportado: ${type} (disponibles: ${Object.keys(EXECUTOR_DEFAULTS).join(', ')})`);
+  }
+
+  let config = merge(merge({}, DEFAULT_CONFIG), { executor: EXECUTOR_DEFAULTS[type] });
+  config = merge(config, userConfig);
 
   const level = Number(config.level);
   if (!Number.isInteger(level) || level < 1 || level > 5) {
     throw new Error(`Nivel de orquestación no válido: ${config.level} (debe ser 1-5)`);
   }
   config.level = level;
-  if (config.executor.type !== 'cline') {
-    throw new Error(`Ejecutor no soportado: ${config.executor.type} (disponible: cline)`);
-  }
   return { config, sources };
 }

@@ -1,0 +1,96 @@
+// Helpers genéricos compartidos por los adaptadores de ejecutor.
+//
+// Aquí vive todo lo que no depende del formato concreto de cada CLI: el informe
+// estructurado del ejecutor, el recorte de textos, la relativización de rutas y
+// el procesado de stdout línea a línea.
+
+const toArray = (value) => (Array.isArray(value) ? value : value ? [value] : []);
+
+/** Busca el último bloque JSON del texto final con el informe del ejecutor. */
+export function extractAgentReport(text) {
+  if (!text) return null;
+  const blocks = [...text.matchAll(/```(?:json)?[^\n]*\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{')) blocks.push(trimmed);
+  for (const block of blocks.reverse()) {
+    try {
+      const data = JSON.parse(block);
+      if (data && typeof data === 'object' && 'status' in data) {
+        return {
+          status: String(data.status),
+          summary: String(data.summary ?? ''),
+          filesChanged: toArray(data.filesChanged).map(String),
+          checks: toArray(data.checks),
+          issues: toArray(data.issues).map(String),
+          questions: toArray(data.questions).map(String),
+          needsEscalation: Boolean(data.needsEscalation),
+        };
+      }
+    } catch {
+      // Bloque no válido: probamos el anterior.
+    }
+  }
+  return null;
+}
+
+/** Últimos `max` caracteres de un texto. */
+export function tail(text, max = 2000) {
+  return text.length > max ? text.slice(-max) : text;
+}
+
+/** Recorta un texto a `max` caracteres, añadiendo "…" si se excede. */
+export function clip(text, max = 160) {
+  const value = String(text ?? '');
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+/** Sustituye el directorio `cwd` (con "\\" o "/") por "." y normaliza a "/". */
+export function relativize(text, cwd) {
+  if (!cwd || !text) return text;
+  const variants = [...new Set([cwd, cwd.replace(/\\/g, '/'), cwd.replace(/\//g, '\\')])];
+  let out = text;
+  for (const v of variants) out = out.split(v).join('.');
+  return out.replace(/\\/g, '/');
+}
+
+/** Primera línea no vacía de un texto. */
+export function firstLine(text) {
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+}
+
+/** Instrucción corta que se le pasa al ejecutor para que lea el prompt. */
+export function instructionFor(promptFile) {
+  return `Read the file ${promptFile} in the working directory and carry out the task it describes exactly. Do not modify or delete that file.`;
+}
+
+/**
+ * Procesa stdout línea a línea y avisa de cada actividad según llega.
+ * `toActivity(evento, cwd)` convierte una línea ya parseada en actividad o null.
+ */
+export function makeLineHandler(toActivity, cwd, onActivity) {
+  let pending = '';
+  const handleLine = (raw) => {
+    if (!raw.startsWith('{')) return;
+    let event;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const activity = toActivity(event, cwd);
+    if (activity) onActivity(activity);
+  };
+  return (chunk) => {
+    pending += chunk;
+    let nl;
+    while ((nl = pending.indexOf('\n')) !== -1) {
+      const raw = pending.slice(0, nl);
+      pending = pending.slice(nl + 1);
+      handleLine(raw.endsWith('\r') ? raw.slice(0, -1) : raw);
+    }
+  };
+}
