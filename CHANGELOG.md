@@ -12,11 +12,14 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `agentrelay init`: prepara el proyecto añadiendo el bloque de instrucciones al `CLAUDE.md` (lo crea o lo añade sin tocar el resto, conservando finales de línea y BOM) y ofrece confirmar solo ese archivo.
 - `init` en una carpeta sin repositorio git: `git init`, `.gitignore` con patrones de secretos (si no existía) y primer commit, con plan y confirmación previos, detección de archivos sensibles y aviso de carpetas servidas públicamente. Nunca modifica un `.gitignore` existente.
 - `run`, `watch`, `show`, `review`, `check` y `list` fuera de un repositorio indican ejecutar `agentrelay init`.
+- Ejecutor Codex (`executor.type: "codex"`): usa Codex CLI de OpenAI con la sesión de la cuenta de ChatGPT, sin clave de API. Lo localiza en el `PATH` o en la extensión de OpenAI para VS Code, pide el informe final con un esquema JSON (`--output-schema`), trabaja en el sandbox `workspace-write` y registra los tokens sin inventar coste. Probado con `gpt-6-luna` en una tarea real.
+- Valores por defecto de `executor` según el tipo elegido: basta `{"executor": {"type": "codex"}}` para cambiar de ejecutor.
 - Guías de instalación paso a paso para Windows, Linux y macOS (`INSTALL.md` e `INSTALL.en.md`), enlazadas desde los README.
 - Documentado que, al actualizar, hay que reiniciar `agentrelay watch` si estaba abierto y que no hace falta repetir `init` ni `setup` salvo indicación del CHANGELOG (README, INSTALL y CLAUDE.md).
 
 ### Corregido
 
+- El informe y la vista en directo ya no muestran `null/null` cuando el ejecutor no tiene proveedor o modelo configurado, y el coste total aparece como desconocido (`-`) si el ejecutor no lo informa, en lugar de `0.0000 USD`.
 - AgentRelay localiza Cline por sí mismo aunque falte el enlace `node_modules/.bin/cline`, que con npm 10 en Linux no se creaba tras `npm install` («cline: not found»). Si no hay enlace, ejecuta el lanzador del paquete con el propio Node.
 - Los archivos JSON de configuración y de tarea con BOM (los que guardan el Bloc de notas o PowerShell en Windows) ya se aceptan.
 

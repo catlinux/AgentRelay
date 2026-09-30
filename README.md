@@ -37,6 +37,7 @@ AgentRelay nunca hace commits, stash ni push: los cambios quedan en el árbol de
 | Papel | Integración | Estado |
 |---|---|---|
 | Ejecutor | [Cline CLI](https://www.npmjs.com/package/cline) con cualquier proveedor que Cline soporte (por defecto, DeepSeek `deepseek-v4-pro`) | disponible |
+| Ejecutor | [Codex CLI](https://github.com/openai/codex) de OpenAI con la sesión de tu cuenta de ChatGPT, sin clave de API (p. ej. `gpt-6-luna`) | disponible |
 | Orquestador | Cualquier agente o persona capaz de ejecutar comandos; pensado para Claude Code | disponible (vía CLI) |
 
 El diseño permite añadir otros ejecutores y proveedores más adelante.
@@ -286,6 +287,16 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 
 Las credenciales no se guardan en la configuración de AgentRelay: las gestiona el ejecutor.
 
+### Usar Codex (cuenta de ChatGPT)
+
+Codex CLI puede trabajar con la sesión de tu cuenta de ChatGPT, sin API de pago por uso. AgentRelay lo busca en el `PATH` (`npm i -g @openai/codex`) y, si no está, usa el que incluye la extensión de OpenAI para VS Code. Inicia sesión una vez con `codex login` (o desde la extensión) y elige el ejecutor en `agentrelay.config.local.json`:
+
+```json
+{ "executor": { "type": "codex", "model": "gpt-6-luna" } }
+```
+
+Sin `model`, Codex usa el de su propia configuración (`~/.codex/config.toml`). Los modelos disponibles dependen de tu cuenta; `agentrelay doctor` muestra el ejecutor y el modelo elegidos. Codex trabaja en su sandbox `workspace-write`: puede escribir en el repositorio, pero no fuera de él. Para volver a Cline, quita `type` o pon `"cline"`.
+
 ## Preparar el orquestador y los proyectos
 
 AgentRelay puede dejar listas las instrucciones que necesita el orquestador, sin pegar nada a mano en cada proyecto. Hoy está pensado para Claude Code.
@@ -321,7 +332,7 @@ Cada ejecución se guarda en `.agentrelay/runs/<id>/` dentro del repositorio: ta
 
 ## Consumo y costes
 
-Por cada intento se registran tokens, duración y el **coste estimado que informa el ejecutor** (Cline lo calcula con sus tablas de precios). No es una factura: consulta el consumo real en tu proveedor. AgentRelay no puede medir el consumo del orquestador.
+Por cada intento se registran tokens, duración y el **coste estimado que informa el ejecutor** (Cline lo calcula con sus tablas de precios; Codex no informa de coste y se registran solo los tokens). No es una factura: consulta el consumo real en tu proveedor. AgentRelay no puede medir el consumo del orquestador.
 
 Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosas distintas: el ejecutor necesita un acceso que su CLI soporte.
 
@@ -334,7 +345,7 @@ Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosa
 
 ## Limitaciones de la versión 0.0.2
 
-- Un único ejecutor (Cline CLI). Las tareas se ejecutan de una en una.
+- Dos ejecutores: Cline CLI y Codex CLI (este último, probado solo en Windows). Las tareas se ejecutan de una en una.
 - Todavía no hay panel en VS Code: se usa desde el terminal (está en la hoja de ruta).
 - El informe estructurado del ejecutor depende de que el modelo lo devuelva; si no lo hace, se muestra su texto final. Los datos objetivos (diff, validaciones) los calcula siempre AgentRelay.
 - La self-review en pasada separada empieza una sesión nueva del ejecutor.
