@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { DEFAULT_CONFIG, merge } from '../src/config.js';
 
 export const FAKE_CLINE = fileURLToPath(new URL('./fixtures/fake-cline.mjs', import.meta.url));
+export const FAKE_CODEX = fileURLToPath(new URL('./fixtures/fake-codex.mjs', import.meta.url));
 
 export function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -49,7 +50,7 @@ export function makeRepo() {
 
 export function testConfig(overrides = {}) {
   return merge(merge({}, DEFAULT_CONFIG), merge({
-    executor: { command: [process.execPath, FAKE_CLINE], provider: 'fake', model: 'fake-model', timeoutSeconds: 60 },
+    executor: { type: 'cline', command: [process.execPath, FAKE_CLINE], provider: 'fake', model: 'fake-model', timeoutSeconds: 60 },
     validation: { commands: [], timeoutSeconds: 60 },
   }, overrides));
 }

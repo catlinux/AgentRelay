@@ -10,11 +10,11 @@ export const LOCAL_CONFIG_FILE = 'agentrelay.config.local.json';
 export const DEFAULT_CONFIG = Object.freeze({
   level: 3,
   executor: {
-    type: 'cline',
+    type: 'codex',
     // Programa a ejecutar. Puede ser un array: ["node", "ruta/a/cline"].
-    command: 'cline',
-    provider: 'deepseek',
-    model: 'deepseek-v4-pro',
+    command: 'codex',
+    provider: null,
+    model: 'gpt-6-luna',
     // none | low | medium | high | xhigh; null deja el valor por defecto del proveedor.
     thinking: null,
     timeoutSeconds: 1200,
@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG = Object.freeze({
 // de ChatGPT del usuario). El usuario siempre puede sobrescribirlos.
 export const EXECUTOR_DEFAULTS = Object.freeze({
   cline: { command: 'cline', provider: 'deepseek', model: 'deepseek-v4-pro' },
-  codex: { command: 'codex', provider: null, model: null },
+  codex: { command: 'codex', provider: null, model: 'gpt-6-luna' },
 });
 
 function isPlainObject(value) {

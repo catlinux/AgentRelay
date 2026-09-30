@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
@@ -8,11 +8,12 @@ import {
   buildArgs, commandParts, describeTool, extractAgentReport, findBundledCline, parseOutput, toActivity,
 } from '../src/executors/cline.js';
 import {
-  buildArgs as codexBuildArgs, findCodex, parseOutput as codexParseOutput, toActivity as codexToActivity,
+  authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
 } from '../src/executors/codex.js';
 import { appendEvent, formatEvent, readEvents } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
+import { FAKE_CODEX } from './helpers.js';
 import { loadTask, normalizeTask } from '../src/task.js';
 import { scopeViolations } from '../src/validate.js';
 
@@ -117,6 +118,7 @@ test('codex: toActivity convierte los eventos JSONL en actividades', () => {
 
 test('codex: localiza el binario en el PATH o en la extensión de VS Code', () => {
   const home = path.join('home', 'u');
+  const root = path.join('empty', 'project');
 
   // 1) El PATH tiene prioridad.
   const pathDir = path.join('usr', 'local', 'bin');
@@ -124,6 +126,7 @@ test('codex: localiza el binario en el PATH o en la extensión de VS Code', () =
   assert.deepEqual(
     findCodex({
       env: { PATH: `${path.join('otro', 'dir')}${path.delimiter}${pathDir}` },
+      root,
       home,
       platform: 'linux',
       exists: (p) => p === fromPath,
@@ -136,7 +139,7 @@ test('codex: localiza el binario en el PATH o en la extensión de VS Code', () =
   const winDir = 'tools';
   const fromCmd = path.join(winDir, 'codex.cmd');
   assert.deepEqual(
-    findCodex({ env: { Path: winDir }, home, platform: 'win32', exists: (p) => p === fromCmd, readdir: () => [] }),
+    findCodex({ root, env: { Path: winDir }, home, platform: 'win32', exists: (p) => p === fromCmd, readdir: () => [] }),
     [fromCmd],
   );
 
@@ -152,12 +155,37 @@ test('codex: localiza el binario en el PATH o en la extensión de VS Code', () =
     return [];
   };
   assert.deepEqual(
-    findCodex({ env: {}, home, platform: 'win32', exists: (p) => p === olderCodex || p === newerCodex, readdir }),
+    findCodex({ root, env: {}, home, platform: 'win32', exists: (p) => p === olderCodex || p === newerCodex, readdir }),
     [newerCodex],
   );
 
   // 3) Nada instalado: null, y no falla aunque los directorios no existan.
-  assert.equal(findCodex({ env: {}, home, platform: 'linux', exists: () => false, readdir: () => { throw new Error('no existe'); } }), null);
+  assert.equal(findCodex({ root, env: {}, home, platform: 'linux', exists: () => false, readdir: () => { throw new Error('no existe'); } }), null);
+});
+
+test('codex: la copia empaquetada tiene prioridad', () => {
+  const root = path.join('project', 'relay');
+  const bundled = path.join(root, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  assert.deepEqual(findCodex({ root, env: { PATH: 'somewhere' }, exists: (p) => p === bundled }), [process.execPath, bundled]);
+});
+
+test('codex: authStatus y login usan la CLI configurada', async () => {
+  const old = { ...process.env };
+  const log = path.join(os.tmpdir(), `fake-codex-${process.pid}.log`);
+  try {
+    process.env.FAKE_CODEX_LOG = log;
+    process.env.FAKE_CODEX_LOGGED_IN = '1';
+    assert.deepEqual(await codexAuthStatus({ command: [process.execPath, FAKE_CODEX] }), { ok: true, message: 'Logged in using ChatGPT' });
+    process.env.FAKE_CODEX_LOGGED_IN = '0';
+    assert.equal((await codexAuthStatus({ command: [process.execPath, FAKE_CODEX] })).ok, false);
+    assert.equal(await codexLogin({ command: [process.execPath, FAKE_CODEX] }, { device: true }), 0);
+    assert.equal(readFileSync(log, 'utf8').trim(), '["login","--device-auth"]');
+  } finally {
+    for (const key of ['FAKE_CODEX_LOG', 'FAKE_CODEX_LOGGED_IN']) {
+      if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key];
+    }
+    rmSync(log, { force: true });
+  }
 });
 
 test('cline: interpreta el NDJSON real', () => {
@@ -268,7 +296,7 @@ test('policy: cuándo revisa el orquestador', () => {
 test('config: valores por defecto, archivo, archivo local y opciones', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-'));
   try {
-    assert.equal(loadConfig({ cwd: dir }).config.executor.model, 'deepseek-v4-pro');
+    assert.equal(loadConfig({ cwd: dir }).config.executor.model, 'gpt-6-luna');
     writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ level: 2, validation: { commands: ['npm test'] } }));
     writeFileSync(path.join(dir, 'agentrelay.config.local.json'), JSON.stringify({ executor: { command: ['node', 'cline.js'] } }));
     const { config, sources } = loadConfig({ cwd: dir, overrides: { level: '4' } });
@@ -276,7 +304,7 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
     assert.equal(config.level, 4);
     assert.deepEqual(config.validation.commands, ['npm test']);
     assert.deepEqual(config.executor.command, ['node', 'cline.js']);
-    assert.equal(config.executor.provider, 'deepseek');
+    assert.equal(config.executor.provider, null);
     assert.throws(() => loadConfig({ cwd: dir, overrides: { level: 9 } }), /1-5/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -286,20 +314,27 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
 test('config: los valores por defecto de executor dependen del tipo', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
-    // Sin archivos: Cline con sus valores de siempre.
+    // Sin archivos: Codex es el ejecutor predeterminado.
     const byDefault = loadConfig({ cwd: dir }).config;
-    assert.equal(byDefault.executor.type, 'cline');
-    assert.equal(byDefault.executor.command, 'cline');
-    assert.equal(byDefault.executor.provider, 'deepseek');
-    assert.equal(byDefault.executor.model, 'deepseek-v4-pro');
+    assert.equal(byDefault.executor.type, 'codex');
+    assert.equal(byDefault.executor.command, 'codex');
+    assert.equal(byDefault.executor.provider, null);
+    assert.equal(byDefault.executor.model, 'gpt-6-luna');
 
-    // Codex: comando propio y sin proveedor ni modelo (usa la sesión de ChatGPT).
+    writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'cline' } }));
+    const cline = loadConfig({ cwd: dir }).config;
+    assert.equal(cline.executor.type, 'cline');
+    assert.equal(cline.executor.command, 'cline');
+    assert.equal(cline.executor.provider, 'deepseek');
+    assert.equal(cline.executor.model, 'deepseek-v4-pro');
+
+    // Codex usa la sesión de ChatGPT y el modelo Luna.
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex' } }));
     const codex = loadConfig({ cwd: dir }).config;
     assert.equal(codex.executor.type, 'codex');
     assert.equal(codex.executor.command, 'codex');
     assert.equal(codex.executor.provider, null);
-    assert.equal(codex.executor.model, null);
+    assert.equal(codex.executor.model, 'gpt-6-luna');
     assert.equal(codex.level, 3);
 
     // Un valor explícito del usuario siempre gana.

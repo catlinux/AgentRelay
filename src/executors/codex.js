@@ -10,7 +10,8 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runProcess } from '../proc.js';
+import { fileURLToPath } from 'node:url';
+import { runInteractive, runProcess } from '../proc.js';
 import { clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, relativize, tail } from './common.js';
 
 export const name = 'codex';
@@ -22,6 +23,8 @@ export const installHint = 'Instala la extensión de OpenAI para VS Code o Codex
 const REPORT_FILE = 'codex-report.schema.json';
 
 const EXTENSION_PREFIX = 'openai.chatgpt-';
+const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+export const loginHint = 'Ejecuta "agentrelay login" para conectar tu cuenta de ChatGPT.';
 
 /** Informe final esperado (el mismo que se pide en las instrucciones del prompt). */
 export const REPORT_SCHEMA = {
@@ -64,8 +67,11 @@ function listDir(dir, readdir) {
  * si no está, en la copia que trae la extensión de OpenAI para VS Code (la
  * versión más nueva primero). Devuelve null si no encuentra ninguna.
  */
-export function findCodex({ env = process.env, home = os.homedir(), exists = existsSync, readdir = readdirSync, platform = process.platform } = {}) {
+export function findCodex({ root = PROJECT_ROOT, env = process.env, home = os.homedir(), exists = existsSync, readdir = readdirSync, platform = process.platform } = {}) {
   const win = platform === 'win32';
+
+  const bundled = path.join(root, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  if (exists(bundled)) return [process.execPath, bundled];
 
   const pathValue = env.PATH || env.Path || '';
   for (const dir of String(pathValue).split(path.delimiter)) {
@@ -259,4 +265,24 @@ export async function version(executor) {
     throw new Error(res.error?.message || res.stderr.trim() || `código ${res.code}`);
   }
   return res.stdout.trim();
+}
+
+/** Comprueba si Codex tiene una sesión de ChatGPT activa. */
+export async function authStatus(executor) {
+  try {
+    const [command, ...prefix] = commandParts(executor.command);
+    const res = await runProcess(command, [...prefix, 'login', 'status'], { timeoutMs: 60_000 });
+    const message = `${res.stdout}\n${res.stderr}`.split(/\r?\n/).find((line) => line.trim())?.trim();
+    if (res.code === 0) return { ok: true, message: message || 'Sesión activa' };
+    return { ok: false, message: res.error?.message || `No hay sesión iniciada. ${loginHint}` };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+
+/** Inicia sesión con el navegador o con un código de dispositivo. */
+export async function login(executor, { device = false } = {}) {
+  const [command, ...prefix] = commandParts(executor.command);
+  const res = await runInteractive(command, [...prefix, 'login', ...(device ? ['--device-auth'] : [])]);
+  return res.code;
 }

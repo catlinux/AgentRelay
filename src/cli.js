@@ -29,6 +29,7 @@ Uso:
   agentrelay list                   Lista las ejecuciones del repositorio
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
+  agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
 
@@ -76,6 +77,7 @@ const OPTIONS = {
   uninstall: { type: 'boolean' },
   'claude-dir': { type: 'string' },
   'with-config': { type: 'boolean' },
+  device: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -241,12 +243,43 @@ async function cmdDoctor(values) {
       const version = await adapter.version(executor);
       line(true, `Ejecutor ${executor.type} ${version} · ${model}`);
       process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
+      if (adapter.authStatus) {
+        const auth = await adapter.authStatus(executor);
+        line(auth.ok, auth.ok ? `Sesión: ${auth.message}` : auth.message);
+      }
     } catch (error) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
       line(false, `Ejecutor ${executor.type} no disponible (${error.message}). ${hint}`);
     }
   }
   return ok ? 0 : 1;
+}
+
+async function cmdLogin(values) {
+  const cwd = path.resolve(values.cwd || process.cwd());
+  const { config } = loadConfig({ cwd, configPath: values.config });
+  const executor = config.executor;
+  const adapter = getExecutor(executor.type);
+  if (!adapter.login) {
+    process.stdout.write(`El ejecutor ${executor.type} no necesita iniciar sesión con AgentRelay (se gestiona en su propia configuración).\n`);
+    return 0;
+  }
+  const current = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false, message: '' };
+  if (current.ok) {
+    process.stdout.write(`Sesión activa: ${current.message}. Para cambiar de cuenta ejecuta "codex logout" y vuelve a ejecutar este comando.\n`);
+    return 0;
+  }
+  process.stdout.write(values.device
+    ? 'Se mostrará un código para iniciar sesión con tu cuenta de ChatGPT.\n'
+    : 'Se abrirá el navegador para iniciar sesión con tu cuenta de ChatGPT…\n');
+  await adapter.login(executor, { device: values.device });
+  const result = adapter.authStatus ? await adapter.authStatus(executor) : { ok: true };
+  if (result.ok) {
+    process.stdout.write('✔ Sesión iniciada\n');
+    return 0;
+  }
+  process.stderr.write(`No se pudo iniciar sesión: ${result.message} Prueba "agentrelay login --device".\n`);
+  return 1;
 }
 
 async function cmdSetup(values) {
@@ -381,6 +414,7 @@ export async function main(argv) {
       case 'list': return await cmdList(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
+      case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
       default:

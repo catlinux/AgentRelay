@@ -38,6 +38,44 @@ export function runProcess(command, args = [], options = {}) {
   return spawnAndCollect(command, args, { ...options, shell: false });
 }
 
+/** Ejecuta un proceso con la terminal conectada, sin capturar ni limitar su salida. */
+export function runInteractive(command, args = [], { cwd, env } = {}) {
+  installSignalHandlers();
+  const windows = IS_WINDOWS;
+  let executable = command;
+  let argv = args;
+  let shell = false;
+  if (windows) {
+    executable = [command, ...args].map(quoteWindowsArg).join(' ');
+    argv = [];
+    shell = true;
+  }
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(executable, argv, {
+        cwd,
+        env: env ? { ...process.env, ...env } : process.env,
+        shell,
+        windowsHide: true,
+        stdio: 'inherit',
+      });
+    } catch (error) {
+      resolve({ code: null, error });
+      return;
+    }
+    activeChildren.add(child);
+    child.once('error', (error) => {
+      activeChildren.delete(child);
+      resolve({ code: null, error });
+    });
+    child.once('close', (code) => {
+      activeChildren.delete(child);
+      resolve({ code, error: null });
+    });
+  });
+}
+
 /** Ejecuta una línea de comandos escrita por el usuario (validaciones). */
 export function runShell(commandLine, options = {}) {
   return spawnAndCollect(commandLine, [], { ...options, shell: true });

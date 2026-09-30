@@ -248,10 +248,15 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
   }
 
   // Comprobación previa: sin ejecutor no tiene sentido gastar reintentos.
+  const adapter = getExecutor(config.executor.type);
   try {
-    await getExecutor(config.executor.type).version(config.executor);
+    await adapter.version(config.executor);
   } catch (error) {
     throw new Error(`El ejecutor ${config.executor.type} no está disponible (${error.message}). Ejecuta "agentrelay doctor".`);
+  }
+  if (adapter.authStatus) {
+    const auth = await adapter.authStatus(config.executor);
+    if (!auth.ok) throw new Error(`El ejecutor ${config.executor.type} no tiene sesión iniciada. ${auth.message}`);
   }
 
   ensureWorkspace(root);

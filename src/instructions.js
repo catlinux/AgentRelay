@@ -25,7 +25,7 @@ export const PROJECT_BLOCK = [
   '<!-- agentrelay:start -->',
   '## Delegación con AgentRelay',
   '',
-  'Este proyecto usa AgentRelay para delegar tareas de implementación a un agente ejecutor más económico (por defecto, Cline con DeepSeek) mientras tú planificas, revisas y decides. No edites este bloque: `agentrelay init` lo actualiza.',
+  'Este proyecto usa AgentRelay para delegar tareas de implementación a un agente ejecutor más económico (por defecto, Codex con GPT-6 Luna) mientras tú planificas, revisas y decides. No edites este bloque: `agentrelay init` lo actualiza.',
   '',
   '- Delega las tareas de implementación bien acotadas con `agentrelay run -`, pasando por la entrada estándar una tarea JSON con `objective`, `context`, `files`, `constraints`, `acceptanceCriteria`, `validation` (comandos que deben pasar) y `doNotModify`. El repositorio debe estar limpio (sin cambios pendientes) antes de delegar.',
   '- Haz tú directamente los cambios triviales, las decisiones de diseño y todo lo que no compense delegar.',
