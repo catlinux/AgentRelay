@@ -6,10 +6,28 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 
 - [x] Salida en directo y comando `watch` (0.0.2).
 - [x] Cline CLI como dependencia: instalación en un solo paso (0.0.2).
-- [ ] Panel de AgentRelay en VS Code, solo lectura: lista de ejecuciones, actividad en directo, informe y diff en el editor de diferencias nativo (0.0.3).
-- [ ] Panel de VS Code: botones de revisión (aceptar, corregir, escalar, rechazar) que registran si decide el usuario o el orquestador, y barra de estado (0.0.4).
-- [ ] Comando para activar AgentRelay en un proyecto (añadir las instrucciones de delegación al `CLAUDE.md` con confirmación).
-- [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja.
+- [ ] Errores de credenciales del ejecutor (p. ej. "Authentication Fails"): detenerse sin reintentos, marcar la ejecución como fallida (no escalada) y mostrar un mensaje claro con el comando para configurar el proveedor (`npx cline auth …`) (0.0.3).
+- [ ] `agentrelay doctor`: comprobar que el ejecutor tiene un proveedor y una credencial configurados (0.0.3).
+- [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado.
+
+### Integración con VS Code (opción A: panel, sin chat propio)
+
+La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentrelay/` y llama a la CLI. El chat con el orquestador sigue siendo el del propio orquestador (p. ej. Claude Code).
+
+- [ ] Panel de AgentRelay en VS Code, solo lectura: lista de ejecuciones, actividad en directo (`events.ndjson`), informe y prompts, y diff archivo a archivo en el editor de diferencias nativo (0.0.4).
+- [ ] Botones de revisión (aceptar, corregir, escalar, rechazar) que llaman a `agentrelay review` y registran **quién decide**: el usuario o el orquestador (0.0.5).
+- [ ] Barra de estado con la ejecución en curso (intento, coste acumulado).
+- [ ] Empaquetado como `.vsix` que incluya el motor y Cline CLI, sin necesidad de clonar ni usar npm.
+- [ ] Clave del proveedor guardada en el almacén seguro de VS Code y configuración guiada la primera vez.
+- [ ] Comando «AgentRelay: activar en este proyecto»: añade, con confirmación, las instrucciones de delegación al `CLAUDE.md`.
+- [ ] Decidir si la extensión vive en el mismo repositorio (`vscode/`) o en uno separado.
+- [ ] Estudiar más adelante una pestaña de chat propia (opción B): requiere un acceso programático al orquestador (API de pago o el agente en modo sin interfaz, comprobando antes sus condiciones de uso) y una interfaz de chat completa.
+
+### Seguridad y control del repositorio
+
+- [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja (evita mezclar sus cambios con el diff de la tarea).
+### Otros
+
 - [ ] Probar el flujo completo en Linux y macOS.
 - [ ] Integración continua con tests en Windows, Linux y macOS.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
