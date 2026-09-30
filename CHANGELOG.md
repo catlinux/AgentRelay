@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- README e INSTALL indican que macOS no está probado (no hay Mac disponible) y piden feedback mediante incidencias de GitHub.
 - Instalación modular de ejecutores: `npm install` instala solo el núcleo y Codex (de 332 a 3 paquetes y 0 vulnerabilidades; los avisos venían de Cline). `agentrelay executors` lista los ejecutores y `agentrelay executors add <nombre>` instala los opcionales en `~/.agentrelay/executors` (fuera de la carpeta de AgentRelay). `agentrelay setup` ofrece instalarlos (`--executors cline` sin preguntas).
 - Instrucciones de actualización con `npm ci` en lugar de `npm install` (no reescribe `package-lock.json`) y cómo resolver el error de `git pull` cuando `package-lock.json` tiene cambios locales (README, INSTALL).
 - Salida en directo (`run`, `review` y `watch`) más amigable: hora local en cada línea, acciones en lenguaje claro («lee src/config.js», «ejecuta los tests») en lugar de la llamada cruda del intérprete de comandos, intentos agrupados, números abreviados, colores opcionales (`NO_COLOR` y salida redirigida los desactivan) y un estado final en español con el siguiente paso sugerido.

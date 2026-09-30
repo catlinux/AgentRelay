@@ -48,7 +48,7 @@ El diseño permite añadir otros ejecutores y proveedores más adelante.
 - Git. El directorio de trabajo debe ser un repositorio git.
 - Una cuenta de ChatGPT (vale la gratuita) para el ejecutor por defecto, Codex. Con Cline como ejecutor, en su lugar, un proveedor configurado (por ejemplo, una API key de DeepSeek).
 
-Windows, Linux y macOS.
+Windows, Linux y macOS (macOS sin probar: ver [Limitaciones](#limitaciones-de-la-versión-002)).
 
 ## Instalación
 
@@ -359,7 +359,7 @@ Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosa
 - Todavía no hay panel en VS Code: se usa desde el terminal (está en la hoja de ruta).
 - El informe estructurado del ejecutor depende de que el modelo lo devuelva; si no lo hace, se muestra su texto final. Los datos objetivos (diff, validaciones) los calcula siempre AgentRelay.
 - La self-review en pasada separada empieza una sesión nueva del ejecutor.
-- Validado en Windows; Linux y macOS están soportados por diseño, pero todavía no se han probado en esos sistemas.
+- Validado en Windows; Linux está probado en Debian con Node 20 (el ejecutor Codex, solo en Windows por ahora). **macOS no está probado: no tenemos ningún Mac.** Si lo usas en macOS, te agradeceremos mucho tu experiencia: abre una [incidencia en GitHub](https://github.com/catlinux/AgentRelay/issues) contando si funcionó o qué falló, e indica tu versión de macOS, tu versión de Node (`node --version`) y la salida de `agentrelay doctor`.
 
 Consulta [TODO.md](TODO.md) y [CHANGELOG.md](CHANGELOG.md).
 

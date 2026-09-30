@@ -115,7 +115,7 @@ Done. Go to [Getting started](#getting-started).
 
 ## macOS
 
-> macOS is supported by design but has not been tested yet. If you run into a problem, please open an issue on GitHub.
+> **macOS is untested: we do not have a Mac.** It is supported by design, and if you use it we would really appreciate your feedback: open an [issue on GitHub](https://github.com/catlinux/AgentRelay/issues) telling us whether it worked or what failed, with your macOS version, your Node version (`node --version`) and the output of `agentrelay doctor`.
 
 Open **Terminal**.
 

@@ -115,7 +115,7 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 
 ## macOS
 
-> macOS está soportado por diseño, pero todavía no se ha probado. Si encuentras un problema, por favor abre una incidencia en GitHub.
+> **macOS no está probado: no tenemos ningún Mac.** Está soportado por diseño, pero si lo usas te agradeceremos mucho tu experiencia: abre una [incidencia en GitHub](https://github.com/catlinux/AgentRelay/issues) contando si funcionó o qué falló, con tu versión de macOS, tu versión de Node (`node --version`) y la salida de `agentrelay doctor`.
 
 Abre **Terminal**.
 

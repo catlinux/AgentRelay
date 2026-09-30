@@ -59,9 +59,9 @@ Precios y tarifas de DeepSeek:
 
 Documentación y plataformas:
 
-- [ ] Indicar en el README y en INSTALL (es/en) que no disponemos de un Mac, por lo que macOS no está probado, y pedir feedback a quien lo use mediante issues de GitHub (con enlace y qué datos aportar: versión de macOS, de Node, salida de `agentrelay doctor`).
+- [x] Indicar en el README y en INSTALL (es/en) que no disponemos de un Mac, por lo que macOS no está probado, y pedir feedback a quien lo use mediante issues de GitHub (con enlace y qué datos aportar: versión de macOS, de Node, salida de `agentrelay doctor`).
 
-Evaluar Qwen como ejecutor (investigado el 2026-10-01):
+Evaluar Qwen como ejecutor (investigado el 2026-10-01). **Prioridad baja, sin prisa: no bloquea ninguna versión.** Retomar más adelante:
 
 - [ ] El acceso gratuito de Qwen Code (OAuth) terminó el 2026-04-15, iFlow cerró el 2026-04-17 y Cerebras quitó su nivel gratuito el 2026-07-21. Vías que quedan: NVIDIA build.nvidia.com (Qwen3-Coder-480B, 256 K de contexto, 40 peticiones/minuto, sin tarjeta; condiciones «solo pruebas y evaluación»); Alibaba Model Studio Singapur (Qwen3.8 Max y otros, 1 M de tokens por modelo durante 90 días, con modo «Free Quota Only»); OpenRouter `qwen/qwen3.8-27b:free` (50 peticiones/día; 1.000/día tras una compra única de 10 $, que se mantiene aunque se gaste el saldo; comisión de tarjeta del 5,5 %). ModelScope exige teléfono chino. Local descartado (sin hardware).
 - [ ] Primera prueba: NVIDIA + Qwen3-Coder-480B con Cline (proveedor compatible con OpenAI, `https://integrate.api.nvidia.com/v1`) en una tarea real, comparándolo con Codex + GPT-6 Luna. El usuario crea la clave gratuita en build.nvidia.com. Si convence: valorar OpenRouter con 10 $ y, más adelante, un adaptador nativo de Qwen Code (`qwen -p`, `--output-format stream-json`, `--json-schema`, `--approval-mode yolo`).

@@ -48,7 +48,7 @@ The design allows adding other executors and providers later.
 - Git. The working directory must be a git repository.
 - A ChatGPT account (the free one is enough) for the default executor, Codex. With Cline as the executor, a configured provider instead (for example, a DeepSeek API key).
 
-Windows, Linux and macOS.
+Windows, Linux and macOS (macOS untested: see [Limitations](#limitations-of-version-002)).
 
 ## Installation
 
@@ -360,7 +360,7 @@ Keep in mind that pay-per-use API access and subscriptions are different things:
 - The CLI output and reports are in Spanish.
 - The executor's structured report depends on the model returning it; otherwise its final text is shown. Objective data (diff, validations) is always computed by AgentRelay.
 - The separate self-review pass starts a new executor session.
-- Validated on Windows; Linux and macOS are supported by design but have not been tested on those systems yet.
+- Validated on Windows; Linux has been tested on Debian with Node 20 (the Codex executor, on Windows only so far). **macOS is untested: we do not have a Mac.** If you use it on macOS, we would really appreciate your feedback: open an [issue on GitHub](https://github.com/catlinux/AgentRelay/issues) telling us whether it worked or what failed, and include your macOS version, your Node version (`node --version`) and the output of `agentrelay doctor`.
 
 See [TODO.md](TODO.md) and [CHANGELOG.md](CHANGELOG.md).
 
