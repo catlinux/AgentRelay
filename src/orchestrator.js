@@ -229,7 +229,7 @@ function finalize(ctx, result, check) {
   state.statusReasons = reasons;
   saveState(root, state);
   writeReport(root, state, check.patch);
-  ctx.emit({ type: 'status', status, reasons });
+  ctx.emit({ type: 'status', runId: state.id, status, reasons });
   return state;
 }
 
@@ -329,7 +329,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.status = 'running';
     saveState(root, state);
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
-    ctx.emit({ type: 'status', status: 'running', reasons: [] });
+    ctx.emit({ type: 'status', runId: state.id, status: 'running', reasons: [] });
     return guard(root, state, async () => {
       const result = await attempt(ctx, 'fix', { feedback, check: state.lastCheck });
       return continueCycle(ctx, result);
@@ -350,7 +350,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     saveState(root, state);
     writeReport(root, state, check.patch);
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
-    ctx.emit({ type: 'status', status: 'accepted', reasons: state.statusReasons });
+    ctx.emit({ type: 'status', runId: state.id, status: 'accepted', reasons: state.statusReasons });
     return state;
   }
 
@@ -364,7 +364,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
   }
   saveState(root, state);
   ctx.emit({ type: 'review', decision, feedback: review.feedback });
-  ctx.emit({ type: 'status', status: state.status, reasons: state.statusReasons });
+  ctx.emit({ type: 'status', runId: state.id, status: state.status, reasons: state.statusReasons });
   return state;
 }
 

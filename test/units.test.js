@@ -10,7 +10,7 @@ import {
 import {
   authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
 } from '../src/executors/codex.js';
-import { appendEvent, formatEvent, readEvents } from '../src/events.js';
+import { appendEvent, describeCommand, formatEvent, readEvents, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
 import { FAKE_CODEX } from './helpers.js';
@@ -453,36 +453,48 @@ test('events: appendEvent añade ts y readEvents ignora líneas no válidas', ()
   }
 });
 
-test('events: formatEvent da formato a los tipos de evento', () => {
+test('events: resume órdenes y formatea eventos con hora local', () => {
   const t0 = Date.parse('2026-09-30T10:00:00.000Z');
-  assert.equal(
-    formatEvent({ type: 'run_start', ts: '2026-09-30T10:00:05.000Z', runId: 'r1', title: 'T', level: 3, levelName: 'equilibrado', selfReview: 'inline' }, t0),
-    '[00:05] Ejecución r1 · nivel 3 (equilibrado) · self-review: inline — T',
-  );
-  assert.equal(formatEvent({ type: 'activity', kind: 'iteration', n: 1, ts: '2026-09-30T10:00:06.000Z' }, t0), null);
-  assert.equal(formatEvent({ type: 'activity', kind: 'thinking', text: 'pensando', ts: '2026-09-30T10:00:06.000Z' }, t0), '[00:06]   piensa: pensando');
-  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'editor', detail: './hello.txt' }, t0), '  edita: ./hello.txt');
-  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'read_files', detail: 'a, b' }, t0), '  lee: a, b');
-  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'run_commands', detail: 'npm test' }, t0), '  ejecuta: npm test');
-  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'write_to_file', detail: 'x' }, t0), '  write_to_file: x');
-  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: 0.0024 }, t0), '  tokens 5463/140 · 0.0024 USD');
-  // Sin coste (p. ej. Codex, que usa la sesión de ChatGPT) se muestran solo los tokens.
-  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140 }, t0), '  tokens 5463/140');
-  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: null }, t0), '  tokens 5463/140');
-  assert.equal(formatEvent({ type: 'activity', kind: 'error', message: 'boom' }, t0), '  error: boom');
-  assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: true, durationMs: 5000, agentStatus: 'done' }, t0), '✔ Intento 1 completado en 5 s (done)');
-  assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: false, error: 'falló' }, t0), '✖ Intento 1 fallido: falló');
-  assert.equal(formatEvent({ type: 'validation', command: 'npm test', passed: true, exitCode: 0, timedOut: false }, t0), '  validación `npm test`: correcta');
-  assert.equal(formatEvent({ type: 'validation', command: 'npm test', passed: false, exitCode: 1, timedOut: false }, t0), '  validación `npm test`: FALLA (código 1)');
-  assert.equal(formatEvent({ type: 'validation', command: 'npm test', passed: false, exitCode: null, timedOut: true }, t0), '  validación `npm test`: TIEMPO AGOTADO');
-  assert.equal(formatEvent({ type: 'check_start' }, t0), '  validando…');
-  assert.equal(formatEvent({ type: 'check', changedFiles: 2, passed: true, scopeViolations: ['LICENSE'], headMoved: false }, t0), '  2 archivo(s) modificado(s) · validación correcta · archivos protegidos: LICENSE');
-  assert.equal(formatEvent({ type: 'retry', n: 1, max: 3 }, t0), '↻ Corrección automática 1/3');
-  assert.equal(formatEvent({ type: 'self_review_start' }, t0), '▶ Self-review del ejecutor');
-  assert.equal(formatEvent({ type: 'self_review_skipped', reason: 'redundante' }, t0), '  self-review separada omitida: redundante');
-  assert.equal(formatEvent({ type: 'status', status: 'accepted', reasons: ['a', 'b'] }, t0), '■ Estado: accepted (a; b)');
-  assert.equal(formatEvent({ type: 'review', decision: 'fix', feedback: 'F' }, t0), 'Revisión del orquestador: fix — F');
-  assert.equal(formatEvent({ type: 'review', decision: 'accept' }, t0), 'Revisión del orquestador: accept');
+  const ts = '2026-09-30T10:00:05.000Z';
+  const localTime = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`; };
+  const prefix = `${localTime(ts)}  `;
+  assert.equal(describeCommand('"C://WINDOWS//System32//WindowsPowerShell//v1.0//powershell.exe" -Command "Get-Content -Raw -LiteralPath \'suma.js\'"'), 'lee suma.js');
+  assert.equal(describeCommand('"C://WINDOWS//System32//WindowsPowerShell//v1.0//powershell.exe" -Command \'npm.cmd test\''), 'ejecuta los tests');
+  assert.equal(describeCommand('"C://WINDOWS//System32//WindowsPowerShell//v1.0//powershell.exe" -Command \'git diff -- suma.js; git status --short\''), 'revisa el estado de git');
+  assert.equal(describeCommand('bash -lc "rg foo src"'), 'busca en el código');
+  assert.equal(describeCommand('unknown-command --arg'), null);
+  assert.equal(formatEvent({ type: 'run_start', ts, runId: 'r1', title: 'T', level: 3, levelName: 'equilibrado' }, t0), `${prefix}▶ Ejecución r1 · nivel 3 (equilibrado)\n  T`);
+  assert.equal(formatEvent({ type: 'attempt_start', ts, attempt: 1, kind: 'implement', model: 'm' }, t0), `\n${prefix}▶ Intento 1 (implementación) · m`);
+  assert.equal(formatEvent({ type: 'activity', kind: 'iteration', n: 1, ts }, t0), null);
+  assert.equal(formatEvent({ type: 'activity', kind: 'thinking', text: 'pensando', ts }, t0), `${prefix}  · piensa: pensando`);
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'editor', detail: './hello.txt' }), '  ✎ edita: hello.txt');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'read_files', detail: 'a, b' }), '  · lee: a, b');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'edit', detail: 'src/a.js' }), '  ✎ edita: src/a.js');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'command', detail: '"C://Windows//powershell.exe" -Command \'npm.cmd test\'' }), '  · ejecuta los tests');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'run_commands', detail: 'unknown --long' }), '  · ejecuta: unknown --long');
+  assert.equal(formatEvent({ type: 'activity', kind: 'usage', inputTokens: 1234, outputTokens: 1045968, cost: 0.0024 }), '  · tokens: 1,2 mil entrada · 1,0 M salida · 0.0024 USD');
+  assert.equal(formatEvent({ type: 'activity', kind: 'error', message: 'boom' }), '  ✖ error: boom');
+  assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: true, durationMs: 65000, agentStatus: 'done' }), '✔ Intento 1 completado en 1 min 05 s (done)');
+  assert.equal(formatEvent({ type: 'attempt_end', attempt: 1, ok: false, error: 'falló' }), '✖ Intento 1 fallido: falló');
+  assert.equal(formatEvent({ type: 'validation', command: 'npm test', passed: true, exitCode: 0 }), '  · validación `npm test`: correcta');
+  assert.equal(formatEvent({ type: 'check_start' }), '  · validando…');
+  assert.equal(formatEvent({ type: 'check', changedFiles: 2, passed: true, scopeViolations: ['LICENSE'] }), '  · 2 archivo(s) modificado(s) · validación correcta · archivos protegidos: LICENSE');
+  assert.equal(formatEvent({ type: 'retry', n: 1, max: 3 }), '↻ Corrección automática 1/3');
+  assert.equal(formatEvent({ type: 'self_review_start' }), '▶ Self-review del ejecutor');
+  assert.equal(formatEvent({ type: 'self_review_skipped', reason: 'redundante' }), '  · self-review separada omitida: redundante');
+  assert.equal(formatEvent({ type: 'status', status: 'awaiting_review', runId: 'r1' }), '■ Listo para tu revisión\n  Siguiente paso: agentrelay review r1 --decision accept|fix|escalate|reject');
+  assert.equal(formatEvent({ type: 'status', status: 'accepted', reasons: ['a', 'b'] }), '✔ Aceptada (a; b)');
+  assert.equal(formatEvent({ type: 'status', status: 'unknown' }), 'unknown');
+  assert.equal(formatEvent({ type: 'review', decision: 'fix', feedback: 'F' }), 'Revisión del orquestador: fix — F');
+  const plain = formatEvent({ type: 'attempt_end', ts, attempt: 1, ok: true, durationMs: 65000, agentStatus: 'done' }, t0);
+  const colored = formatEvent({ type: 'attempt_end', ts, attempt: 1, ok: true, durationMs: 65000, agentStatus: 'done' }, t0, { color: true });
+  assert.match(colored, /\u001b\[/);
+  assert.equal(colored.replace(/\u001b\[[0-9;]*m/g, ''), plain);
+  assert.doesNotMatch(plain, /\u001b\[/);
+  assert.equal(useColor({ isTTY: true }, {}), true);
+  assert.equal(useColor({ isTTY: true }, { NO_COLOR: '1' }), false);
+  assert.equal(useColor({ isTTY: false }, {}), false);
+  assert.equal(useColor({ isTTY: true }, { TERM: 'dumb' }), false);
 });
 
 test('proc: onStdout recibe los fragmentos de stdout', async () => {

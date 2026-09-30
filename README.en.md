@@ -118,19 +118,22 @@ agentrelay run "$AR\examples\demo-task.json"
 
 In Bash: `agentrelay run "$AR/examples/demo-task.json"`.
 
-You will see each executor step live (example with Cline; with Codex the lines are similar):
+You will see each executor step live, with the time of each line and the actions summarised in plain language:
 
 ```
-[00:00] ▶ Intento 1 (implement) · deepseek/deepseek-v4-pro
-[00:07]   piensa: I need to add and export a `slugify(text)` function in `src/text.js`…
-[00:07]   lee: ./src/text.js, ./spec/text.spec.js, ./package.json
-[00:18]   edita: ./src/text.js
-[00:20]   ejecuta: npm test
-[00:22]   tokens 39080/1339 · 0.0056 USD
-[00:25] ✔ Intento 1 completado en 23 s (done)
-[00:25]   validando…
-[00:26]   validación `npm test`: correcta
-[00:26] ■ Estado: awaiting_review (el nivel 3 revisa siempre)
+12:00:00  ▶ Ejecución 20261001-100000-ab12 · nivel 3 (equilibrado)
+  Añadir una función slugify con sus tests
+
+12:00:00  ▶ Intento 1 (implementación) · gpt-6-luna
+12:00:07    · lee src/text.js
+12:00:18    ✎ edita: src/text.js
+12:00:20    · ejecuta los tests
+12:00:22    · tokens: 39,1 mil entrada · 1,3 mil salida
+12:00:23  ✔ Intento 1 completado en 23 s (done)
+12:00:23    · validando…
+12:00:26    · validación `npm test`: correcta
+12:00:26  ■ Listo para tu revisión (el nivel 3 revisa siempre)
+  Siguiente paso: agentrelay review 20261001-100000-ab12 --decision accept|fix|escalate|reject
 ```
 
 (The CLI output is currently in Spanish.) When it finishes, the full report is printed: diff, validations and executor report.
@@ -148,7 +151,7 @@ The `<id>` appears on the first line of the run and in `agentrelay list`. With `
 
 ## Watching the work live
 
-- `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, commands it runs, its summarized reasoning, tokens, cost and validations). `--quiet` turns it off.
+- `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, what it runs, its summarized reasoning, tokens, cost and validations), with the local time on every line. It uses colours when the terminal supports them; they are turned off by the `NO_COLOR` environment variable or when the output is redirected to a file. `--quiet` turns it off.
 - `agentrelay watch` follows, from **another terminal**, runs started by another process, for example an orchestrator such as Claude Code. Without an id it follows the latest run and switches to each new one until you press Ctrl+C; with an id it shows that run and exits when it is no longer in progress.
 
 In VS Code: open a split terminal, run `agentrelay watch` in one and work in the other or in the orchestrator's chat.

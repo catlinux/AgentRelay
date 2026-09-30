@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Salida en directo (`run`, `review` y `watch`) más amigable: hora local en cada línea, acciones en lenguaje claro («lee src/config.js», «ejecuta los tests») en lugar de la llamada cruda del intérprete de comandos, intentos agrupados, números abreviados, colores opcionales (`NO_COLOR` y salida redirigida los desactivan) y un estado final en español con el siguiente paso sugerido.
 - `agentrelay setup`: instala (con confirmación) un bloque delimitado con marcas en las instrucciones globales de Claude Code (`~/.claude/CLAUDE.md`) para que delegue con AgentRelay en cualquier proyecto; `--uninstall` lo retira. Solo modifica lo que hay entre las marcas.
 - `agentrelay init`: prepara el proyecto añadiendo el bloque de instrucciones al `CLAUDE.md` (lo crea o lo añade sin tocar el resto, conservando finales de línea y BOM) y ofrece confirmar solo ese archivo.
 - `init` en una carpeta sin repositorio git: `git init`, `.gitignore` con patrones de secretos (si no existía) y primer commit, con plan y confirmación previos, detección de archivos sensibles y aviso de carpetas servidas públicamente. Nunca modifica un `.gitignore` existente.

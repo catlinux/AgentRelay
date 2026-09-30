@@ -30,6 +30,14 @@ Conexión y primera experiencia:
 - [ ] Revisar los avisos de `npm install` en Windows y Linux. Windows: `node-domexception@1.0.0` deprecado, 329 paquetes, 47 piden financiación y 21 vulnerabilidades (6 bajas, 14 moderadas, 1 alta) que vienen de las dependencias de Cline (enlaza con la revisión de vulnerabilidades y con decidir si Cline sigue instalándose por defecto). En Linux también hay avisos: recogerlos, clasificarlos (los que se pueden corregir, los que no dependen de nosotros) y documentar o eliminar los que sea posible, incluidos los `EBADENGINE` de Node 20.
 - [ ] Instalador para Windows (por ejemplo un `.exe`/`.msi` o un script guiado) que instale Node.js y Git si faltan, AgentRelay, el comando `agentrelay`, y conecte la cuenta; valorar winget, un `.cmd` de una sola línea o un empaquetado con `pkg`/instalador Inno Setup antes de decidir.
 
+Instalación modular de ejecutores (acordado el 2026-10-01):
+
+- [ ] `npm install` instala solo el núcleo y Codex, el ejecutor por defecto (sin avisos ni vulnerabilidades: los 21 avisos y el de `node-domexception` vienen todos de las dependencias de Cline). Cline deja de ser dependencia por defecto.
+- [ ] Elegir los ejecutores al instalar: `agentrelay setup` (paso del asistente de instalación) ofrece la lista de ejecutores disponibles, instala los marcados y explica cómo conectar cada uno. Los ejecutores extra se guardan en una carpeta propia del usuario (`~/.agentrelay/executors/`), no en el repositorio, para que sobrevivan a `git pull`/`npm install` y no ensucien el repositorio. No preguntar desde `npm install` (los scripts de instalación no son interactivos, se ejecutan en CI y npm reciente los bloquea por defecto).
+- [ ] `agentrelay executors` (listar disponibles e instalados) y `agentrelay executors add <nombre>`. Si alguien elige en la configuración un ejecutor no instalado, AgentRelay indica el comando exacto para añadirlo.
+- [ ] Registro de ejecutores con la información de instalación de cada uno (paquete npm, cómo conectar la cuenta), para que los futuros ejecutores (Gemini, Qwen, etc.) se añadan sin aumentar el peso de la instalación base.
+- [ ] Instalador gráfico multiplataforma: sustituir el script manual por paquetes nativos que hagan la misma pregunta de ejecutores con interfaz gráfica. Windows: instalador `.exe` (Inno Setup o NSIS). Linux: paquetes `.deb` y `.rpm` (con `nfpm` o `fpm`) y/o AppImage, con un asistente gráfico sencillo (p. ej. Zenity o una pequeña aplicación multiplataforma tipo Tauri) para la selección de ejecutores y la conexión de la cuenta. macOS: `.pkg`. Calamares, que se propuso como referencia, es un instalador de sistemas operativos (particiones, distribuciones) y no de aplicaciones: no encaja; se toma solo como inspiración de la experiencia de asistente paso a paso. Todos los instaladores llaman a los mismos comandos (`agentrelay executors`, `login`, `setup`).
+
 Configuración y comandos:
 
 - [ ] Centralizar toda la configuración en un solo archivo, fácil de modificar, entendible y explicado: plantilla con todas las opciones y comentarios en español (formato que admita comentarios, p. ej. JSONC o TOML; hoy es JSON sin comentarios), valores por defecto visibles, una sola ubicación para el usuario (y otra, opcional, por proyecto) y validación con mensajes claros. Incluir ejecutor, modelo, esfuerzo, nivel de orquestación, reintentos, timeouts, validaciones y política de revisión. `agentrelay config` para crearlo, mostrarlo y abrirlo.
@@ -38,8 +46,8 @@ Configuración y comandos:
 
 Salida de `agentrelay watch`:
 
-- [ ] Hora en cada línea (hoy solo se ve el tiempo transcurrido `[mm:ss]`): mostrar la hora local, y opcionalmente el tiempo transcurrido.
-- [ ] Salida mucho más amigable: agrupar por intento, resumir las acciones en lenguaje claro (qué archivo lee/edita, qué prueba ejecuta) en vez de mostrar el comando crudo (hoy, con Codex, aparece la llamada completa a PowerShell), colores y símbolos con opción para desactivarlos, y un resumen final. Comprobar que se ve bien en los terminales de VS Code, Windows, Linux y macOS.
+- [x] Hora en cada línea (hoy solo se ve el tiempo transcurrido `[mm:ss]`): mostrar la hora local, y opcionalmente el tiempo transcurrido.
+- [x] Salida mucho más amigable (primera versión hecha; pendiente revisarla en terminales de Windows, Linux y macOS y refinar con el uso): agrupar por intento, resumir las acciones en lenguaje claro (qué archivo lee/edita, qué prueba ejecuta) en vez de mostrar el comando crudo (hoy, con Codex, aparece la llamada completa a PowerShell), colores y símbolos con opción para desactivarlos, y un resumen final. Comprobar que se ve bien en los terminales de VS Code, Windows, Linux y macOS.
 
 Precios y tarifas de DeepSeek:
 

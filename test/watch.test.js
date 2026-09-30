@@ -38,7 +38,7 @@ test('watch: con id muestra eventos y termina tras un estado final', async () =>
     const lines = [];
     const promise = watchRuns({ root: dir, id: 'r1', write: (l) => lines.push(l), intervalMs: 20 });
 
-    await waitFor(() => lines.some((l) => l.includes('Estado: running')));
+    await waitFor(() => lines.some((l) => l.includes('En curso')));
 
     appendFileSync(eventsPath(dir, 'r1'), '{"type":"activity","kind":"thinking","text":"pensando","ts":"2026-09-30T10:00:02.000Z"}\n');
     await waitFor(() => lines.some((l) => l.includes('piensa: pensando')));
@@ -46,9 +46,9 @@ test('watch: con id muestra eventos y termina tras un estado final', async () =>
     appendFileSync(eventsPath(dir, 'r1'), '{"type":"status","status":"awaiting_review","ts":"2026-09-30T10:00:05.000Z"}\n');
     await promise; // termina sola tras awaiting_review
 
-    assert.ok(lines.some((l) => l.includes('Estado: running')));
+    assert.ok(lines.some((l) => l.includes('En curso')));
     assert.ok(lines.some((l) => l.includes('piensa: pensando')));
-    assert.ok(lines.some((l) => l.includes('Estado: awaiting_review')));
+    assert.ok(lines.some((l) => l.includes('Listo para tu revisión')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -66,12 +66,12 @@ test('watch: sin id sigue la última y cambia a las nuevas', async () => {
     makeRun(dir, 'run-01');
     writeFileSync(path.join(dir, '.agentrelay', 'runs', 'run-01', 'state.json'), '{"id":"run-01","status":"running"}\n');
     writeFileSync(eventsPath(dir, 'run-01'), `{"type":"status","status":"running","ts":"${T0}"}\n`);
-    await waitFor(() => lines.includes('── Ejecución run-01 ──') && lines.some((l) => l.includes('Estado: running')));
+    await waitFor(() => lines.includes('── Ejecución run-01 ──') && lines.some((l) => l.includes('En curso')));
 
     makeRun(dir, 'run-02');
     writeFileSync(path.join(dir, '.agentrelay', 'runs', 'run-02', 'state.json'), '{"id":"run-02","status":"accepted"}\n');
     writeFileSync(eventsPath(dir, 'run-02'), `{"type":"status","status":"accepted","ts":"${T0}"}\n`);
-    await waitFor(() => lines.includes('── Ejecución run-02 ──') && lines.some((l) => l.includes('Estado: accepted')));
+    await waitFor(() => lines.includes('── Ejecución run-02 ──') && lines.some((l) => l.includes('Aceptada')));
 
     ac.abort();
     await promise;
@@ -83,8 +83,8 @@ test('watch: sin id sigue la última y cambia a las nuevas', async () => {
     assert.ok(i2 > i1);
     assert.equal(lines[i1 - 1], '');
     assert.equal(lines[i2 - 1], '');
-    assert.ok(lines.some((l) => l.includes('Estado: running')));
-    assert.ok(lines.some((l) => l.includes('Estado: accepted')));
+    assert.ok(lines.some((l) => l.includes('En curso')));
+    assert.ok(lines.some((l) => l.includes('Aceptada')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -103,7 +103,7 @@ test('watch: procesa una línea partida en dos trozos una sola vez', async () =>
     const ac = new AbortController();
     const promise = watchRuns({ root: dir, id: 'r1', write: (l) => lines.push(l), intervalMs: 20, signal: ac.signal });
 
-    await waitFor(() => lines.some((l) => l.includes('Estado: running')));
+    await waitFor(() => lines.some((l) => l.includes('En curso')));
 
     appendFileSync(eventsPath(dir, 'r1'), ' uno","ts":"2026-09-30T10:00:02.000Z"}\n');
     await waitFor(() => lines.some((l) => l.includes('piensa: trozo uno')));
@@ -130,7 +130,7 @@ test('watch: no corrompe un carácter UTF-8 partido entre dos lecturas', async (
     const lines = [];
     const ac = new AbortController();
     const promise = watchRuns({ root: dir, id: 'r1', write: (l) => lines.push(l), intervalMs: 20, signal: ac.signal });
-    await waitFor(() => lines.some((l) => l.includes('Estado: running')));
+    await waitFor(() => lines.some((l) => l.includes('En curso')));
     await sleep(60);
     appendFileSync(eventsPath(dir, 'r1'), line.subarray(cut));
     await waitFor(() => lines.some((l) => l.includes('piensa:')));
@@ -155,8 +155,8 @@ test('watch: ignora una línea JSON inválida', async () => {
     const lines = [];
     await watchRuns({ root: dir, id: 'r1', write: (l) => lines.push(l), intervalMs: 20 });
 
-    assert.ok(lines.some((l) => l.includes('Estado: running')));
-    assert.ok(lines.some((l) => l.includes('Estado: awaiting_review')));
+    assert.ok(lines.some((l) => l.includes('En curso')));
+    assert.ok(lines.some((l) => l.includes('Listo para tu revisión')));
     assert.equal(lines.filter((l) => l.includes('json')).length, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });

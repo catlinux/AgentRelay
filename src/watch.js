@@ -4,7 +4,7 @@
 
 import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import path from 'node:path';
-import { formatEvent } from './events.js';
+import { formatEvent, useColor } from './events.js';
 import { latestRunId, runDir } from './store.js';
 
 /** Ruta del events.ndjson de una ejecución. */
@@ -88,17 +88,17 @@ function parseLines(lines) {
 }
 
 /** Formatea un evento y entrega la línea a `write` (si no se muestra, null). */
-function emitEvent(event, state, write) {
+function emitEvent(event, state, write, color) {
   if (state.startedAtMs === null && event.ts) {
     const ms = Date.parse(event.ts);
     if (Number.isFinite(ms)) state.startedAtMs = ms;
   }
-  const line = formatEvent(event, state.startedAtMs ?? 0);
+  const line = formatEvent(event, state.startedAtMs ?? 0, { color });
   if (line) write(line);
 }
 
 /** Sigue una ejecución concreta hasta que deja de estar 'running'. */
-async function watchRun({ root, id, write, intervalMs, signal }) {
+async function watchRun({ root, id, write, intervalMs, signal, color }) {
   if (!existsSync(eventsFile(root, id))) throw new Error(`No existe la ejecución ${id}`);
   const state = newRunState();
   let lastStatus = null;
@@ -116,7 +116,7 @@ async function watchRun({ root, id, write, intervalMs, signal }) {
       idlePolls = 0;
       for (const event of events) {
         if (event.type === 'status') lastStatus = event.status;
-        emitEvent(event, state, write);
+        emitEvent(event, state, write, color);
       }
     }
     await sleep(intervalMs, signal);
@@ -124,7 +124,7 @@ async function watchRun({ root, id, write, intervalMs, signal }) {
 }
 
 /** Sigue la ejecución más reciente y salta a cada ejecución nueva. */
-async function followRuns({ root, write, intervalMs, signal }) {
+async function followRuns({ root, write, intervalMs, signal, color }) {
   let current = null;
   let state = newRunState();
   let waitingShown = false;
@@ -149,7 +149,7 @@ async function followRuns({ root, write, intervalMs, signal }) {
     }
 
     for (const event of parseLines(readNewLines(root, current, state))) {
-      emitEvent(event, state, write);
+      emitEvent(event, state, write, color);
     }
     await sleep(intervalMs, signal);
   }
@@ -160,7 +160,7 @@ async function followRuns({ root, write, intervalMs, signal }) {
  * Con `id` termina solo cuando su estado deja de ser 'running'; sin `id`
  * sigue la ejecución más reciente y no termina por sí solo (solo al abortar).
  */
-export async function watchRuns({ root, id, write, intervalMs = 500, signal }) {
-  if (id) return watchRun({ root, id, write, intervalMs, signal });
-  return followRuns({ root, write, intervalMs, signal });
+export async function watchRuns({ root, id, write, intervalMs = 500, signal, color = false }) {
+  if (id) return watchRun({ root, id, write, intervalMs, signal, color });
+  return followRuns({ root, write, intervalMs, signal, color });
 }

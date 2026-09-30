@@ -10,7 +10,7 @@ import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, initExplanation
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository } from './prepare.js';
-import { formatEvent } from './events.js';
+import { formatEvent, useColor } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
 import { latestRunId, listRunIds, loadState, runDir } from './store.js';
@@ -127,7 +127,7 @@ function eventPrinter(values) {
   if (values.quiet) return undefined;
   const startedAtMs = Date.now();
   return (event) => {
-    const line = formatEvent(event, startedAtMs);
+    const line = formatEvent(event, startedAtMs, { color: useColor(process.stderr) });
     if (line) process.stderr.write(`${line}\n`);
   };
 }
@@ -201,6 +201,7 @@ async function cmdWatch(positionals, values) {
       root,
       id: positionals[0],
       write: (line) => process.stdout.write(`${line}\n`),
+      color: useColor(process.stdout),
       signal: controller.signal,
     });
   } finally {
