@@ -7,6 +7,7 @@ import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
 import { getExecutor } from './executors/index.js';
 import { repoRoot } from './git.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
+import { formatEvent } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
 import { latestRunId, listRunIds, loadState, runDir } from './store.js';
@@ -100,6 +101,16 @@ function printResult(state, root, json) {
   return state.status === 'escalated' ? 2 : 0;
 }
 
+/** Crea el manejador onEvent que muestra los eventos formateados por stderr. */
+function eventPrinter(values) {
+  if (values.quiet) return undefined;
+  const startedAtMs = Date.now();
+  return (event) => {
+    const line = formatEvent(event, startedAtMs);
+    if (line) process.stderr.write(`${line}\n`);
+  };
+}
+
 async function cmdRun(positionals, values) {
   const source = positionals[0];
   if (!source) throw new Error('Indica la tarea: agentrelay run <tarea.json | ->');
@@ -111,8 +122,8 @@ async function cmdRun(positionals, values) {
   const root = await resolveRoot(values);
   const overrides = values.level ? { level: values.level } : undefined;
   const { config } = loadConfig({ cwd: root, configPath: values.config, overrides });
-  const log = values.quiet ? undefined : (line) => process.stderr.write(`${line}\n`);
-  const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], log });
+  const onEvent = eventPrinter(values);
+  const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
   return printResult(state, root, values.json);
 }
 
@@ -128,17 +139,17 @@ async function cmdReview(positionals, values) {
   if (!values.decision) throw new Error(`Indica --decision ${DECISIONS.join(' | ')}`);
   let feedback = values.feedback || '';
   if (values['feedback-file']) feedback = readFileSync(path.resolve(values['feedback-file']), 'utf8');
-  const log = values.quiet ? undefined : (line) => process.stderr.write(`${line}\n`);
+  const onEvent = eventPrinter(values);
   const state = await applyReview({
-    root, id: positionals[0], decision: values.decision, feedback, force: values.force, log,
+    root, id: positionals[0], decision: values.decision, feedback, force: values.force, onEvent,
   });
   return printResult(state, root, values.json);
 }
 
 async function cmdCheck(positionals, values) {
   const root = await resolveRoot(values);
-  const log = (line) => process.stderr.write(`${line}\n`);
-  const { state, check } = await recheck({ root, id: resolveRunId(root, positionals[0]), log });
+  const onEvent = eventPrinter(values);
+  const { state, check } = await recheck({ root, id: resolveRunId(root, positionals[0]), onEvent });
   if (values.json) {
     process.stdout.write(`${JSON.stringify({ id: state.id, passed: check.passed, files: check.files, validations: check.validations, scopeViolations: check.scopeViolations }, null, 2)}\n`);
   } else {

@@ -13,6 +13,7 @@ import { diffFromBase, head, pendingChanges } from './git.js';
 import { buildFixPrompt, buildImplementPrompt, buildSelfReviewPrompt } from './prompts.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from './policy.js';
 import { renderReport } from './report.js';
+import { appendEvent } from './events.js';
 import {
   createRunDir, ensureWorkspace, loadState, newRunId, relativeRunFile, saveState, workspaceDir, writeRunFile,
 } from './store.js';
@@ -22,8 +23,13 @@ import { VERSION } from './version.js';
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
 
-function context(root, state, log) {
+function context(root, state, onEvent) {
   const { config, task } = state;
+  // Añade el evento al registro y lo notifica a quien lo muestra en tiempo real.
+  const emit = (event) => {
+    const written = appendEvent(root, state.id, event);
+    if (onEvent) onEvent(written);
+  };
   return {
     root,
     state,
@@ -32,7 +38,7 @@ function context(root, state, log) {
     policy: state.policy,
     executor: getExecutor(config.executor.type),
     validationCommands: [...config.validation.commands, ...task.validation],
-    log: log || (() => {}),
+    emit,
   };
 }
 
@@ -67,11 +73,12 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
   const base = `attempt-${n}-${kind}`;
   writeRunFile(root, state.id, `${base}.prompt.md`, prompt);
   const { provider, model } = config.executor;
-  ctx.log(`→ Intento ${n} (${kind}): ${ctx.executor.name} ${provider}/${model}...`);
+  ctx.emit({ type: 'attempt_start', attempt: n, kind, provider, model });
 
   const startedAt = new Date().toISOString();
   const result = await ctx.executor.run({
     executor: config.executor, cwd: root, promptFile: relativeRunFile(state.id, `${base}.prompt.md`),
+    onActivity: (activity) => ctx.emit({ type: 'activity', attempt: n, ...activity }),
   });
   writeRunFile(root, state.id, `${base}.ndjson`, result.rawOutput);
   if (result.rawError.trim()) writeRunFile(root, state.id, `${base}.stderr.log`, result.rawError);
@@ -97,16 +104,20 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
   addUsage(state, result.usage);
   saveState(root, state);
 
-  const seconds = Math.round((result.durationMs || 0) / 1000);
-  ctx.log(result.ok
-    ? `  completado en ${seconds} s${result.report ? ` (${result.report.status})` : ''}`
-    : `  fallido: ${result.error}`);
+  ctx.emit({
+    type: 'attempt_end',
+    attempt: n,
+    ok: result.ok,
+    durationMs: result.durationMs,
+    agentStatus: result.report?.status,
+    error: result.error,
+  });
   return result;
 }
 
 async function evaluate(ctx) {
   const { root, state, task, config } = ctx;
-  ctx.log('→ Validando...');
+  ctx.emit({ type: 'check_start' });
   const diff = await diffFromBase(root, state.baseline.head, path.join(workspaceDir(root), 'tmp'));
   const validations = await runValidations(ctx.validationCommands, {
     cwd: root, timeoutSeconds: config.validation.timeoutSeconds, maxOutputChars: config.report.maxOutputChars,
@@ -115,6 +126,17 @@ async function evaluate(ctx) {
   const headMoved = (await head(root)) !== state.baseline.head;
   const passed = validations.every((v) => v.passed) && violations.length === 0;
 
+  for (const v of validations) {
+    ctx.emit({
+      type: 'validation',
+      command: v.command,
+      passed: v.passed,
+      exitCode: v.exitCode,
+      timedOut: v.timedOut,
+      durationMs: v.durationMs,
+    });
+  }
+
   const check = {
     at: new Date().toISOString(), passed, files: diff.files, validations, scopeViolations: violations, headMoved,
   };
@@ -122,9 +144,7 @@ async function evaluate(ctx) {
   state.lastCheck = check;
   saveState(root, state);
 
-  const failed = validations.filter((v) => !v.passed).length;
-  ctx.log(`  ${diff.files.length} archivo(s) modificado(s); validaciones: ${validations.length - failed}/${validations.length} correctas`
-    + (violations.length ? `; ${violations.length} archivo(s) protegido(s) modificado(s)` : ''));
+  ctx.emit({ type: 'check', changedFiles: diff.files.length, passed, scopeViolations: violations, headMoved });
   return { ...check, patch: diff.patch };
 }
 
@@ -151,7 +171,7 @@ async function continueCycle(ctx, result) {
     if (!result.ok || !check.passed) {
       if (policy.autoFix && state.retriesUsed < policy.maxRetries) {
         state.retriesUsed += 1;
-        ctx.log(`→ Corrección automática ${state.retriesUsed}/${policy.maxRetries}`);
+        ctx.emit({ type: 'retry', n: state.retriesUsed, max: policy.maxRetries });
         result = await attempt(ctx, 'fix', { feedback: autoFeedback(result, check), check });
         continue;
       }
@@ -164,11 +184,11 @@ async function continueCycle(ctx, result) {
       });
       state.selfReview.pass = decision;
       if (decision.run) {
-        ctx.log('→ Self-review del ejecutor');
+        ctx.emit({ type: 'self_review_start' });
         result = await attempt(ctx, 'self-review', { check });
         continue;
       }
-      if (state.selfReview.mode === 'pass') ctx.log(`  self-review separada omitida: ${decision.reason}`);
+      if (state.selfReview.mode === 'pass') ctx.emit({ type: 'self_review_skipped', reason: decision.reason });
     }
     return finalize(ctx, result, check);
   }
@@ -209,7 +229,7 @@ function finalize(ctx, result, check) {
   state.statusReasons = reasons;
   saveState(root, state);
   writeReport(root, state, check.patch);
-  ctx.log(`= Estado: ${status}${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
+  ctx.emit({ type: 'status', status, reasons });
   return state;
 }
 
@@ -218,7 +238,7 @@ export function writeReport(root, state, patch) {
 }
 
 /** Inicia una ejecución nueva para una tarea. */
-export async function startRun({ root, task, config, allowDirty = false, log }) {
+export async function startRun({ root, task, config, allowDirty = false, onEvent }) {
   const pending = await pendingChanges(root);
   if (pending.length && !allowDirty) {
     throw new Error(
@@ -258,8 +278,15 @@ export async function startRun({ root, task, config, allowDirty = false, log }) 
   writeRunFile(root, id, 'task.json', `${JSON.stringify(task, null, 2)}\n`);
   saveState(root, state);
 
-  const ctx = context(root, state, log);
-  ctx.log(`AgentRelay ${VERSION} · ejecución ${id} · nivel ${policy.level} (${policy.name}) · self-review: ${state.selfReview.mode}`);
+  const ctx = context(root, state, onEvent);
+  ctx.emit({
+    type: 'run_start',
+    runId: id,
+    title: task.title,
+    level: policy.level,
+    levelName: policy.name,
+    selfReview: state.selfReview.mode,
+  });
   return guard(root, state, async () => continueCycle(ctx, await attempt(ctx, 'implement')));
 }
 
@@ -275,13 +302,13 @@ async function guard(root, state, fn) {
 }
 
 /** Registra la decisión del orquestador sobre una ejecución. */
-export async function applyReview({ root, id, decision, feedback = '', force = false, log }) {
+export async function applyReview({ root, id, decision, feedback = '', force = false, onEvent }) {
   if (!DECISIONS.includes(decision)) throw new Error(`Decisión no válida: ${decision} (${DECISIONS.join(' | ')})`);
   const state = loadState(root, id);
   if (FINAL_STATUSES.includes(state.status)) throw new Error(`La ejecución ${id} ya está cerrada (${state.status})`);
   if (state.status === 'running') throw new Error(`La ejecución ${id} todavía está en curso`);
 
-  const ctx = context(root, state, log);
+  const ctx = context(root, state, onEvent);
   const review = { at: new Date().toISOString(), decision, feedback: feedback || null };
 
   if (decision === 'fix') {
@@ -296,6 +323,8 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.retriesUsed += 1;
     state.status = 'running';
     saveState(root, state);
+    ctx.emit({ type: 'review', decision, feedback: review.feedback });
+    ctx.emit({ type: 'status', status: 'running', reasons: [] });
     return guard(root, state, async () => {
       const result = await attempt(ctx, 'fix', { feedback, check: state.lastCheck });
       return continueCycle(ctx, result);
@@ -315,6 +344,8 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.statusReasons = [check.passed ? 'aceptada tras validación final' : 'aceptada con --force sin superar la validación final'];
     saveState(root, state);
     writeReport(root, state, check.patch);
+    ctx.emit({ type: 'review', decision, feedback: review.feedback });
+    ctx.emit({ type: 'status', status: 'accepted', reasons: state.statusReasons });
     return state;
   }
 
@@ -327,13 +358,15 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.statusReasons = [feedback || 'rechazada por el orquestador; los cambios siguen en el árbol de trabajo'];
   }
   saveState(root, state);
+  ctx.emit({ type: 'review', decision, feedback: review.feedback });
+  ctx.emit({ type: 'status', status: state.status, reasons: state.statusReasons });
   return state;
 }
 
 /** Vuelve a ejecutar las validaciones sin cambiar el estado (p. ej. tras un cambio manual). */
-export async function recheck({ root, id, log }) {
+export async function recheck({ root, id, onEvent }) {
   const state = loadState(root, id);
-  const ctx = context(root, state, log);
+  const ctx = context(root, state, onEvent);
   const check = await evaluate(ctx);
   writeReport(root, state, check.patch);
   return { state, check };

@@ -51,6 +51,31 @@ emit({ type: 'hook_event', hookEventName: 'agent_start', agentId: 'agent_fake', 
 emit({ type: 'agent_event', event: { type: 'iteration_start', iteration: 1 } });
 emit({ type: 'hook_event', hookEventName: 'tool_call', agentId: 'agent_fake', taskId: 'conv_fake', parentAgentId: null });
 emit({ type: 'agent_event', event: { type: 'done', reason: finishReason, text, iterations: 1, usage } });
+emit({ type: 'agent_event', event: { type: 'content_end', contentType: 'reasoning', reasoning: 'fake reasoning for the test' } });
+for (const [index, file] of Object.keys(action.write || {}).entries()) {
+  emit({
+    type: 'agent_event',
+    event: {
+      type: 'content_start',
+      contentType: 'tool',
+      toolCallId: `call_editor_${index + 1}`,
+      toolName: 'editor',
+      input: { path: path.resolve(process.cwd(), file) },
+    },
+  });
+}
+emit({
+  type: 'agent_event',
+  event: {
+    type: 'usage',
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cost: usage.totalCost,
+    totalInputTokens: usage.inputTokens,
+    totalOutputTokens: usage.outputTokens,
+    totalCost: usage.totalCost,
+  },
+});
 emit({
   type: 'run_result', finishReason, iterations: 1, usage, aggregateUsage: usage, durationMs: 5, text,
   model: { id: 'fake-model', provider: 'fake' },

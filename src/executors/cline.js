@@ -117,13 +117,103 @@ function tail(text, max = 2000) {
   return text.length > max ? text.slice(-max) : text;
 }
 
+/** Recorta un texto a `max` caracteres, añadiendo "…" si se excede. */
+function clip(text, max = 160) {
+  const value = String(text ?? '');
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+/** Sustituye el directorio `cwd` (con "\\" o "/") por "." y normaliza a "/". */
+function relativize(text, cwd) {
+  if (!cwd || !text) return text;
+  const variants = [...new Set([cwd, cwd.replace(/\\/g, '/'), cwd.replace(/\//g, '\\')])];
+  let out = text;
+  for (const v of variants) out = out.split(v).join('.');
+  return out.replace(/\\/g, '/');
+}
+
+/** Describe brevemente la entrada de una llamada a herramienta de Cline. */
+export function describeTool(toolName, input, cwd) {
+  const value = input ?? {};
+  let text;
+  if (toolName === 'read_files') text = (value.files || []).map((f) => f?.path ?? '').join(', ');
+  else if (toolName === 'editor') text = value.path ?? '';
+  else if (toolName === 'run_commands') text = (value.commands || []).join(' ; ');
+  else text = JSON.stringify(value);
+  return clip(relativize(text, cwd), 160);
+}
+
+/** Primera línea no vacía de un texto. */
+function firstLine(text) {
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+}
+
+/** Convierte una línea NDJSON ya parseada de Cline en un evento de actividad (o null). */
+export function toActivity(clineEvent, cwd) {
+  if (!clineEvent || typeof clineEvent !== 'object') return null;
+  if (clineEvent.type === 'error') {
+    return { kind: 'error', message: String(clineEvent.message ?? '') };
+  }
+  if (clineEvent.type !== 'agent_event' || !clineEvent.event) return null;
+  const e = clineEvent.event;
+  if (e.type === 'iteration_start') return { kind: 'iteration', n: e.iteration };
+  if (e.type === 'content_end' && e.contentType === 'reasoning') {
+    return { kind: 'thinking', text: clip(firstLine(e.reasoning), 160) };
+  }
+  if (e.type === 'content_start' && e.contentType === 'tool') {
+    return { kind: 'tool', tool: e.toolName, detail: describeTool(e.toolName, e.input, cwd) };
+  }
+  if (e.type === 'usage') {
+    return {
+      kind: 'usage',
+      inputTokens: e.totalInputTokens,
+      outputTokens: e.totalOutputTokens,
+      cost: e.totalCost,
+    };
+  }
+  return null;
+}
+
+/** Procesa stdout línea a línea y avisa de cada actividad según llega. */
+function makeStdoutHandler(cwd, onActivity) {
+  let pending = '';
+  const handleLine = (raw) => {
+    if (!raw.startsWith('{')) return;
+    let event;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const activity = toActivity(event, cwd);
+    if (activity) onActivity(activity);
+  };
+  return (chunk) => {
+    pending += chunk;
+    let nl;
+    while ((nl = pending.indexOf('\n')) !== -1) {
+      const raw = pending.slice(0, nl);
+      pending = pending.slice(nl + 1);
+      handleLine(raw.endsWith('\r') ? raw.slice(0, -1) : raw);
+    }
+  };
+}
+
 /** Ejecuta Cline sobre `cwd` con el prompt guardado en `promptFile` (ruta relativa). */
-export async function run({ executor, cwd, promptFile }) {
+export async function run({ executor, cwd, promptFile, onActivity }) {
   const [command, ...prefix] = commandParts(executor.command);
   const args = [...prefix, ...buildArgs(executor, instructionFor(promptFile))];
   const timeoutMs = executor.timeoutSeconds ? executor.timeoutSeconds * 1000 + KILL_GRACE_MS : undefined;
 
-  const res = await runProcess(command, args, { cwd, timeoutMs });
+  const res = await runProcess(command, args, {
+    cwd,
+    timeoutMs,
+    onStdout: onActivity ? makeStdoutHandler(cwd, onActivity) : undefined,
+  });
   const parsed = parseOutput(`${res.stdout}\n${res.stderr}`);
   const ok = res.code === 0 && parsed.finishReason === 'completed';
 

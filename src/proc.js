@@ -59,7 +59,7 @@ function installSignalHandlers() {
   }
 }
 
-function spawnAndCollect(command, args, { cwd, env, timeoutMs, shell } = {}) {
+function spawnAndCollect(command, args, { cwd, env, timeoutMs, shell, onStdout } = {}) {
   installSignalHandlers();
   return new Promise((resolve) => {
     const started = Date.now();
@@ -102,7 +102,7 @@ function spawnAndCollect(command, args, { cwd, env, timeoutMs, shell } = {}) {
 
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stdout.on('data', (chunk) => { stdout += chunk; if (onStdout) onStdout(chunk); });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     child.on('error', (error) => finish({ code: null, error }));
     child.on('close', (code) => finish({ code }));

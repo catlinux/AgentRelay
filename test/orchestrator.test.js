@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyReview, startRun } from '../src/orchestrator.js';
+import { readEvents } from '../src/events.js';
 import { runDir } from '../src/store.js';
 import { normalizeTask } from '../src/task.js';
 import { baseTask, fakePlan, git, makeRepo, testConfig } from './helpers.js';
@@ -239,6 +240,32 @@ test('falla pronto si el ejecutor no está disponible', async () => {
       /no está disponible/,
     );
     assert.equal(existsSync(path.join(repo.dir, '.agentrelay')), false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('registra eventos estructurados en events.ndjson y los emite en orden', async () => {
+  const repo = makeRepo();
+  try {
+    fakePlan(repo, { implement: GOOD });
+    const received = [];
+    const state = await startRun({
+      root: repo.dir,
+      task: normalizeTask(baseTask()),
+      config: testConfig(),
+      onEvent: (event) => received.push(event),
+    });
+
+    const events = readEvents(repo.dir, state.id);
+    assert.deepEqual(
+      events.filter((e) => e.type !== 'activity').map((e) => e.type),
+      ['run_start', 'attempt_start', 'attempt_end', 'check_start', 'validation', 'check', 'status'],
+    );
+    const tool = events.find((e) => e.type === 'activity' && e.kind === 'tool');
+    assert.ok(tool);
+    assert.equal(tool.detail, './hello.txt');
+    assert.equal(received.length, events.length);
   } finally {
     repo.cleanup();
   }
