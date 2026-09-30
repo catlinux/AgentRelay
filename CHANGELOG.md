@@ -13,6 +13,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- Validado el flujo completo en Linux (Debian, Node 20) con un proyecto real.
 - README: aclarado que la tarea JSON la redacta el orquestador y que la conversación se hace con él; indicada la versión de Node recomendada.
 
 ## [0.0.2] - 2026-09-30

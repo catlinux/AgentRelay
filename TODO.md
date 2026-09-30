@@ -8,7 +8,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [x] Cline CLI como dependencia: instalación en un solo paso (0.0.2).
 - [ ] Errores de credenciales del ejecutor (p. ej. "Authentication Fails"): detenerse sin reintentos, marcar la ejecución como fallida (no escalada) y mostrar un mensaje claro con el comando para configurar el proveedor (`npx cline auth …`) (0.0.3).
 - [ ] `agentrelay doctor`: comprobar que el ejecutor tiene un proveedor y una credencial configurados (0.0.3).
-- [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado. Windows: clon limpio probado (0.0.2). Linux (Debian): en prueba.
+- [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración de Cline) y dejarlo documentado. Windows: clon limpio probado (0.0.2). Linux (Debian): probado.
 - [x] Linux (Debian, Node 20.20.2, npm 10.8.2): tras `npm install` no existía `node_modules/.bin/cline` y AgentRelay no encontraba el ejecutor («cline: not found»). AgentRelay localiza ahora Cline sin depender del enlace de `.bin` (ejecuta `node_modules/cline/bin/cline` con Node). Probado con una ejecución real. Pendiente: confirmar en una instalación limpia en Debian.
 - [x] Aceptar archivos JSON con BOM (Windows).
 - [ ] Versión mínima de Node: las dependencias de Cline piden Node >= 22 (avisos `EBADENGINE`). Comprobado: Cline 3.0.66 arranca con Node 20.20.2; solo avisa de que no puede leer el almacén de certificados del sistema (necesita >= 22.15; afecta a certificados corporativos o autofirmados). Decidir si se mantiene `engines` en Node 20 o se sube a 22, y documentar el aviso.
@@ -34,7 +34,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja (evita mezclar sus cambios con el diff de la tarea).
 ### Otros
 
-- [ ] Probar el flujo completo en Linux y macOS.
+- [x] Probar el flujo completo en Linux: Debian (Node 20.20.2) con Claude Code en VS Code y DeepSeek, proyecto de prueba (calculadora) completado.
+- [ ] Probar el flujo completo en macOS.
 - [ ] Integración continua con tests en Windows, Linux y macOS.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
 - [ ] Recuperación de ejecuciones interrumpidas (estado `running` huérfano).
