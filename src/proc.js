@@ -54,7 +54,8 @@ function installSignalHandlers() {
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.once(signal, () => {
       for (const child of activeChildren) killTree(child);
-      process.exit(signal === 'SIGINT' ? 130 : 143);
+      // Si otro código gestiona la señal (p. ej. watch), le dejamos terminar.
+      if (process.listenerCount(signal) === 0) process.exit(signal === 'SIGINT' ? 130 : 143);
     });
   }
 }

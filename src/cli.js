@@ -13,6 +13,7 @@ import { runProcess } from './proc.js';
 import { latestRunId, listRunIds, loadState, runDir } from './store.js';
 import { loadTask } from './task.js';
 import { VERSION } from './version.js';
+import { watchRuns } from './watch.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -23,6 +24,7 @@ Uso:
                                     Registra la revisión del orquestador
   agentrelay check [id]             Repite las validaciones sin cambiar el estado
   agentrelay list                   Lista las ejecuciones del repositorio
+  agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay init                   Crea ${CONFIG_FILE} con los valores por defecto
 
@@ -170,6 +172,24 @@ async function cmdList(values) {
   return 0;
 }
 
+async function cmdWatch(positionals, values) {
+  const root = await resolveRoot(values);
+  const controller = new AbortController();
+  const onSigint = () => controller.abort();
+  process.once('SIGINT', onSigint);
+  try {
+    await watchRuns({
+      root,
+      id: positionals[0],
+      write: (line) => process.stdout.write(`${line}\n`),
+      signal: controller.signal,
+    });
+  } finally {
+    process.removeListener('SIGINT', onSigint);
+  }
+  return 0;
+}
+
 async function cmdDoctor(values) {
   let ok = true;
   const line = (good, text) => {
@@ -246,6 +266,7 @@ export async function main(argv) {
       case 'review': return await cmdReview(rest, values);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
+      case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
       case 'init': return await cmdInit(values);
       default:
