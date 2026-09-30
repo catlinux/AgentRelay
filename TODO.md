@@ -30,6 +30,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 
 ### Seguridad y control del repositorio
 
+- [ ] Carpeta que no es un repositorio git (p. ej. un sitio web sin versionar): el error debe explicar qué hacer (`git init` y un primer commit) y advertir de que `.agentrelay/` no debe quedar dentro de un directorio servido públicamente. Valorar un comando `agentrelay init` que ofrezca preparar el repositorio.
 - [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja (evita mezclar sus cambios con el diff de la tarea).
 ### Otros
 
