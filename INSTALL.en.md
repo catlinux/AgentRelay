@@ -47,7 +47,7 @@ agentrelay doctor
 
 Every line should show `[ok]`, including the `Sesión` one.
 
-**5. Set up your orchestrator** (once; it asks for confirmation):
+**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
 
 ```powershell
 agentrelay setup
@@ -103,7 +103,7 @@ If the machine has no browser (for example over SSH), use `agentrelay login --de
 agentrelay doctor
 ```
 
-**5. Set up your orchestrator** (once; it asks for confirmation):
+**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
 
 ```sh
 agentrelay setup
@@ -155,7 +155,7 @@ If the machine has no browser (for example over SSH), use `agentrelay login --de
 agentrelay doctor
 ```
 
-**5. Set up your orchestrator** (once; it asks for confirmation):
+**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
 
 ```sh
 agentrelay setup
@@ -184,6 +184,7 @@ Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes
 | `agentrelay doctor` reports a failure for the executor | Run `npm install` again in the AgentRelay folder and repeat `doctor`. |
 | `EBADENGINE` warnings during `npm install` | They are warnings: some dependencies prefer Node 22. It works with Node 20. To avoid them, upgrade to Node 22. |
 | "Authentication Fails" when delegating (Cline only) | The provider key is not configured or is wrong: repeat the Cline setup described in the README. |
+| `doctor` says Cline is not available | Install it with `agentrelay executors add cline`. |
 | `doctor` or `run` say there is no session | Run `agentrelay login` and sign in with your ChatGPT account. On a machine without a browser (for example over SSH), use `agentrelay login --device`. |
 | "no es un repositorio git" (not a git repository) | Run `agentrelay init` in the project folder. |
 

@@ -32,10 +32,10 @@ Conexión y primera experiencia:
 
 Instalación modular de ejecutores (acordado el 2026-10-01):
 
-- [ ] `npm install` instala solo el núcleo y Codex, el ejecutor por defecto (sin avisos ni vulnerabilidades: los 21 avisos y el de `node-domexception` vienen todos de las dependencias de Cline). Cline deja de ser dependencia por defecto.
-- [ ] Elegir los ejecutores al instalar: `agentrelay setup` (paso del asistente de instalación) ofrece la lista de ejecutores disponibles, instala los marcados y explica cómo conectar cada uno. Los ejecutores extra se guardan en una carpeta propia del usuario (`~/.agentrelay/executors/`), no en el repositorio, para que sobrevivan a `git pull`/`npm install` y no ensucien el repositorio. No preguntar desde `npm install` (los scripts de instalación no son interactivos, se ejecutan en CI y npm reciente los bloquea por defecto).
-- [ ] `agentrelay executors` (listar disponibles e instalados) y `agentrelay executors add <nombre>`. Si alguien elige en la configuración un ejecutor no instalado, AgentRelay indica el comando exacto para añadirlo.
-- [ ] Registro de ejecutores con la información de instalación de cada uno (paquete npm, cómo conectar la cuenta), para que los futuros ejecutores (Gemini, Qwen, etc.) se añadan sin aumentar el peso de la instalación base.
+- [x] `npm install` instala solo el núcleo y Codex, el ejecutor por defecto (sin avisos ni vulnerabilidades: los 21 avisos y el de `node-domexception` vienen todos de las dependencias de Cline). Cline deja de ser dependencia por defecto.
+- [x] Elegir los ejecutores al instalar: `agentrelay setup` (paso del asistente de instalación) ofrece la lista de ejecutores disponibles, instala los marcados y explica cómo conectar cada uno. Los ejecutores extra se guardan en una carpeta propia del usuario (`~/.agentrelay/executors/`), no en el repositorio, para que sobrevivan a `git pull`/`npm install` y no ensucien el repositorio. No preguntar desde `npm install` (los scripts de instalación no son interactivos, se ejecutan en CI y npm reciente los bloquea por defecto).
+- [x] `agentrelay executors` (listar disponibles e instalados) y `agentrelay executors add <nombre>`. Si alguien elige en la configuración un ejecutor no instalado, AgentRelay indica el comando exacto para añadirlo.
+- [x] Registro de ejecutores con la información de instalación de cada uno (paquete npm, cómo conectar la cuenta), para que los futuros ejecutores (Gemini, Qwen, etc.) se añadan sin aumentar el peso de la instalación base.
 - [ ] Instalador gráfico multiplataforma: sustituir el script manual por paquetes nativos que hagan la misma pregunta de ejecutores con interfaz gráfica. Windows: instalador `.exe` (Inno Setup o NSIS). Linux: paquetes `.deb` y `.rpm` (con `nfpm` o `fpm`) y/o AppImage, con un asistente gráfico sencillo (p. ej. Zenity o una pequeña aplicación multiplataforma tipo Tauri) para la selección de ejecutores y la conexión de la cuenta. macOS: `.pkg`. Calamares, que se propuso como referencia, es un instalador de sistemas operativos (particiones, distribuciones) y no de aplicaciones: no encaja; se toma solo como inspiración de la experiencia de asistente paso a paso. Todos los instaladores llaman a los mismos comandos (`agentrelay executors`, `login`, `setup`).
 
 Configuración y comandos:
@@ -45,6 +45,9 @@ Configuración y comandos:
 - [ ] Investigar si, además del modelo, se puede cambiar el esfuerzo de razonamiento: Codex (`model_reasoning_effort`, ya soportado con `executor.thinking`; comprobar los valores válidos por modelo) y DeepSeek/Cline (`--thinking`). Exponerlo en la configuración central y en los comandos `/`.
 
 Salida de `agentrelay watch`:
+
+- [ ] Rutas clicables: la terminal de VS Code ya abre con Ctrl+clic las rutas que existen (relativas al directorio de la terminal). Emitir enlaces explícitos (OSC 8 o rutas absolutas) para que funcione aunque `watch` no se lance en la raíz del proyecto. Comprobar en terminales de Windows, Linux y macOS.
+- [ ] Ctrl+clic sobre un archivo editado abre el **diff** de la tarea (archivo en el commit de partida frente al estado actual) en el editor de diferencias de VS Code. La terminal sola no puede; se hace con la extensión de VS Code registrando un proveedor de enlaces de terminal (`registerTerminalLinkProvider`) que llama a `vscode.diff`.
 
 - [x] Hora en cada línea (hoy solo se ve el tiempo transcurrido `[mm:ss]`): mostrar la hora local, y opcionalmente el tiempo transcurrido.
 - [x] Salida mucho más amigable (primera versión hecha; pendiente revisarla en terminales de Windows, Linux y macOS y refinar con el uso): agrupar por intento, resumir las acciones en lenguaje claro (qué archivo lee/edita, qué prueba ejecuta) en vez de mostrar el comando crudo (hoy, con Codex, aparece la llamada completa a PowerShell), colores y símbolos con opción para desactivarlos, y un resumen final. Comprobar que se ve bien en los terminales de VS Code, Windows, Linux y macOS.
@@ -57,6 +60,11 @@ Precios y tarifas de DeepSeek:
 Documentación y plataformas:
 
 - [ ] Indicar en el README y en INSTALL (es/en) que no disponemos de un Mac, por lo que macOS no está probado, y pedir feedback a quien lo use mediante issues de GitHub (con enlace y qué datos aportar: versión de macOS, de Node, salida de `agentrelay doctor`).
+
+Evaluar Qwen como ejecutor (investigado el 2026-10-01):
+
+- [ ] El acceso gratuito de Qwen Code (OAuth) terminó el 2026-04-15, iFlow cerró el 2026-04-17 y Cerebras quitó su nivel gratuito el 2026-07-21. Vías que quedan: NVIDIA build.nvidia.com (Qwen3-Coder-480B, 256 K de contexto, 40 peticiones/minuto, sin tarjeta; condiciones «solo pruebas y evaluación»); Alibaba Model Studio Singapur (Qwen3.8 Max y otros, 1 M de tokens por modelo durante 90 días, con modo «Free Quota Only»); OpenRouter `qwen/qwen3.8-27b:free` (50 peticiones/día; 1.000/día tras una compra única de 10 $, que se mantiene aunque se gaste el saldo; comisión de tarjeta del 5,5 %). ModelScope exige teléfono chino. Local descartado (sin hardware).
+- [ ] Primera prueba: NVIDIA + Qwen3-Coder-480B con Cline (proveedor compatible con OpenAI, `https://integrate.api.nvidia.com/v1`) en una tarea real, comparándolo con Codex + GPT-6 Luna. El usuario crea la clave gratuita en build.nvidia.com. Si convence: valorar OpenRouter con 10 $ y, más adelante, un adaptador nativo de Qwen Code (`qwen -p`, `--output-format stream-json`, `--json-schema`, `--approval-mode yolo`).
 
 Uso desde el móvil (Android):
 

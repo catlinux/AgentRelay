@@ -47,7 +47,7 @@ agentrelay doctor
 
 Todas las líneas deben salir con `[ok]`, incluida la de `Sesión`.
 
-**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación):
+**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación y te ofrecerá instalar ejecutores opcionales, como Cline; puedes decir que no y añadirlos más tarde con `agentrelay executors add <nombre>`):
 
 ```powershell
 agentrelay setup
@@ -103,7 +103,7 @@ Si el equipo no tiene navegador (por ejemplo, por SSH), usa `agentrelay login --
 agentrelay doctor
 ```
 
-**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación):
+**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación y te ofrecerá instalar ejecutores opcionales, como Cline; puedes decir que no y añadirlos más tarde con `agentrelay executors add <nombre>`):
 
 ```sh
 agentrelay setup
@@ -155,7 +155,7 @@ Si el equipo no tiene navegador (por ejemplo, por SSH), usa `agentrelay login --
 agentrelay doctor
 ```
 
-**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación):
+**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación y te ofrecerá instalar ejecutores opcionales, como Cline; puedes decir que no y añadirlos más tarde con `agentrelay executors add <nombre>`):
 
 ```sh
 agentrelay setup
@@ -185,6 +185,7 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 | `doctor` o `run` dicen que no hay sesión iniciada | Ejecuta `agentrelay login` y entra con tu cuenta de ChatGPT. Si el equipo no tiene navegador (por ejemplo, por SSH), usa `agentrelay login --device`. |
 | Avisos `EBADENGINE` durante `npm install` | Son avisos: algunas dependencias prefieren Node 22. Con Node 20 funciona. Si quieres evitarlos, actualiza a Node 22. |
 | «Authentication Fails» al delegar (solo si usas Cline) | La clave del proveedor no está configurada o es incorrecta: repite la configuración de Cline descrita en el README. |
+| `doctor` dice que Cline no está disponible | Instálalo con `agentrelay executors add cline`. |
 | «no es un repositorio git» | Ejecuta `agentrelay init` en la carpeta del proyecto. |
 
 ## Actualizar y desinstalar

@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Instalación modular de ejecutores: `npm install` instala solo el núcleo y Codex (de 332 a 3 paquetes y 0 vulnerabilidades; los avisos venían de Cline). `agentrelay executors` lista los ejecutores y `agentrelay executors add <nombre>` instala los opcionales en `~/.agentrelay/executors` (fuera de la carpeta de AgentRelay). `agentrelay setup` ofrece instalarlos (`--executors cline` sin preguntas).
 - Instrucciones de actualización con `npm ci` en lugar de `npm install` (no reescribe `package-lock.json`) y cómo resolver el error de `git pull` cuando `package-lock.json` tiene cambios locales (README, INSTALL).
 - Salida en directo (`run`, `review` y `watch`) más amigable: hora local en cada línea, acciones en lenguaje claro («lee src/config.js», «ejecuta los tests») en lugar de la llamada cruda del intérprete de comandos, intentos agrupados, números abreviados, colores opcionales (`NO_COLOR` y salida redirigida los desactivan) y un estado final en español con el siguiente paso sugerido.
 - `agentrelay setup`: instala (con confirmación) un bloque delimitado con marcas en las instrucciones globales de Claude Code (`~/.claude/CLAUDE.md`) para que delegue con AgentRelay en cualquier proyecto; `--uninstall` lo retira. Solo modifica lo que hay entre las marcas.
@@ -32,6 +33,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- Cline deja de instalarse con AgentRelay: quien lo use debe instalarlo una vez con `agentrelay executors add cline` (una copia instalada antes dentro de AgentRelay se sigue encontrando).
 - Cambio de comportamiento: el ejecutor por defecto pasa de Cline con DeepSeek a Codex con GPT-6 Luna. Quien use Cline debe indicar `{ "executor": { "type": "cline" } }` en su configuración. Los proyectos que ya tenían el bloque de instrucciones lo actualizan con `agentrelay init`.
 - `agentrelay init` ya no crea `agentrelay.config.json` por defecto: ahora se hace con `init --with-config`.
 - Validado el flujo completo en Linux (Debian, Node 20) con un proyecto real.
@@ -43,6 +45,7 @@ Actividad en directo e instalación en un solo paso.
 
 ### Añadido
 
+- Instalación modular de ejecutores: `npm install` instala solo el núcleo y Codex (de 332 a 3 paquetes y 0 vulnerabilidades; los avisos venían de Cline). `agentrelay executors` lista los ejecutores y `agentrelay executors add <nombre>` instala los opcionales en `~/.agentrelay/executors` (fuera de la carpeta de AgentRelay). `agentrelay setup` ofrece instalarlos (`--executors cline` sin preguntas).
 - Salida en directo en `run` y `review`: fases, archivos que el ejecutor lee o edita, comandos que ejecuta, razonamiento resumido, tokens, coste estimado y validaciones, con marca de tiempo `[mm:ss]`. `--quiet` la desactiva.
 - Registro de eventos estructurados por ejecución en `.agentrelay/runs/<id>/events.ndjson`.
 - Comando `agentrelay watch [id]` para seguir en directo, desde otro terminal, las ejecuciones lanzadas por otro proceso.
@@ -50,6 +53,7 @@ Actividad en directo e instalación en un solo paso.
 
 ### Cambiado
 
+- Cline deja de instalarse con AgentRelay: quien lo use debe instalarlo una vez con `agentrelay executors add cline` (una copia instalada antes dentro de AgentRelay se sigue encontrando).
 - Cline CLI pasa a ser una dependencia de AgentRelay (versión fijada 3.0.66): `npm install` instala todo lo necesario y AgentRelay usa esa copia por defecto.
 - `examples/task.example.json` se sustituye por `examples/demo-task.json`.
 
@@ -63,6 +67,7 @@ Primera versión: prototipo funcional del flujo de delegación.
 
 ### Añadido
 
+- Instalación modular de ejecutores: `npm install` instala solo el núcleo y Codex (de 332 a 3 paquetes y 0 vulnerabilidades; los avisos venían de Cline). `agentrelay executors` lista los ejecutores y `agentrelay executors add <nombre>` instala los opcionales en `~/.agentrelay/executors` (fuera de la carpeta de AgentRelay). `agentrelay setup` ofrece instalarlos (`--executors cline` sin preguntas).
 - CLI `agentrelay` con los comandos `run`, `show`, `review`, `check`, `list`, `doctor` e `init`.
 - Ejecutor Cline CLI en modo headless (`--json`), con proveedor y modelo configurables (por defecto, DeepSeek `deepseek-v4-pro`).
 - Tareas autocontenidas en JSON: objetivo, contexto, archivos, restricciones, criterios de aceptación, comandos de validación y archivos protegidos.

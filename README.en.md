@@ -57,7 +57,7 @@ Windows, Linux and macOS.
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
 cd AgentRelay
-npm install         # also installs Codex CLI (the default executor) and Cline CLI
+npm install         # also installs Codex CLI, the default executor
 npm link            # makes the "agentrelay" command available
 agentrelay login    # connect your ChatGPT account (the browser opens)
 ```
@@ -68,13 +68,14 @@ Without `npm link` you can also use `node <path>/bin/agentrelay.js`.
 
 The Codex copy is installed as a dependency of AgentRelay and is used before any other you may have on the `PATH` or in the VS Code extension.
 
-**Using Cline instead of Codex** (optional): Cline CLI is also installed as a dependency and shares its configuration with the Cline extension for VS Code (`~/.cline/data`). If you have not configured it, set the provider once and choose the executor in the configuration (`{ "executor": { "type": "cline" } }`):
+**Optional executors.** `npm install` installs only the core and Codex: it is light and has no vulnerability warnings. Other executors are installed when you want them, in a folder of your user (`~/.agentrelay/executors`), never inside AgentRelay's folder, so updates do not affect them:
 
 ```sh
-npx cline auth --provider deepseek --apikey <your-api-key> --modelid deepseek-v4-pro
+agentrelay executors               # lists executors, which ones are installed and which one is in use
+agentrelay executors add cline     # installs Cline (DeepSeek or other providers with an API key)
 ```
 
-(from the AgentRelay folder)
+`agentrelay setup` also offers to install them (or `agentrelay setup --executors cline`, without questions). When Cline is installed, AgentRelay shows the command to configure its provider; if you already use the Cline extension in VS Code, it shares its configuration (`~/.cline/data`) and nothing else is needed. To use it, set `{ "executor": { "type": "cline" } }` in `agentrelay.config.local.json`.
 
 To update later, in the AgentRelay folder: `git pull` and then `npm ci` (it installs exactly the versions in `package-lock.json` without changing it; `npm install` may rewrite it and make the next `git pull` fail). If `git pull` says your local changes to `package-lock.json` would be overwritten, discard them with `git checkout -- package-lock.json` (npm regenerates them; you lose nothing) and run `git pull` again. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
 
@@ -354,7 +355,7 @@ Keep in mind that pay-per-use API access and subscriptions are different things:
 
 ## Limitations of version 0.0.2
 
-- Two executors: Codex CLI (default) and Cline CLI. Codex has been tested on Windows only. Tasks run one at a time.
+- Two executors: Codex CLI (bundled, default) and Cline CLI (optional). Codex has been tested on Windows only. Tasks run one at a time.
 - There is no VS Code panel yet: it is used from the terminal (it is on the roadmap).
 - The CLI output and reports are in Spanish.
 - The executor's structured report depends on the model returning it; otherwise its final text is shown. Objective data (diff, validations) is always computed by AgentRelay.
@@ -384,5 +385,5 @@ Copies and forks must keep this attribution and link to https://github.com/catli
 
 | Component | Author | License | Link |
 | --- | --- | --- | --- |
-| Cline CLI (npm dependency, not included in the repository) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |
+| Cline CLI (optional executor; installed with `agentrelay executors add cline`) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |
 | Codex CLI (npm dependency, not included in the repository) | OpenAI | Apache-2.0 | https://github.com/openai/codex |
