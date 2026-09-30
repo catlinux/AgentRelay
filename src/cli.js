@@ -5,6 +5,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, DEFAULT_CONFIG, loadConfig } from './config.js';
 import { getExecutor } from './executors/index.js';
+import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
 import { applyBlockToFile, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
@@ -33,6 +34,9 @@ Uso:
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
 
+  agentrelay executors              Lista los ejecutores disponibles e instalados
+  agentrelay executors add <nombre> Instala un ejecutor opcional
+
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
   --config <archivo>      Archivo de configuración alternativo
@@ -53,6 +57,8 @@ Opciones de setup:
   --uninstall             Retira el bloque de AgentRelay
   --yes                   Aplica sin pedir confirmación
   --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
+
+  --executors <lista>     Instala ejecutores opcionales separados por comas
 
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)
@@ -78,6 +84,7 @@ const OPTIONS = {
   'claude-dir': { type: 'string' },
   'with-config': { type: 'boolean' },
   device: { type: 'boolean' },
+  executors: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -250,10 +257,67 @@ async function cmdDoctor(values) {
       }
     } catch (error) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
-      line(false, `Ejecutor ${executor.type} no disponible (${error.message}). ${hint}`);
+      line(false, `Ejecutor ${executor.type} no disponible (${error.message})${error.message.includes(hint) ? '' : `. ${hint}`}`);
     }
   }
   return ok ? 0 : 1;
+}
+
+async function cmdExecutors(positionals, values) {
+  const action = positionals[0];
+  const dir = executorsDir();
+  if (!action) {
+    let configured = null;
+    try {
+      const cwd = path.resolve(values.cwd || process.cwd());
+      const root = await repoRoot(cwd);
+      configured = loadConfig({ cwd: root || cwd, configPath: values.config }).config.executor.type;
+    } catch {
+      // Listing remains useful when the project config cannot be loaded.
+    }
+    for (const entry of CATALOG) {
+      const installed = await isInstalled(entry.name, { dir });
+      const state = entry.bundled ? 'incluido' : installed ? 'instalado' : 'no instalado';
+      const mark = entry.bundled || installed ? '✔' : '·';
+      process.stdout.write(`${mark} ${entry.title} (${entry.name}) — ${state}${configured === entry.name ? ' · en uso' : ''}\n`);
+      process.stdout.write(`  ${entry.description}\n`);
+    }
+    process.stdout.write('Añade uno con: agentrelay executors add <nombre>\n');
+    return 0;
+  }
+  if (action !== 'add' || positionals.length !== 2) {
+    process.stderr.write('Uso: agentrelay executors [add <nombre>]\n');
+    return 1;
+  }
+  const name = positionals[1];
+  const entry = getCatalogEntry(name, dir);
+  if (!entry) {
+    process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}\n`);
+    return 1;
+  }
+  if (entry.bundled) {
+    process.stdout.write('Codex ya viene incluido con AgentRelay.\n');
+    return 0;
+  }
+  if (await isInstalled(name, { dir })) {
+    process.stdout.write(`${entry.title} ya está instalado en ${dir}.\n`);
+    return 0;
+  }
+  return installOptionalExecutor(name, dir);
+}
+
+async function installOptionalExecutor(name, dir = executorsDir()) {
+  const entry = getCatalogEntry(name, dir);
+  process.stdout.write(`Se instalará ${entry.title} en ${dir}.\n`);
+  const result = await installExecutor(name, { dir });
+  if (!result.ok) {
+    process.stderr.write(`No se pudo instalar ${entry.title}: ${result.error}\n`);
+    return 1;
+  }
+  process.stdout.write(`✔ ${entry.title} instalado en ${dir}\n`);
+  if (entry.connect) process.stdout.write(`Conéctalo con: ${entry.connect}\n`);
+  process.stdout.write(`Para usarlo: pon { "executor": { "type": "${name}" } } en agentrelay.config.local.json\n`);
+  return 0;
 }
 
 async function cmdLogin(values) {
@@ -307,6 +371,37 @@ async function cmdSetup(values) {
     const { action } = applyBlockToFile(file, GLOBAL_BLOCK);
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
     process.stdout.write(`${label} ${file}\n`);
+  }
+  if (!removing) {
+    const dir = executorsDir();
+    const requested = [...new Set((values.executors || '').split(',').map((item) => item.trim()).filter(Boolean))];
+    for (const name of requested) {
+      const entry = getCatalogEntry(name, dir);
+      if (!entry) {
+        process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}\n`);
+        return 1;
+      }
+      if (entry.bundled) {
+        process.stdout.write('Codex ya viene incluido con AgentRelay.\n');
+      } else if (await isInstalled(name, { dir })) {
+        process.stdout.write(`${entry.title} ya está instalado en ${dir}.\n`);
+      } else if (await installOptionalExecutor(name, dir) !== 0) {
+        return 1;
+      }
+    }
+    let noTtyNotice = false;
+    for (const entry of CATALOG.filter((item) => !item.bundled && !requested.includes(item.name))) {
+      if (await isInstalled(entry.name, { dir })) continue;
+      const answer = await confirm(`¿Instalar también ${entry.title}? ${entry.description}`, { yes: false });
+      if (answer === null) {
+        if (!noTtyNotice) {
+          process.stdout.write('Ejecutores opcionales: agentrelay executors add <nombre> (ver agentrelay executors)\n');
+          noTtyNotice = true;
+        }
+      } else if (answer && await installOptionalExecutor(entry.name, dir) !== 0) {
+        return 1;
+      }
+    }
   }
   return 0;
 }
@@ -419,6 +514,7 @@ export async function main(argv) {
       case 'list': return await cmdList(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
+      case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);

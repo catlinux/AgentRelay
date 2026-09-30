@@ -9,6 +9,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IS_WINDOWS, runProcess } from '../proc.js';
+import { executorsDir as defaultExecutorsDir } from './catalog.js';
 import {
   clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, relativize, tail,
 } from './common.js';
@@ -19,7 +20,7 @@ export const name = 'cline';
 export { extractAgentReport, instructionFor };
 
 // Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
-export const installHint = 'Ejecuta "npm install" en la carpeta de AgentRelay.';
+export const installHint = 'Instálalo con "agentrelay executors add cline".';
 
 // Margen sobre el timeout propio de Cline antes de terminar el proceso.
 const KILL_GRACE_MS = 60_000;
@@ -28,26 +29,31 @@ const KILL_GRACE_MS = 60_000;
 const PROJECT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
- * Localiza el Cline instalado con AgentRelay. No basta con el enlace de
+ * Localiza primero cualquier copia anterior de Cline instalada con AgentRelay
+ * y después la copia opcional instalada en la carpeta de ejecutores. No basta con el enlace de
  * node_modules/.bin, que según la versión de npm puede no crearse (se ha visto
  * en Linux con npm 10): en ese caso se ejecuta el lanzador del paquete con el
  * propio Node. Devuelve null si no hay ninguna copia instalada.
  */
-export function findBundledCline(root = PROJECT_ROOT, exists = existsSync) {
+export function findBundledCline(root = PROJECT_ROOT, exists = existsSync, executorsDirectory = defaultExecutorsDir()) {
   const link = path.join(root, 'node_modules', '.bin', `cline${IS_WINDOWS ? '.cmd' : ''}`);
   if (exists(link)) return [link];
   const launcher = path.join(root, 'node_modules', 'cline', 'bin', 'cline');
   if (exists(launcher)) return [process.execPath, launcher];
+  const managedLink = path.join(executorsDirectory, 'node_modules', '.bin', `cline${IS_WINDOWS ? '.cmd' : ''}`);
+  if (exists(managedLink)) return [managedLink];
+  const managedLauncher = path.join(executorsDirectory, 'node_modules', 'cline', 'bin', 'cline');
+  if (exists(managedLauncher)) return [process.execPath, managedLauncher];
   return null;
 }
 
 /**
- * "cline" (valor por defecto) usa la copia instalada con AgentRelay y, si no
- * existe, la del PATH. Cualquier otro valor se usa tal cual.
+ * "cline" (valor por defecto) usa la copia instalada con AgentRelay o en la
+ * carpeta de ejecutores y, si no existe, el del PATH. Cualquier otro valor se usa tal cual.
  */
-export function commandParts(command) {
+export function commandParts(command, { executorsDir = defaultExecutorsDir() } = {}) {
   if (command === 'cline') {
-    const bundled = findBundledCline();
+    const bundled = findBundledCline(PROJECT_ROOT, existsSync, executorsDir);
     if (bundled) return bundled;
   }
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
@@ -159,7 +165,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   let error = null;
   if (res.error) {
     error = res.error.code === 'ENOENT'
-      ? `No se encuentra el ejecutor "${command}". Ejecuta "npm install" en la carpeta de AgentRelay o ajusta executor.command.`
+      ? `No se encuentra el ejecutor "${command}". ${installHint} o ajusta executor.command.`
       : res.error.message;
   } else if (res.timedOut) {
     error = `El ejecutor ha superado el tiempo máximo (${executor.timeoutSeconds} s)`;
@@ -192,6 +198,7 @@ export async function version(executor) {
   const [command, ...prefix] = commandParts(executor.command);
   const res = await runProcess(command, [...prefix, '--version'], { timeoutMs: 60_000 });
   if (res.code !== 0) {
+    if (res.error?.code === 'ENOENT') throw new Error(`${res.error.message}. ${installHint}`);
     throw new Error(res.error?.message || res.stderr.trim() || `código ${res.code}`);
   }
   return res.stdout.trim();
