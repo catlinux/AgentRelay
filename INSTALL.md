@@ -184,7 +184,7 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 
 ## Actualizar y desinstalar
 
-**Actualizar:** dentro de la carpeta de AgentRelay, ejecuta `git pull` y `npm install`.
+**Actualizar:** dentro de la carpeta de AgentRelay, ejecuta `git pull` y `npm install`. Si tenías `agentrelay watch` abierto, ciérralo (Ctrl+C) y vuelve a lanzarlo. No hace falta repetir `init` ni `setup`, salvo que el CHANGELOG lo indique.
 
 **Desinstalar:**
 

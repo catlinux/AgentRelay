@@ -70,7 +70,7 @@ npx cline auth --provider deepseek --apikey <tu-api-key> --modelid deepseek-v4-p
 
 (desde la carpeta de AgentRelay)
 
-Para actualizar más adelante: `git pull` y `npm install` en la carpeta de AgentRelay.
+Para actualizar más adelante: `git pull` y `npm install` en la carpeta de AgentRelay. Si tenías `agentrelay watch` abierto, ciérralo (Ctrl+C) y vuelve a lanzarlo para que use el código nuevo. No hace falta repetir `init` ni `setup`, salvo que el CHANGELOG lo indique.
 
 ## Probar AgentRelay en 5 minutos
 

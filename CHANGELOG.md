@@ -13,6 +13,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `init` en una carpeta sin repositorio git: `git init`, `.gitignore` con patrones de secretos (si no existía) y primer commit, con plan y confirmación previos, detección de archivos sensibles y aviso de carpetas servidas públicamente. Nunca modifica un `.gitignore` existente.
 - `run`, `watch`, `show`, `review`, `check` y `list` fuera de un repositorio indican ejecutar `agentrelay init`.
 - Guías de instalación paso a paso para Windows, Linux y macOS (`INSTALL.md` e `INSTALL.en.md`), enlazadas desde los README.
+- Documentado que, al actualizar, hay que reiniciar `agentrelay watch` si estaba abierto y que no hace falta repetir `init` ni `setup` salvo indicación del CHANGELOG (README, INSTALL y CLAUDE.md).
 
 ### Corregido
 

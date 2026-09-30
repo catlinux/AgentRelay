@@ -184,7 +184,7 @@ Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes
 
 ## Updating and uninstalling
 
-**Update:** inside the AgentRelay folder, run `git pull` and `npm install`.
+**Update:** inside the AgentRelay folder, run `git pull` and `npm install`. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again. There is no need to repeat `init` or `setup` unless the CHANGELOG says so.
 
 **Uninstall:**
 
