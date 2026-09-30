@@ -24,13 +24,17 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Barra de estado con la ejecución en curso (intento, coste acumulado).
 - [ ] Empaquetado como `.vsix` que incluya el motor y Cline CLI, sin necesidad de clonar ni usar npm.
 - [ ] Clave del proveedor guardada en el almacén seguro de VS Code y configuración guiada la primera vez.
-- [ ] Comando «AgentRelay: activar en este proyecto»: añade, con confirmación, las instrucciones de delegación al `CLAUDE.md`.
+- [ ] Extensión de VS Code: ejecutar `agentrelay init` automáticamente al abrir una carpeta.
 - [ ] Decidir si la extensión vive en el mismo repositorio (`vscode/`) o en uno separado.
 - [ ] Aparcado: chat propio (`agentrelay chat` en terminal o pestaña de VS Code) para hablar con el orquestador a través de AgentRelay. Restricción: solo con la suscripción del usuario, sin API de pago por uso. Requiere el agente del orquestador en modo sin interfaz (comprobando antes las condiciones de uso de la suscripción), elegir el modo de permisos y depender de su instalación. Retomar cuando el resto esté estable.
 
 ### Seguridad y control del repositorio
 
-- [ ] Carpeta que no es un repositorio git (p. ej. un sitio web sin versionar): el error debe explicar qué hacer (`git init` y un primer commit) y advertir de que `.agentrelay/` no debe quedar dentro de un directorio servido públicamente. Valorar un comando `agentrelay init` que ofrezca preparar el repositorio.
+- [ ] Automatizar la preparación de proyectos y del orquestador (0.0.3):
+  - [ ] `agentrelay setup`: añade, con confirmación, un bloque delimitado con marcas al archivo de instrucciones global del orquestador (`~/.claude/CLAUDE.md`), de modo que en cualquier proyecto sepa delegar con AgentRelay sin pegar nada a mano. Reversible (`--uninstall`); solo modifica el contenido entre sus marcas.
+  - [ ] `agentrelay init`: prepara el proyecto. Crea `CLAUDE.md` con el bloque de AgentRelay o, si existe, lo añade sin tocar el resto; al repetirlo solo actualiza lo que hay entre las marcas. Obligatorio por ahora. (La creación de `agentrelay.config.json` pasa a `init --with-config`.)
+  - [ ] `init` en una carpeta sin git: `git init`, `.gitignore` con patrones de secretos si no existe y primer commit, pidiendo confirmación y mostrando qué archivos entrarán; avisar si la carpeta parece servida públicamente (`/var/www`, `public_html`…) porque `.agentrelay/` no debe quedar expuesto. Sin confirmación interactiva (p. ej. lo ejecuta el orquestador) requiere `--yes`.
+  - [ ] `run`, `watch` y `review` en una carpeta sin git: mensaje que indique ejecutar `agentrelay init`.
 - [ ] Avisar si el usuario modifica archivos mientras el ejecutor trabaja (evita mezclar sus cambios con el diff de la tarea).
 ### Otros
 
@@ -52,6 +56,9 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 
 ## Posteriores
 
+- [ ] Instrucciones independientes del orquestador: hoy el bloque global es para Claude Code (`~/.claude/CLAUDE.md`). Cuando se admitan otros orquestadores o agentes (Codex, Cline…), decidir cómo darles las instrucciones de delegación (cada uno tiene su propio archivo o mecanismo).
+- [ ] Bloque por proyecto opcional: detectar que el proyecto no tiene las instrucciones de AgentRelay y preguntar si se quieren añadir (ahora `init` siempre las añade). Tener en cuenta que un `CLAUDE.md` versionado haría públicas esas instrucciones.
+- [ ] `init`: preguntar si se quiere subir el proyecto a un repositorio remoto y si se crea el `.gitignore`.
 - [ ] Interfaz estable de ejecutores y adaptadores adicionales (Codex, Continue, otros CLIs).
 - [ ] Proveedores adicionales (OpenAI, Anthropic, Qwen, Gemini…) a través de los ejecutores.
 - [ ] Integración opcional para que el orquestador reciba el informe sin pasar por la terminal.
