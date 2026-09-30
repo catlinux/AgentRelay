@@ -106,7 +106,7 @@ ${list(task.acceptanceCriteria)}
 
 ${attemptsTable(state.attempts)}
 
-Total: ${state.usage.inputTokens} tokens de entrada, ${state.usage.outputTokens} de salida · coste estimado por el ejecutor: ${fmtCost(state.usage.estimatedCost)}
+Total: ${state.usage.inputTokens} tokens de entrada, ${state.usage.outputTokens} de salida · coste estimado por el ejecutor: ${fmtCost(state.attempts.some((a) => typeof a.usage?.totalCost === 'number') ? state.usage.estimatedCost : null)}
 
 ## Informe del ejecutor (último intento)
 
