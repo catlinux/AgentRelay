@@ -47,7 +47,7 @@ agentrelay doctor
 
 Todas las líneas deben salir con `[ok]`, incluida la de `Sesión`.
 
-**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación y te ofrecerá instalar ejecutores opcionales, como Cline; puedes decir que no y añadirlos más tarde con `agentrelay executors add <nombre>`):
+**5. Prepara tu orquestador y conecta tu cuenta** (una sola vez; te pedirá confirmación, te ofrecerá instalar ejecutores opcionales, como Cline, y al final te propondrá conectar tu cuenta de ChatGPT; puedes decir que no a cualquiera de los dos y hacerlo más tarde con `agentrelay executors add <nombre>` o `agentrelay login`):
 
 ```powershell
 agentrelay setup

@@ -80,7 +80,7 @@ agentrelay login    # conecta tu cuenta de ChatGPT (se abre el navegador)
 
 Sin `npm link` también puedes usar `node <ruta>/bin/agentrelay.js`.
 
-`agentrelay login` se hace una sola vez. Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y no hace falta. En un equipo sin navegador (por ejemplo, por SSH), usa `agentrelay login --device`: muestra un código que introduces desde otro dispositivo. `agentrelay doctor` comprueba que la sesión está activa, y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no la hay.
+`agentrelay login` se hace una sola vez, y `agentrelay setup` te lo ofrece al final (`agentrelay setup --login` lo hace sin preguntar). Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y no hace falta. En un equipo sin navegador (por ejemplo, por SSH o un Linux sin entorno gráfico), AgentRelay lo detecta y usa por sí solo el código de dispositivo: te muestra un código que introduces desde otro dispositivo (`--device` lo fuerza y `--browser` fuerza el navegador). `agentrelay doctor` comprueba que la sesión está activa, y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no la hay.
 
 La copia de Codex se instala como dependencia de AgentRelay y se usa antes que cualquier otra que tengas en el `PATH` o en la extensión de VS Code.
 

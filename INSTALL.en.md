@@ -47,7 +47,7 @@ agentrelay doctor
 
 Every line should show `[ok]`, including the `Sesión` one.
 
-**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
+**5. Set up your orchestrator and connect your account** (once; it asks for confirmation, offers to install optional executors such as Cline and, at the end, offers to connect your ChatGPT account; you can say no to either and do it later with `agentrelay executors add <name>` or `agentrelay login`):
 
 ```powershell
 agentrelay setup
