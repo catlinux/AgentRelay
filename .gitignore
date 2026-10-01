@@ -1,9 +1,7 @@
 # ---------------------------------------------------------------
 # Archivos internos: nunca se publican
 # ---------------------------------------------------------------
-CLAUDE.md
 CLAUDE.local.md
-AGENTS.md
 .claude/
 .cline/
 .clinerules
