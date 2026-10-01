@@ -292,6 +292,19 @@ All configuration can be done in text files with **comments** (`//` and `/* */`)
 
 Command-line options take precedence over all of them.
 
+**Quick settings, without editing files.** For what you change often (executor, model, effort, level):
+
+```sh
+agentrelay models                # models of your account and the efforts each one supports; marks the active one
+agentrelay set model gpt-5.5     # change the executor's model
+agentrelay set effort high       # effort: low, medium, high, xhigh or max (or bajo, medio, alto, extremo, máximo)
+agentrelay set level 4           # orchestration level (1-5)
+agentrelay set executor cline    # switch executor (forgets the previous one's saved model)
+agentrelay unset effort          # back to the default
+```
+
+These commands write to `~/.agentrelay/settings.json`, a file they manage themselves (do not edit it by hand: that way your explained `config.json` keeps its comments). It has priority over `config.json` and loses to the project files; if a project file overrides what you just changed, `set` warns you. The result is validated and, if invalid, it is not saved. `agentrelay config` shows where each value comes from. With Codex and GPT-6 Luna the executor's model is fixed: what you tune is the effort and the level.
+
 ```sh
 agentrelay config init            # creates your personal file, explained option by option
 agentrelay config init --project  # creates the project one

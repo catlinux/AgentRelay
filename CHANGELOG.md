@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Añadido
+
+- Ajustes rápidos sin editar archivos: `agentrelay set <clave> <valor>` (`model`, `effort` con bajo/medio/alto/extremo/máximo, `level`, `executor`, `provider`, `timeout`), `agentrelay unset <clave>` y `agentrelay models` (modelos de la cuenta con los esfuerzos que admite cada uno, marcando el activo; Codex los lee de su caché local). Escriben en `~/.agentrelay/settings.json`, una capa nueva con prioridad sobre `config.json` y por debajo de los archivos del proyecto, que no destruye los comentarios del archivo explicado. Se valida el resultado, se avisa si un archivo del proyecto lo sustituye o si el modelo no admite el esfuerzo, y cambiar de ejecutor olvida el modelo guardado del anterior.
+
 ## [0.0.3] - 2026-10-01
 
 ### Añadido
