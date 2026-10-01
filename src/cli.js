@@ -50,7 +50,7 @@ Uso:
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay config [show|path|init] Muestra, localiza o crea la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
-  agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
+  agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
 
   agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
@@ -74,12 +74,13 @@ Opciones comunes:
   --json                  Salida en JSON
   -q, --quiet             Solo errores, avisos y resultados esenciales
   -v, --verbose           Añade detalles para diagnosticar problemas
+  -h, --help              Muestra esta ayuda
+  -V, --version           Muestra la versión
 
 Opciones de run:
   --level <1-5>           Nivel de orquestación (1 = máximo ahorro … 5 = máxima supervisión)
   --self-review <modo>    Fuerza el modo de self-review: ${SELF_REVIEW_MODES.join(' | ')}
   --allow-dirty           Permite delegar con cambios sin confirmar
-  --quiet                 Sin mensajes de progreso
 
 Opciones de review:
   --feedback <texto>      Problemas a corregir (obligatorio con fix)
@@ -87,17 +88,23 @@ Opciones de review:
   --force                 Acepta sin superar la validación final, o corrige por encima del límite
 
 Opciones de setup:
-  --uninstall             Retira el bloque de AgentRelay
+  --uninstall             Retira el bloque y los comandos de Claude Code
+  --no-commands            No instala los comandos de Claude Code
   --yes                   Aplica sin pedir confirmación
   --login                 Conecta la cuenta de ChatGPT sin preguntar
-  --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
-
   --executors <lista>     Instala ejecutores opcionales separados por comas
+  --claude-dir <dir>      Directorio .claude (por defecto, ~/.claude)
 
 Opciones de login:
   --device                Usa el código de dispositivo
   --browser               Fuerza el inicio de sesión con navegador
-  --type --size --kind --executor --model --effort --level --outcome --run --note --signals --include-legacy  Opciones de triage
+
+Opciones de usage:
+  --since <fecha>         Incluye ejecuciones desde esta fecha
+  --executor <tipo>       Filtra por ejecutor
+
+Opciones de triage:
+  --type --size --kind --executor --model --effort --level --outcome --run --note --signals --include-legacy
 
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)

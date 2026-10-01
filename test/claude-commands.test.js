@@ -18,6 +18,9 @@ test('listCommands lee los seis comandos reales y su metadato', () => {
     assert.match(frontmatter, /description:/);
     assert.match(frontmatter, /model: haiku/);
   }
+  const status = commands.find(({ name }) => name === 'estado.md').content;
+  assert.match(status, /agentrelay doctor -q 2>&1 \| grep -vE/);
+  assert.match(status, /agentrelay \(setup\|init\|login\)/);
 });
 
 test('removeLegacyCommands retira solo comandos gestionados conocidos', () => {

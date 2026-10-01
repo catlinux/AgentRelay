@@ -7,7 +7,7 @@ model: haiku
 <!-- agentrelay:managed -->
 Estado de AgentRelay:
 
-!`agentrelay doctor`
+!`agentrelay doctor -q 2>&1 | grep -vE 'agentrelay (setup|init|login)|npm install'`
 
 !`agentrelay config`
 
