@@ -77,6 +77,7 @@ test('executors lista el estado, la configuración activa y una instalación del
     assert.equal(listed.status, 0, listed.stderr);
     assert.match(listed.stdout, /Codex \(OpenAI\) \(codex\) — incluido · en uso/);
     assert.match(listed.stdout, /Cline \(cline\) — no instalado/);
+    assert.match(listed.stdout, /OpenCode \(opencode\) — (instalado|no instalado)/);
 
     const bin = path.join(dir, 'node_modules', '.bin');
     mkdirSync(bin, { recursive: true });

@@ -33,6 +33,15 @@ export const CATALOG = [
     npmPackage: 'cline@3',
     connect: 'npx --prefix <executorsDir> cline auth --provider deepseek --apikey TU_CLAVE --modelid deepseek-v4-pro',
   },
+  {
+    name: 'opencode',
+    title: 'OpenCode',
+    description: 'Con los modelos gratuitos de OpenCode (p. ej. opencode/nemotron-3-ultra-free).',
+    bundled: false,
+    // No se instala con npm: se instala aparte en el PATH (npmPackage: null).
+    npmPackage: null,
+    connect: 'opencode auth login',
+  },
 ];
 
 export function getCatalogEntry(name, dir = executorsDir()) {
@@ -40,10 +49,26 @@ export function getCatalogEntry(name, dir = executorsDir()) {
   return entry ? { ...entry, connect: entry.connect?.replace('<executorsDir>', dir) ?? null } : null;
 }
 
+/** Busca un ejecutable en el PATH (para ejecutores instalados fuera de AgentRelay). */
+function findOnPath(command, { env = process.env, exists = existsSync, platform = process.platform } = {}) {
+  const pathValue = env.PATH || env.Path || '';
+  const names = platform === 'win32' ? [`${command}.exe`, `${command}.cmd`, command] : [command];
+  for (const dir of String(pathValue).split(path.delimiter)) {
+    if (!dir) continue;
+    for (const fileName of names) {
+      const candidate = path.join(dir, fileName);
+      if (exists(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
 export async function isInstalled(name, options = {}) {
   const entry = getCatalogEntry(name, options.dir || executorsDir(options.env, options.home));
   if (!entry) throw new Error(`Ejecutor desconocido: ${name}`);
   if (entry.bundled) return true;
+  // Sin npmPackage: se instala aparte en el PATH, no lo gestiona AgentRelay.
+  if (!entry.npmPackage) return Boolean(findOnPath(entry.name, options));
   const dir = options.dir || executorsDir(options.env, options.home);
   const parts = clineCommandParts('cline', { executorsDir: dir, exists: options.exists || existsSync });
   const candidate = parts.length > 1 && parts[0] === process.execPath ? parts[1] : parts[0];
@@ -54,6 +79,7 @@ export async function installExecutor(name, { dir = executorsDir(), run = runPro
   const entry = getCatalogEntry(name, dir);
   if (!entry) throw new Error(`Ejecutor desconocido: ${name}`);
   if (entry.bundled) throw new Error(`${entry.title} ya viene incluido con AgentRelay.`);
+  if (!entry.npmPackage) throw new Error(`${entry.title} no se instala con AgentRelay; instálalo aparte en el PATH (${entry.connect}).`);
 
   mkdirSync(dir, { recursive: true });
   const packageJson = path.join(dir, 'package.json');

@@ -45,6 +45,7 @@ export const DEFAULT_CONFIG = Object.freeze({
 export const EXECUTOR_DEFAULTS = Object.freeze({
   cline: { command: 'cline', provider: 'deepseek', model: 'deepseek-v4-pro' },
   codex: { command: 'codex', provider: null, model: 'gpt-6-luna' },
+  opencode: { command: 'opencode', provider: null, model: 'opencode/nemotron-3-ultra-free' },
 });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 

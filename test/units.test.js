@@ -11,11 +11,14 @@ import {
 import {
   authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
 } from '../src/executors/codex.js';
+import {
+  buildArgs as opencodeBuildArgs, parseOutput as opencodeParseOutput, run as opencodeRun, toActivity as opencodeToActivity,
+} from '../src/executors/opencode.js';
 import { appendEvent, describeCommand, formatEvent, readEvents, supportsLinks, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
 import { relativize } from '../src/executors/common.js';
-import { FAKE_CODEX } from './helpers.js';
+import { FAKE_CODEX, FAKE_OPENCODE } from './helpers.js';
 import { loadTask, normalizeTask } from '../src/task.js';
 import { scopeViolations } from '../src/validate.js';
 
@@ -37,6 +40,14 @@ const CODEX_OUTPUT = [
   '{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"powershell.exe -Command \\"Set-Content b.txt adios\\"","exit_code":0,"status":"completed"}}',
   '{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"{\\"status\\":\\"done\\",\\"summary\\":\\"Creado b.txt.\\",\\"filesChanged\\":[\\"b.txt\\"]}"}}',
   '{"type":"turn.completed","usage":{"input_tokens":27706,"cached_input_tokens":13056,"output_tokens":246,"reasoning_output_tokens":62}}',
+].join('\n');
+
+// Salida real de OpenCode CLI (`opencode run --auto --format json`, recortada).
+const OPENCODE_OUTPUT = [
+  '{"type":"step_start","part":{"type":"step-start"}}',
+  '{"type":"tool_use","part":{"type":"tool","tool":"write","state":{"status":"completed","input":{"path":"hola.txt","content":"hola"},"output":"Created file successfully: hola.txt","title":"write"}}}',
+  '{"type":"step_finish","part":{"type":"step-finish","reason":"tool-calls","cost":0,"tokens":{"input":8002,"output":38,"reasoning":36,"cache":{"read":0,"write":0}}}}',
+  '{"type":"text","part":{"type":"text","text":"Done.\\n```json\\n{\\"status\\":\\"done\\",\\"summary\\":\\"ok\\",\\"filesChanged\\":[\\"hola.txt\\"]}\\n```"}}',
 ].join('\n');
 
 test('codex: interpreta el JSONL real', () => {
@@ -243,6 +254,72 @@ test('cline: commandParts respeta los valores explícitos', () => {
   assert.ok(parts.length >= 1 && parts.every((p) => typeof p === 'string'));
 });
 
+test('opencode: interpreta el JSON real', () => {
+  const parsed = opencodeParseOutput(OPENCODE_OUTPUT);
+  assert.equal(parsed.toolCalls, 1);
+  assert.deepEqual(parsed.usage, { inputTokens: 8002, outputTokens: 38, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
+  const report = extractAgentReport(parsed.text);
+  assert.equal(report.status, 'done');
+  assert.deepEqual(report.filesChanged, ['hola.txt']);
+});
+
+test('opencode: argumentos de línea de comandos', () => {
+  assert.deepEqual(
+    opencodeBuildArgs({ model: 'opencode/nemotron-3-ultra-free', extraArgs: [] }, 'instr'),
+    ['run', '--auto', '--format', 'json', '-m', 'opencode/nemotron-3-ultra-free', 'instr'],
+  );
+  assert.deepEqual(opencodeBuildArgs({}, 'hola'), ['run', '--auto', '--format', 'json', 'hola']);
+});
+
+test('opencode: toActivity convierte los eventos JSON en actividades', () => {
+  const cwd = 'C:\\repo';
+  assert.deepEqual(
+    opencodeToActivity({ type: 'tool_use', part: { type: 'tool', tool: 'write', state: { input: { path: 'C:\\repo\\a.txt', content: 'x' } } } }, cwd),
+    { kind: 'tool', tool: 'edit', detail: './a.txt' },
+  );
+  assert.deepEqual(
+    opencodeToActivity({ type: 'tool_use', part: { type: 'tool', tool: 'read', state: { input: { path: 'C:\\repo\\b.txt' } } } }, cwd),
+    { kind: 'tool', tool: 'read_files', detail: './b.txt' },
+  );
+  assert.deepEqual(
+    opencodeToActivity({ type: 'tool_use', part: { type: 'tool', tool: 'bash', state: { input: { command: 'npm test' } } } }, cwd),
+    { kind: 'tool', tool: 'command', detail: 'npm test' },
+  );
+  assert.deepEqual(
+    opencodeToActivity({ type: 'step_finish', part: { type: 'step-finish', reason: 'tool-calls', cost: 0, tokens: { input: 10, output: 2 } } }, cwd),
+    { kind: 'usage', inputTokens: 10, outputTokens: 2, cost: 0 },
+  );
+  assert.deepEqual(opencodeToActivity({ type: 'step_start', part: { type: 'step-start' } }, cwd), { kind: 'iteration' });
+  assert.equal(opencodeToActivity({ type: 'text', part: { type: 'text', text: 'ok' } }, cwd), null);
+});
+
+test('opencode: run devuelve error si falta el binario', async () => {
+  const res = await opencodeRun({
+    executor: { command: 'opencode-que-no-existe-xyz', model: null, extraArgs: [], timeoutSeconds: 60 },
+    cwd: process.cwd(),
+    promptFile: 'run/attempt-1-implement.prompt.md',
+  });
+  assert.equal(res.ok, false);
+  assert.ok(res.error);
+});
+
+test('opencode: run termina por tiempo máximo', async () => {
+  const old = process.env.FAKE_OPENCODE_DELAY;
+  process.env.FAKE_OPENCODE_DELAY = '30000';
+  try {
+    const res = await opencodeRun({
+      executor: { command: [process.execPath, FAKE_OPENCODE], model: null, extraArgs: [], timeoutSeconds: 1 },
+      cwd: process.cwd(),
+      promptFile: 'run/attempt-1-implement.prompt.md',
+    });
+    assert.equal(res.timedOut, true);
+    assert.equal(res.ok, false);
+    assert.match(res.error, /superado el tiempo máximo/);
+  } finally {
+    if (old === undefined) delete process.env.FAKE_OPENCODE_DELAY; else process.env.FAKE_OPENCODE_DELAY = old;
+  }
+});
+
 test('proc: quoting seguro para cmd.exe', () => {
   assert.equal(quoteWindowsArg('--json'), '--json');
   assert.equal(quoteWindowsArg('C:\\Program Files\\node.exe'), '"C:\\Program Files\\node.exe"');
@@ -358,7 +435,7 @@ test('config: rechaza un ejecutor no soportado', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
     writeFileSync(path.join(dir, CONFIG_FILE), JSON.stringify({ executor: { type: 'foo' } }));
-    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: cline, codex\)/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: cline, codex, opencode\)/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
