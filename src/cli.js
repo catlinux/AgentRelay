@@ -24,6 +24,7 @@ import { watchRuns } from './watch.js';
 import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
 import { canOpenBrowser } from './platform.js';
 import { aggregateUsage, renderUsage } from './usage.js';
+import { createOutput } from './output.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -63,6 +64,8 @@ Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
   --config <archivo>      Archivo de configuración alternativo
   --json                  Salida en JSON
+  -q, --quiet             Solo errores, avisos y resultados esenciales
+  -v, --verbose           Añade detalles para diagnosticar problemas
 
 Opciones de run:
   --level <1-5>           Nivel de orquestación (1 = máximo ahorro … 5 = máxima supervisión)
@@ -108,7 +111,8 @@ const OPTIONS = {
   level: { type: 'string' },
   'self-review': { type: 'string' },
   'allow-dirty': { type: 'boolean' },
-  quiet: { type: 'boolean' },
+  quiet: { type: 'boolean', short: 'q' },
+  verbose: { type: 'boolean', short: 'v' },
   decision: { type: 'string' },
   feedback: { type: 'string' },
   'feedback-file': { type: 'string' },
@@ -144,7 +148,7 @@ function resolveRunId(root, id) {
   return runId;
 }
 
-function printResult(state, root, json) {
+function printResult(state, root, json, values = {}) {
   const dir = runDir(root, state.id);
   if (json) {
     const check = state.lastCheck;
@@ -164,6 +168,8 @@ function printResult(state, root, json) {
       diffFile: path.join(dir, 'diff.patch'),
     };
     process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  } else if (values.quiet) {
+    process.stdout.write(`${state.id}  ${state.status}\n${path.join(dir, 'report.md')}\n`);
   } else {
     const report = path.join(dir, 'report.md');
     process.stdout.write(existsSync(report) ? readFileSync(report, 'utf8') : `Estado: ${state.status}\n`);
@@ -195,13 +201,18 @@ async function cmdRun(positionals, values) {
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
-  return printResult(state, root, values.json);
+  if (values.verbose) printAttemptDetails(state, root, config);
+  if (values.verbose) {
+    const { sources } = loadConfig({ cwd: root, configPath: values.config });
+    process.stdout.write(`Archivos de configuración leídos: ${sources.length ? sources.join(', ') : 'ninguno'}\n`);
+  }
+  return printResult(state, root, values.json, values);
 }
 
 async function cmdShow(positionals, values) {
   const root = await resolveRoot(values);
   const state = loadState(root, resolveRunId(root, positionals[0]));
-  return printResult(state, root, values.json);
+  return printResult(state, root, values.json, values);
 }
 
 async function cmdReview(positionals, values) {
@@ -214,13 +225,22 @@ async function cmdReview(positionals, values) {
   const state = await applyReview({
     root, id: positionals[0], decision: values.decision, feedback, force: values.force, onEvent,
   });
-  return printResult(state, root, values.json);
+  if (values.verbose) {
+    const { config, sources } = loadConfig({ cwd: root, configPath: values.config });
+    printAttemptDetails(state, root, config);
+    process.stdout.write(`Archivos de configuración leídos: ${sources.length ? sources.join(', ') : 'ninguno'}\n`);
+  }
+  return printResult(state, root, values.json, values);
 }
 
 async function cmdCheck(positionals, values) {
   const root = await resolveRoot(values);
   const onEvent = eventPrinter(values);
   const { state, check } = await recheck({ root, id: resolveRunId(root, positionals[0]), onEvent });
+  if (values.quiet) {
+    process.stdout.write(`${state.id}  ${state.status}\n${path.join(runDir(root, state.id), 'report.md')}\n`);
+    return check.passed ? 0 : 1;
+  }
   if (values.json) {
     process.stdout.write(`${JSON.stringify({ id: state.id, passed: check.passed, files: check.files, validations: check.validations, scopeViolations: check.scopeViolations }, null, 2)}\n`);
   } else {
@@ -264,9 +284,10 @@ async function cmdDoctor(values) {
   let ok = true;
   const line = (good, text) => {
     if (!good) ok = false;
+    if (good && values.quiet) return;
     process.stdout.write(`${good ? '[ok]   ' : '[fallo]'} ${text}\n`);
   };
-  const warn = (text) => process.stdout.write(`[aviso] ${text}\n`);
+  const warn = (text) => (values.quiet ? process.stderr : process.stdout).write(`[aviso] ${text}\n`);
   const major = Number(process.versions.node.split('.')[0]);
   line(major >= 20, `Node.js ${process.versions.node} (se necesita >= 20) · ${process.platform}/${process.arch}`);
 
@@ -295,7 +316,7 @@ async function cmdDoctor(values) {
       adapter = getExecutor(executor.type);
       const version = await adapter.version(executor);
       line(true, `Ejecutor ${executor.type} ${version} · ${model}`);
-      process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
+      if (values.verbose) process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
       if (adapter.authStatus) {
         const auth = await adapter.authStatus(executor);
         line(auth.ok, auth.ok ? `Sesión: ${auth.message}` : auth.message);
@@ -304,6 +325,11 @@ async function cmdDoctor(values) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
       line(false, `Ejecutor ${executor.type} no disponible (${error.message})${error.message.includes(hint) ? '' : `. ${hint}`}`);
     }
+  }
+
+  if (values.verbose && config) {
+    const loaded = loadConfig({ cwd: root || path.resolve(values.cwd || process.cwd()), configPath: values.config });
+    process.stdout.write(`Archivos de configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'ninguno'}\n`);
   }
 
   // Instrucciones del orquestador: tras actualizar AgentRelay pueden haber cambiado.
@@ -358,7 +384,8 @@ async function cmdConfig(positionals, values) {
     }
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, configTemplate({ scope: values.project || values.local ? 'project' : 'user' }), 'utf8');
-    process.stdout.write(`Creado ${target}\nDescomenta las opciones para cambiar sus valores.\n`);
+    process.stdout.write(`Creado ${target}\n`);
+    if (!values.quiet) process.stdout.write('Descomenta las opciones para cambiar sus valores.\n');
     return 0;
   }
   if ((action !== 'show' || positionals.length > 1) && positionals.length) {
@@ -376,6 +403,17 @@ async function cmdConfig(positionals, values) {
   process.stdout.write(loaded.sources.length ? `Archivos leídos:\n${loaded.sources.map((file) => `  ${file}`).join('\n')}\n` : 'Archivos leídos: ninguno: se usan los valores por defecto\n');
   for (const warning of loaded.warnings) process.stdout.write(`[aviso] ${warning}\n`);
   return 0;
+}
+
+function printAttemptDetails(state, root, config) {
+  const adapter = getExecutor(config.executor.type);
+  const command = adapter.commandParts(config.executor.command)[0] || String(config.executor.command);
+  const dir = runDir(root, state.id);
+  process.stdout.write(`Ejecutor: ${command}\n`);
+  for (const attempt of state.attempts) {
+    const base = `attempt-${attempt.n}-${attempt.kind}`;
+    process.stdout.write(`Archivos del intento ${attempt.n}: ${path.join(dir, `${base}.prompt.md`)} · ${path.join(dir, `${base}.ndjson`)} · ${path.join(dir, `${base}.stderr.log`)} · ${path.join(dir, 'report.md')}\n`);
+  }
 }
 
 async function cmdUsage(values) {
@@ -673,10 +711,10 @@ async function signIn(adapter, executor, { device = false, browser = false, show
   const browserStatus = canOpenBrowser();
   const useDevice = device || (!browser && !browserStatus.ok);
   if (showAccountHint && adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
-  if (!device && !browser && !browserStatus.ok) {
+  if (!device && !browser && !browserStatus.ok && showAccountHint) {
     process.stdout.write(`No se puede abrir un navegador en este equipo (${browserStatus.reason}): se usará el código de dispositivo.\n`);
   }
-  process.stdout.write(useDevice
+  if (showAccountHint) process.stdout.write(useDevice
     ? 'Se mostrará un código para iniciar sesión con tu cuenta de ChatGPT.\n'
     : 'Se abrirá el navegador para iniciar sesión con tu cuenta de ChatGPT…\n');
   await adapter.login(executor, { device: useDevice });
@@ -686,7 +724,7 @@ async function signIn(adapter, executor, { device = false, browser = false, show
     return 0;
   }
   process.stderr.write(`No se pudo iniciar sesión: ${result.message} Prueba "agentrelay login --device".\n`);
-  if (adapter.accountHint && !result.message?.includes(adapter.accountHint)) process.stderr.write(`${adapter.accountHint}\n`);
+  if (showAccountHint && adapter.accountHint && !result.message?.includes(adapter.accountHint)) process.stderr.write(`${adapter.accountHint}\n`);
   return 1;
 }
 
@@ -704,13 +742,13 @@ async function cmdLogin(values) {
     process.stdout.write(`Sesión activa: ${current.message}. Para cambiar de cuenta ejecuta "codex logout" y vuelve a ejecutar este comando.\n`);
     return 0;
   }
-  return signIn(adapter, executor, { device: values.device, browser: values.browser });
+  return signIn(adapter, executor, { device: values.device, browser: values.browser, showAccountHint: !values.quiet });
 }
 
 async function cmdSetup(values) {
   const file = globalInstructionsPath(values['claude-dir']);
   const removing = Boolean(values.uninstall);
-  for (const line of setupExplanation(file, removing)) process.stdout.write(`${line}\n`);
+  if (!values.quiet) for (const line of setupExplanation(file, removing)) process.stdout.write(`${line}\n`);
 
   const ok = await confirm(removing ? '¿Eliminar el bloque de AgentRelay?' : '¿Añadir el bloque de AgentRelay?', { yes: values.yes });
   if (ok === null) {
@@ -736,16 +774,16 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
       const legacy = removeLegacyCommands(values['claude-dir']);
-      if (legacy.removed.length) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
+      if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
       const counts = [];
       if (result.created.length) counts.push(`comandos creados: ${result.created.length}`);
       if (result.updated.length) counts.push(`actualizados: ${result.updated.length}`);
       if (result.unchanged.length) counts.push('sin cambios');
-      process.stdout.write(`${counts.join(' · ') || 'sin cambios'}\n`);
-      if (result.skipped.length) process.stdout.write(`omitidos (ya existía un archivo tuyo con ese nombre): ${result.skipped.join(', ')}\n`);
+      if (!values.quiet) process.stdout.write(`${counts.join(' · ') || 'sin cambios'}\n`);
+      if (result.skipped.length && !values.quiet) process.stdout.write(`omitidos (ya existía un archivo tuyo con ese nombre): ${result.skipped.join(', ')}\n`);
     }
     const dir = executorsDir();
     const requested = [...new Set((values.executors || '').split(',').map((item) => item.trim()).filter(Boolean))];
@@ -769,7 +807,7 @@ async function cmdSetup(values) {
       const answer = await confirm(`¿Instalar también ${entry.title}? ${entry.description}`, { yes: false });
       if (answer === null) {
         if (!noTtyNotice) {
-          process.stdout.write('Ejecutores opcionales: agentrelay executors add <nombre> (ver agentrelay executors)\n');
+          if (!values.quiet) process.stdout.write('Ejecutores opcionales: agentrelay executors add <nombre> (ver agentrelay executors)\n');
           noTtyNotice = true;
         }
       } else if (answer && await installOptionalExecutor(entry.name, dir) !== 0) {
@@ -790,16 +828,16 @@ async function cmdSetup(values) {
       if (current.ok) {
         process.stdout.write(`✔ Sesión activa: ${current.message}\n`);
       } else {
-        if (adapter.accountHint) process.stdout.write(`${adapter.accountHint}\n`);
+        if (adapter.accountHint && !values.quiet) process.stdout.write(`${adapter.accountHint}\n`);
         let answer;
         if (values.login) answer = true;
         else if (values.yes) answer = null;
         else answer = await confirm('¿Conectar ahora tu cuenta de ChatGPT?', { yes: false });
         if (answer === true) {
-          const result = await signIn(adapter, executor, { showAccountHint: false });
+          const result = await signIn(adapter, executor, { showAccountHint: !values.quiet });
           if (values.login && result !== 0) return 1;
         } else {
-          process.stdout.write('Puedes hacerlo más tarde con: agentrelay login\n');
+          if (!values.quiet) process.stdout.write('Puedes hacerlo más tarde con: agentrelay login\n');
         }
       }
     }
@@ -827,7 +865,7 @@ async function cmdInit(values) {
   if (!root) {
     const result = await prepareRepository(dir, {
       yes: values.yes,
-      out: (line) => process.stdout.write(`${line}\n`),
+      out: (line) => { if (!values.quiet) process.stdout.write(`${line}\n`); },
       err: (line) => process.stderr.write(`${line}\n`),
     });
     if (result.status === 'needs-confirmation') return 1;
@@ -837,7 +875,7 @@ async function cmdInit(values) {
     }
 
     const file = path.join(dir, 'CLAUDE.md');
-    process.stdout.write(`${initExplanation(file)}\n`);
+    if (!values.quiet) process.stdout.write(`${initExplanation(file)}\n`);
     const { action } = applyBlockToFile(file, PROJECT_BLOCK);
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
     process.stdout.write(`${label} ${file}\n`);
@@ -858,7 +896,7 @@ async function cmdInit(values) {
   const wasClean = await isClean(root);
   const ignored = await isIgnored(root, 'CLAUDE.md');
 
-  process.stdout.write(`${initExplanation(file)}\n`);
+  if (!values.quiet) process.stdout.write(`${initExplanation(file)}\n`);
   const { action } = applyBlockToFile(file, PROJECT_BLOCK);
   const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
   process.stdout.write(`${label} ${file}\n`);
@@ -894,6 +932,8 @@ export async function main(argv) {
     return 1;
   }
   const { values, positionals } = parsed;
+  try { createOutput({ quiet: values.quiet, verbose: values.verbose }); }
+  catch (error) { process.stderr.write(`${error.message}\n`); return 1; }
   const [command, ...rest] = positionals;
 
   if (values.version) {
