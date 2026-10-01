@@ -7,7 +7,7 @@
 // corta de una línea que le indica leerlo. El informe final se pide con un
 // esquema JSON (--output-schema) para que llegue siempre con el mismo formato.
 
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,19 @@ import { runInteractive, runProcess } from '../proc.js';
 import { clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, relativize, tail } from './common.js';
 
 export const name = 'codex';
+
+/** Modelos visibles de la caché local de Codex; nunca falla si no está disponible. */
+export async function listModels(executor, { codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex') } = {}) {
+  try {
+    const cached = JSON.parse(readFileSync(path.join(codexHome, 'models_cache.json'), 'utf8'));
+    if (!Array.isArray(cached.models)) return [];
+    return cached.models.filter((item) => item?.visibility === 'list' && typeof item.slug === 'string').map((item) => ({
+      id: item.slug,
+      efforts: Array.isArray(item.supported_reasoning_levels) ? item.supported_reasoning_levels.map((entry) => entry.effort).filter((effort) => typeof effort === 'string') : [],
+      defaultEffort: item.default_reasoning_level ?? null,
+    }));
+  } catch { return []; }
+}
 
 // Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
 export const installHint = 'Instala la extensión de OpenAI para VS Code o Codex CLI (npm i -g @openai/codex) e inicia sesión con "codex login".';

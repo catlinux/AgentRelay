@@ -16,6 +16,14 @@ import {
 
 export const name = 'cline';
 
+// Lista de sugerencias; no representa una consulta al proveedor.
+export async function listModels() {
+  return [
+    { id: 'deepseek-v4-pro', efforts: null, defaultEffort: null },
+    { id: 'deepseek-v4-flash', efforts: null, defaultEffort: null },
+  ];
+}
+
 // Se siguen reexportando desde aquí para no romper los imports existentes.
 export { extractAgentReport, instructionFor };
 

@@ -1,6 +1,6 @@
 // Carga de configuración por capas (la última gana):
 //   valores integrados <- valores del ejecutor elegido <- archivo personal
-//   (~/.agentrelay/config.json) <- agentrelay.config.json <- agentrelay.config.local.json
+//   (~/.agentrelay/config.json) <- settings.json <- agentrelay.config.json <- agentrelay.config.local.json
 //   <- opciones de línea de comandos.
 // Todos los archivos admiten comentarios (JSONC). Ver `agentrelay config`.
 
@@ -153,10 +153,12 @@ function leaves(value, prefix = '', result = {}) {
 export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } = {}) {
   const root = path.resolve(cwd);
   const userFile = path.join(home || agentrelayHome(), 'config.json');
+  const settingsFile = path.join(home || agentrelayHome(), 'settings.json');
   const projectFiles = configPath ? [path.resolve(root, configPath)] : [path.join(root, CONFIG_FILE), path.join(root, LOCAL_CONFIG_FILE)];
   const layers = [{ data: {}, origin: 'defecto' }];
   const sources = [];
   if (existsSync(userFile)) { layers.push({ data: readConfig(userFile), origin: userFile }); sources.push(userFile); }
+  if (existsSync(settingsFile)) { layers.push({ data: readConfig(settingsFile), origin: settingsFile }); sources.push(settingsFile); }
   for (const file of projectFiles) if (configPath || existsSync(file)) { layers.push({ data: readConfig(file), origin: file }); sources.push(file); }
   if (overrides) layers.push({ data: overrides, origin: 'línea de comandos' });
   let mergedUser = {};

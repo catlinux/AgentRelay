@@ -1,11 +1,12 @@
 // Interfaz de línea de comandos.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
+import { canonicalSetting, parseSettingValue, readSettings, setSetting, settingsFile, unsetSetting, writeSettings } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
 import { applyBlockToFile, blockStatus, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
@@ -39,6 +40,15 @@ Uso:
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
+
+  agentrelay set <clave> <valor>   Cambia un ajuste personal (ejemplo: set effort alto)
+  agentrelay unset <clave>         Restablece un ajuste personal (ejemplo: unset effort)
+  agentrelay models                Lista los modelos del ejecutor actual
+
+Ajustes rápidos:
+  agentrelay set model gpt-5.5
+  agentrelay unset effort
+  agentrelay models
 
   agentrelay executors              Lista los ejecutores disponibles e instalados
   agentrelay executors add <nombre> Instala un ejecutor opcional
@@ -319,10 +329,11 @@ async function cmdConfig(positionals, values) {
   const requestedCwd = path.resolve(values.cwd || process.cwd());
   const cwd = await repoRoot(requestedCwd) || requestedCwd;
   const userFile = path.join(configHome(), 'config.json');
+  const settingsPath = settingsFile(configHome());
   const projectFile = path.join(cwd, CONFIG_FILE);
   const localFile = path.join(cwd, LOCAL_CONFIG_FILE);
   if (action === 'path' && positionals.length === 1) {
-    for (const [label, file] of [['Usuario', userFile], ['Proyecto', projectFile], ['Local', localFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
+    for (const [label, file] of [['Usuario', userFile], ['Ajustes', settingsPath], ['Proyecto', projectFile], ['Local', localFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
     return 0;
   }
   if (action === 'init' && positionals.length === 1) {
@@ -351,6 +362,92 @@ async function cmdConfig(positionals, values) {
   for (const [section, rows] of sections) process.stdout.write(`${section}\n${rows.join('\n')}\n`);
   process.stdout.write(loaded.sources.length ? `Archivos leídos:\n${loaded.sources.map((file) => `  ${file}`).join('\n')}\n` : 'Archivos leídos: ninguno: se usan los valores por defecto\n');
   for (const warning of loaded.warnings) process.stdout.write(`[aviso] ${warning}\n`);
+  return 0;
+}
+
+const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
+
+function effectiveDescription(loaded, key) {
+  const parts = key.split('.');
+  const value = parts.length === 1 ? loaded.config[parts[0]] : loaded.config[parts[0]][parts[1]];
+  return `${JSON.stringify(value)} (${loaded.origins[key] || 'defecto'})`;
+}
+
+async function cmdSet(positionals, values) {
+  if (positionals.length !== 2) throw new Error('Uso: agentrelay set <clave> <valor>');
+  const [alias, raw] = positionals;
+  const key = canonicalSetting(alias);
+  if (!key) throw new Error(`Opción no ajustable: ${alias}`);
+  const parsed = parseSettingValue(key, raw);
+  const home = configHome(), file = settingsFile(home);
+  const hadFile = existsSync(file);
+  const previousText = hadFile ? readFileSync(file, 'utf8') : null;
+  const previous = readSettings(home);
+  let priorConfig;
+  try { priorConfig = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config, home }).config; }
+  catch { priorConfig = null; }
+  let next = parsed.unset ? unsetSetting(previous, key) : setSetting(previous, key, parsed.value);
+  const changedExecutor = key === 'executor.type' && priorConfig && priorConfig.executor.type !== parsed.value;
+  if (changedExecutor) {
+    next = unsetSetting(next, 'executor.model');
+    next = unsetSetting(next, 'executor.provider');
+    next = unsetSetting(next, 'executor.command');
+  }
+  writeSettings(home, next);
+  let loaded;
+  try { loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config, home }); }
+  catch (error) {
+    if (hadFile) writeFileSync(file, previousText, 'utf8'); else rmSync(file, { force: true });
+    throw error;
+  }
+  const shown = parsed.unset ? '(por defecto)' : JSON.stringify(parsed.value);
+  process.stdout.write(`✔ ${key} = ${shown}\n`);
+  if (changedExecutor) process.stdout.write('Se eliminaron model, provider y command guardados para el ejecutor anterior.\n');
+  if (!parsed.unset && loaded.origins[key] !== file) {
+    const origin = loaded.origins[key] || 'defecto';
+    const label = path.basename(origin) === CONFIG_FILE ? `${CONFIG_FILE} del proyecto` : path.basename(origin) === LOCAL_CONFIG_FILE ? `${LOCAL_CONFIG_FILE} del proyecto` : origin;
+    process.stdout.write(`Ojo: ${label} lo sustituye por ${effectiveDescription(loaded, key)}\n`);
+  }
+  if (!parsed.unset && key === 'executor.thinking') {
+    const adapter = getExecutor(loaded.config.executor.type);
+    const models = await adapter.listModels?.(loaded.config.executor) || [];
+    const model = models.find((item) => item.id === loaded.config.executor.model);
+    if (model?.efforts && !model.efforts.includes(parsed.value)) process.stdout.write(`Aviso: ${model.id} admite: ${model.efforts.map((effort) => EFFORT_ES[effort] || effort).join(', ')}\n`);
+  }
+  if (!parsed.unset && key === 'executor.model') {
+    const adapter = getExecutor(loaded.config.executor.type);
+    const models = await adapter.listModels?.(loaded.config.executor) || [];
+    if (models.length && !models.some((item) => item.id === parsed.value)) process.stdout.write(`Aviso: ${parsed.value} no está en la lista de modelos de la cuenta (puede ser nuevo o no estar disponible).\n`);
+  }
+  return 0;
+}
+
+async function cmdUnset(positionals, values) {
+  if (positionals.length !== 1) throw new Error('Uso: agentrelay unset <clave>');
+  const key = canonicalSetting(positionals[0]);
+  if (!key) throw new Error(`Opción no ajustable: ${positionals[0]}`);
+  const home = configHome();
+  writeSettings(home, unsetSetting(readSettings(home), key));
+  const loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config, home });
+  process.stdout.write(`✔ ${key} = ${effectiveDescription(loaded, key)}\n`);
+  return 0;
+}
+
+async function cmdModels(values) {
+  const loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
+  const executor = loaded.config.executor;
+  const adapter = getExecutor(executor.type);
+  const models = await adapter.listModels?.(executor) || [];
+  if (!models.length) {
+    process.stdout.write('Este ejecutor no ofrece lista de modelos. Indica uno con: agentrelay set model <id>\n');
+    return 0;
+  }
+  for (const model of models) {
+    const efforts = model.efforts ? model.efforts.map((effort) => `${EFFORT_ES[effort] || effort}${effort === model.defaultEffort ? '*' : ''}`).join(' ') : '—';
+    process.stdout.write(`${model.id === executor.model ? '●' : ' '} ${model.id}  ${efforts}\n`);
+  }
+  process.stdout.write(`Esfuerzo actual: ${executor.thinking ? (EFFORT_ES[executor.thinking] || executor.thinking) : 'por defecto'}\n`);
+  process.stdout.write('Cambia el modelo con: agentrelay set model <id>\nCambia el esfuerzo con: agentrelay set effort <bajo|medio|alto|extremo|máximo>\n');
   return 0;
 }
 
@@ -781,6 +878,9 @@ export async function main(argv) {
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
       case 'config': return await cmdConfig(rest, values);
+      case 'set': return await cmdSet(rest, values);
+      case 'unset': return await cmdUnset(rest, values);
+      case 'models': return await cmdModels(values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'triage': return await cmdTriage(rest, values);
       case 'login': return await cmdLogin(values);
