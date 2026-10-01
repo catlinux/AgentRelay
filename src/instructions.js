@@ -33,7 +33,7 @@ export const GLOBAL_BLOCK = [
   '<!-- agentrelay:end -->',
 ].join('\n');
 
-// Bloque de instrucciones para el CLAUDE.md de cada proyecto.
+// Bloque de instrucciones para CLAUDE.md o AGENTS.md de cada proyecto.
 export const PROJECT_BLOCK = [
   '<!-- agentrelay:start -->',
   '## Delegación con AgentRelay',

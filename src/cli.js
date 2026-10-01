@@ -51,7 +51,7 @@ Uso:
   agentrelay config [show|path|init] Muestra, localiza o crea la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
-  agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
+  agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
   agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
   agentrelay unset <clave> [--local]       Restablece un ajuste
@@ -107,7 +107,7 @@ Opciones de triage:
   --type --size --kind --executor --model --effort --level --outcome --run --note --signals --include-legacy
 
 Opciones de init:
-  --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de CLAUDE.md)
+  --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
   --with-config           Crea además ${CONFIG_FILE}
 
 Opciones de config init:
@@ -1022,10 +1022,14 @@ async function cmdInit(values) {
     }
 
     const file = path.join(dir, 'CLAUDE.md');
-    if (!values.quiet) process.stdout.write(`${initExplanation(file)}\n`);
-    const { action } = applyBlockToFile(file, PROJECT_BLOCK);
-    const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
-    process.stdout.write(`${label} ${file}\n`);
+    const agentsFile = path.join(dir, 'AGENTS.md');
+    const instructionFiles = [file, ...(existsSync(agentsFile) ? [agentsFile] : [])];
+    for (const instructionFile of instructionFiles) {
+      if (!values.quiet) process.stdout.write(`${initExplanation(instructionFile)}\n`);
+      const { action } = applyBlockToFile(instructionFile, PROJECT_BLOCK);
+      const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
+      process.stdout.write(`${label} ${instructionFile}\n`);
+    }
 
     const res = await commitAll(dir, 'Estado inicial (AgentRelay)');
     if (res.ok) {
@@ -1038,31 +1042,39 @@ async function cmdInit(values) {
   }
 
   const file = path.join(root, 'CLAUDE.md');
+  const agentsFile = path.join(root, 'AGENTS.md');
+  const instructionFiles = [file, ...(existsSync(agentsFile) ? [agentsFile] : [])];
 
   // Estado del repositorio antes de tocar nada.
   const wasClean = await isClean(root);
-  const ignored = await isIgnored(root, 'CLAUDE.md');
+  const ignoredFiles = new Set(await Promise.all(instructionFiles.map(async (instructionFile) => (
+    await isIgnored(root, path.relative(root, instructionFile)) ? instructionFile : null
+  ))));
 
-  if (!values.quiet) process.stdout.write(`${initExplanation(file)}\n`);
-  const { action } = applyBlockToFile(file, PROJECT_BLOCK);
-  const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
-  process.stdout.write(`${label} ${file}\n`);
-  const changed = action !== 'unchanged';
+  const changedFiles = [];
+  for (const instructionFile of instructionFiles) {
+    if (!values.quiet) process.stdout.write(`${initExplanation(instructionFile)}\n`);
+    const { action } = applyBlockToFile(instructionFile, PROJECT_BLOCK);
+    const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
+    process.stdout.write(`${label} ${instructionFile}\n`);
+    if (action !== 'unchanged') changedFiles.push(instructionFile);
+  }
+  const commitFiles = changedFiles.filter((instructionFile) => !ignoredFiles.has(instructionFile));
 
-  if (changed && wasClean && !ignored) {
-    const ok = await confirm('¿Crear un commit con CLAUDE.md?', { yes: values.yes });
+  if (commitFiles.length && wasClean) {
+    const ok = await confirm('¿Crear un commit con los archivos de instrucciones?', { yes: values.yes });
     if (ok === true) {
-      const res = await commitPaths(root, ['CLAUDE.md'], 'Añade las instrucciones de AgentRelay');
+      const res = await commitPaths(root, commitFiles.map((instructionFile) => path.relative(root, instructionFile)), 'Añade las instrucciones de AgentRelay');
       if (!res.ok) {
-        process.stderr.write(`No se pudo crear el commit de CLAUDE.md: ${res.error}\n`);
+        process.stderr.write(`No se pudo crear el commit de las instrucciones: ${res.error}\n`);
       } else {
-        process.stdout.write('Commit de CLAUDE.md creado.\n');
+        process.stdout.write('Commit de instrucciones creado.\n');
       }
     } else if (ok === null) {
-      process.stderr.write('CLAUDE.md ha cambiado: confírmalo con git antes de delegar (AgentRelay necesita el repositorio limpio), o ejecuta de nuevo con --yes.\n');
+      process.stderr.write('Los archivos de instrucciones han cambiado: confírmalos con git antes de delegar (AgentRelay necesita el repositorio limpio), o ejecuta de nuevo con --yes.\n');
     }
-  } else if (changed && !wasClean) {
-    process.stderr.write('El repositorio tenía cambios pendientes: confirma CLAUDE.md con git antes de delegar (AgentRelay necesita el repositorio limpio).\n');
+  } else if (changedFiles.length && !wasClean) {
+    process.stderr.write('El repositorio tenía cambios pendientes: confirma los archivos de instrucciones con git antes de delegar (AgentRelay necesita el repositorio limpio).\n');
   }
 
   writeConfigIfRequested(root, values);
