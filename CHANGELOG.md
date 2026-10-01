@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Comandos `/` de Claude Code instalados por `agentrelay setup` en `~/.claude/commands/agentrelay/`: `/agentrelay:estado`, `/agentrelay:modelo`, `/agentrelay:esfuerzo`, `/agentrelay:nivel`, `/agentrelay:ejecutor` y `/agentrelay:triaje`, con autocompletado en el chat y el prefijo `agentrelay:` para no chocar con `/model` y `/effort` de Claude Code. Solo se modifican los archivos con la marca `<!-- agentrelay:managed -->`; `doctor` avisa si están desactualizados, `setup --uninstall` los retira y `setup --no-commands` los omite. Repite `agentrelay setup` para recibirlos.
 - Ajustes rápidos sin editar archivos: `agentrelay set <clave> <valor>` (`model`, `effort` con bajo/medio/alto/extremo/máximo, `level`, `executor`, `provider`, `timeout`), `agentrelay unset <clave>` y `agentrelay models` (modelos de la cuenta con los esfuerzos que admite cada uno, marcando el activo; Codex los lee de su caché local). Escriben en `~/.agentrelay/settings.json`, una capa nueva con prioridad sobre `config.json` y por debajo de los archivos del proyecto, que no destruye los comentarios del archivo explicado. Se valida el resultado, se avisa si un archivo del proyecto lo sustituye o si el modelo no admite el esfuerzo, y cambiar de ejecutor olvida el modelo guardado del anterior.
 
 ## [0.0.3] - 2026-10-01
