@@ -180,6 +180,7 @@ A run still marked `running` whose process no longer exists and that has no rece
 ## Watching the work live
 
 - `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, what it runs, its summarized reasoning, tokens, cost and validations), with the local time on every line. It uses colours when the terminal supports them; they are turned off by the `NO_COLOR` environment variable or when the output is redirected to a file. `--quiet` turns it off for other commands too.
+- The paths of the files the executor reads or edits are **terminal hyperlinks** to the absolute path: Ctrl+click opens them from any folder. They turn on by themselves in terminals that support them (VS Code, iTerm2, WezTerm, ghostty, Hyper, Windows Terminal, VTE 5000 or later, Konsole); `AGENTRELAY_LINKS=1` forces them and `AGENTRELAY_LINKS=0` turns them off. Other terminals show the usual text.
 - `agentrelay watch` follows, from **another terminal**, runs started by another process, for example an orchestrator such as Claude Code. Without an id it follows the latest run and switches to each new one until you press Ctrl+C; with an id it shows that run and exits when it is no longer in progress.
 
 In VS Code: open a split terminal, run `agentrelay watch` in one and work in the other or in the orchestrator's chat.
@@ -326,6 +327,8 @@ agentrelay unset effort          # back to the default
 
 These commands write to `~/.agentrelay/settings.json`, a file they manage themselves (do not edit it by hand: that way your explained `config.json` keeps its comments). It has priority over `config.json` and loses to the project files; if a project file overrides what you just changed, `set` warns you. The result is validated and, if invalid, it is not saved. `agentrelay config` shows where each value comes from. With Codex and GPT-6 Luna the executor's model is fixed: what you tune is the effort and the level.
 
+To save a setting **only for the current project**, add `--local`: `agentrelay set effort high --local` (and `unset … --local`) stores it in `agentrelay.config.local.json`. If that file already has comments or its own format, AgentRelay **does not rewrite it** (it asks you to edit it by hand) so no comments are lost.
+
 **Commands inside the Claude Code chat.** `agentrelay setup` also installs some custom `/` commands that show up in the menu when you type `/ar`, with autocompletion and an argument hint. They carry the `ar:` prefix so they are not confused with Claude Code's own (`/model`, `/effort`, which change *your* model, the orchestrator's):
 
 | Command | What it does |
@@ -424,9 +427,11 @@ Each run is stored in `.agentrelay/runs/<id>/` inside the repository: task, stat
 
 ## Usage and costs
 
-For each attempt AgentRelay records tokens, duration and the **estimated cost reported by the executor** (Cline computes it from its price tables; Codex reports no cost, so only tokens are recorded). It is not an invoice: check real usage with your provider. AgentRelay cannot measure the orchestrator's usage.
+For each attempt AgentRelay records tokens and duration. A money cost is shown only when it can really be estimated: for DeepSeek models AgentRelay computes it with the official price table (see below); Codex reports no cost and has no per-token price on your plan, so it shows `-`. A cost is never invented. It is not an invoice: check real usage with your provider. AgentRelay cannot measure the orchestrator's usage.
 
 `agentrelay usage` summarizes executions and attempts by executor and model, including retries, escalated/rejected runs, input/output/cache tokens, total time, and positive costs reported by the executor (labelled “estimated by the executor”). It includes totals and status counts, and warns about runs “in progress” for over 24 hours. Filter by date (`YYYY-MM-DD`, `7d`, or `24h`) or executor; `--json` returns JSON. The orchestrator's own usage (Claude) is not included.
+
+**DeepSeek prices and tariffs.** `agentrelay pricing` shows the official table (USD per million tokens: cache-hit input, cache-miss input and output; models `deepseek-flash`, `deepseek-v4-flash` and `deepseek-v4-pro`), the tariff in force now, when it changes and the peak hours in your local time. DeepSeek charges half price **off-peak**: peak is 01:00-04:00 and 06:00-10:00 UTC, Monday to Friday, and every other hour and the weekends are off-peak (Chinese public holidays are not taken into account). When a run starts with a DeepSeek model you are told the tariff of the moment (`--quiet` hides it). `agentrelay usage` computes DeepSeek's cost with this table (labelled "estimated by AgentRelay", each attempt priced at the tariff of its start time) instead of Cline's figure, which was inaccurate. If DeepSeek changes its prices, correct them in `~/.agentrelay/pricing.json`. Source: https://api-docs.deepseek.com/quick_start/pricing.
 
 ```sh
 agentrelay usage

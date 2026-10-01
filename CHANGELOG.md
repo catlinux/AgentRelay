@@ -8,6 +8,9 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- `agentrelay set` y `unset` con `--local`: guardan un ajuste solo en el proyecto actual (`agentrelay.config.local.json`); si ese archivo tiene comentarios o formato propio no se reescribe, para no perderlos.
+- Rutas clicables en la salida en directo (`watch`, `run`, `review`): las rutas de lo que el ejecutor lee o edita son enlaces de terminal (OSC 8) a la ruta absoluta, que se abren con Ctrl+clic desde cualquier carpeta. Se activan solos en las terminales compatibles; `AGENTRELAY_LINKS=1` los fuerza y `=0` los desactiva.
+- Precios reales de DeepSeek: `agentrelay pricing` (tabla oficial, tarifa vigente, próximo cambio y horas punta en hora local; archivo opcional `~/.agentrelay/pricing.json`), aviso de la tarifa al lanzar una tarea con DeepSeek y coste estimado por AgentRelay en `usage`, en lugar de la cifra inexacta de Cline (por ejemplo, 0,63 USD frente a 0,42 USD para las mismas ejecuciones; con Flash, que no tenía precio, 0,066 USD). Sin precio no hay coste: Codex sigue mostrando `-`. No se tienen en cuenta los festivos chinos.
 - `agentrelay recover` detecta y permite recuperar ejecuciones interrumpidas que siguen en estado `running` sin proceso activo ni actividad reciente, sin tocar el repositorio.
 
 - Opciones globales `-q`/`--quiet` para mostrar solo errores, avisos y resultados esenciales, y `-v`/`--verbose` para añadir detalles de diagnóstico; no se pueden combinar y no cambian los códigos de salida.
