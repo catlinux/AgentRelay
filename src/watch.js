@@ -91,17 +91,17 @@ function parseLines(lines) {
 }
 
 /** Formatea un evento y entrega la línea a `write` (si no se muestra, null). */
-function emitEvent(event, state, write, color) {
+function emitEvent(event, state, write, color, links) {
   if (state.startedAtMs === null && event.ts) {
     const ms = Date.parse(event.ts);
     if (Number.isFinite(ms)) state.startedAtMs = ms;
   }
-  const line = formatEvent(event, state.startedAtMs ?? 0, { color });
+  const line = formatEvent(event, state.startedAtMs ?? 0, { color, links });
   if (line) write(line);
 }
 
 /** Sigue una ejecución concreta hasta que deja de estar 'running'. */
-async function watchRun({ root, id, write, intervalMs, signal, color }) {
+async function watchRun({ root, id, write, intervalMs, signal, color, links }) {
   if (!existsSync(eventsFile(root, id))) throw new Error(`No existe la ejecución ${id}`);
   const state = newRunState();
   let lastStatus = null;
@@ -126,7 +126,7 @@ async function watchRun({ root, id, write, intervalMs, signal, color }) {
       idlePolls = 0;
       for (const event of events) {
         if (event.type === 'status') lastStatus = event.status;
-        emitEvent(event, state, write, color);
+        emitEvent(event, state, write, color, links);
       }
     }
     await sleep(intervalMs, signal);
@@ -134,7 +134,7 @@ async function watchRun({ root, id, write, intervalMs, signal, color }) {
 }
 
 /** Sigue la ejecución más reciente y salta a cada ejecución nueva. */
-async function followRuns({ root, write, intervalMs, signal, color }) {
+async function followRuns({ root, write, intervalMs, signal, color, links }) {
   let current = null;
   let state = newRunState();
   let waitingShown = false;
@@ -159,7 +159,7 @@ async function followRuns({ root, write, intervalMs, signal, color }) {
     }
 
     for (const event of parseLines(readNewLines(root, current, state))) {
-      emitEvent(event, state, write, color);
+      emitEvent(event, state, write, color, links);
     }
     await sleep(intervalMs, signal);
   }
@@ -170,7 +170,7 @@ async function followRuns({ root, write, intervalMs, signal, color }) {
  * Con `id` termina solo cuando su estado deja de ser 'running'; sin `id`
  * sigue la ejecución más reciente y no termina por sí solo (solo al abortar).
  */
-export async function watchRuns({ root, id, write, intervalMs = 500, signal, color = false }) {
-  if (id) return watchRun({ root, id, write, intervalMs, signal, color });
-  return followRuns({ root, write, intervalMs, signal, color });
+export async function watchRuns({ root, id, write, intervalMs = 500, signal, color = false, links }) {
+  if (id) return watchRun({ root, id, write, intervalMs, signal, color, links });
+  return followRuns({ root, write, intervalMs, signal, color, links });
 }

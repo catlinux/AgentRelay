@@ -15,7 +15,7 @@ import { applyBlockToFile, blockStatus, GLOBAL_BLOCK, globalInstructionsPath, in
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository } from './prepare.js';
-import { formatEvent, useColor } from './events.js';
+import { formatEvent, supportsLinks, useColor } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
 import { latestRunId, listRunIds, loadState, runDir } from './store.js';
@@ -184,11 +184,11 @@ function printResult(state, root, json, values = {}) {
 }
 
 /** Crea el manejador onEvent que muestra los eventos formateados por stderr. */
-function eventPrinter(values) {
+function eventPrinter(values, root) {
   if (values.quiet) return undefined;
   const startedAtMs = Date.now();
   return (event) => {
-    const line = formatEvent(event, startedAtMs, { color: useColor(process.stderr) });
+    const line = formatEvent(event, startedAtMs, { color: useColor(process.stderr), ...(supportsLinks(process.stderr) ? { links: { root } } : {}) });
     if (line) process.stderr.write(`${line}\n`);
   };
 }
@@ -205,7 +205,7 @@ async function cmdRun(positionals, values) {
   const overrides = values.level ? { level: values.level } : undefined;
   const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config, overrides });
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
-  const onEvent = eventPrinter(values);
+  const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
   if (values.verbose) printAttemptDetails(state, root, config);
   if (values.verbose) {
@@ -227,7 +227,7 @@ async function cmdReview(positionals, values) {
   if (!values.decision) throw new Error(`Indica --decision ${DECISIONS.join(' | ')}`);
   let feedback = values.feedback || '';
   if (values['feedback-file']) feedback = readFileSync(path.resolve(values['feedback-file']), 'utf8');
-  const onEvent = eventPrinter(values);
+  const onEvent = eventPrinter(values, root);
   const state = await applyReview({
     root, id: positionals[0], decision: values.decision, feedback, force: values.force, onEvent,
   });
@@ -279,6 +279,7 @@ async function cmdWatch(positionals, values) {
       id: positionals[0],
       write: (line) => process.stdout.write(`${line}\n`),
       color: useColor(process.stdout),
+      ...(supportsLinks(process.stdout) ? { links: { root } } : {}),
       signal: controller.signal,
     });
   } finally {

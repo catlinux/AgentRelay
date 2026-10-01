@@ -4,6 +4,7 @@
 
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { runDir } from './store.js';
 
 /** Añade una línea JSON al events.ndjson y devuelve el evento escrito. */
@@ -72,6 +73,53 @@ export function useColor(stream = process.stderr, env = process.env) {
   return stream?.isTTY === true && (env.NO_COLOR === undefined || env.NO_COLOR === '') && env.TERM !== 'dumb';
 }
 
+/** OSC 8 depende de la capacidad del terminal, no de la configuración de color. */
+export function supportsLinks(stream = process.stdout, env = process.env) {
+  if (env.AGENTRELAY_LINKS === '1') return true;
+  if (env.AGENTRELAY_LINKS === '0') return false;
+  return stream?.isTTY === true && env.TERM !== 'dumb'
+    && (['vscode', 'iTerm.app', 'WezTerm', 'ghostty', 'Hyper'].includes(env.TERM_PROGRAM)
+      || Boolean(env.WT_SESSION)
+      || Number(env.VTE_VERSION) >= 5000
+      || Boolean(env.KONSOLE_VERSION));
+}
+
+function linkFiles(files, root) {
+  if (!root) return files;
+  return files.split(/(, )/).map((part) => {
+    if (part === ', ') return part;
+    if (part === 'archivos' || /[*?\[\]"'`]/.test(part)) return part;
+    const normalized = part.replace(/\\/g, '/');
+    if (!normalized || path.isAbsolute(part) || /^[A-Za-z]:/.test(part)) return part;
+    const absolute = path.resolve(root, normalized);
+    const relative = path.relative(root, absolute);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return part;
+    return `\u001b]8;;${pathToFileURL(absolute).href}\u001b\\${part}\u001b]8;;\u001b\\`;
+  }).join('');
+}
+
+function formatFileDetails(detail, root) {
+  // Preserve the formatter's historical output byte-for-byte when links are off.
+  if (!root) return detail.split(/\s*[,;]\s*/).map(cleanPath).join(', ');
+  const files = [];
+  const pattern = /\s*(?:"([^"]+)"|'([^']+)'|([^,;]+?))\s*(?:[,;]|$)/g;
+  for (const match of detail.matchAll(pattern)) {
+    const quoted = match[1] ?? match[2];
+    const value = (quoted ?? match[3] ?? '').trim();
+    if (value) files.push({ value, quoted: quoted !== undefined });
+  }
+  return files.map(({ value, quoted }) => {
+    const visible = cleanPath(value);
+    if (quoted && visible.includes(' ')) {
+      const absolute = path.resolve(root, visible);
+      const relative = path.relative(root, absolute);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return visible;
+      return `"\u001b]8;;${pathToFileURL(absolute).href}\u001b\\${visible}\u001b]8;;\u001b\\"`;
+    }
+    return linkFiles(visible, root);
+  }).join(', ');
+}
+
 function shortNumber(value) {
   const number = Number(value) || 0;
   if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1).replace('.', ',')} M`;
@@ -118,14 +166,18 @@ export function formatEvent(event, startedAtMs, options = {}) {
       if (event.kind === 'tool') {
         const detail = String(event.detail ?? '');
         if (['read_files', 'editor-read', 'editor'].includes(event.tool)) {
-          const files = detail.split(/\s*[,;]\s*/).map(cleanPath).join(', ');
+          const files = formatFileDetails(detail, options.links?.root);
           return fmt(`  ${event.tool === 'editor' ? '✎ edita' : '· lee'}: ${files}`);
         }
-        if (event.tool === 'edit') return fmt(`  ✎ edita: ${detail.split(/\s*[,;]\s*/).map(cleanPath).join(', ')}`);
+        if (event.tool === 'edit') return fmt(`  ✎ edita: ${formatFileDetails(detail, options.links?.root)}`);
         if (['run_commands', 'command'].includes(event.tool)) {
           const inner = unwrapCommand(detail);
           const summary = describeCommand(detail) ?? `ejecuta: ${inner.slice(0, 100)}`;
-          return fmt(`  · ${summary}`);
+          const read = /^lee (.+)$/.exec(summary);
+          const linkedSummary = options.links?.root && read
+            ? `lee ${linkFiles(read[1], options.links.root)}`
+            : summary;
+          return fmt(`  · ${linkedSummary}`);
         }
         return fmt(`  · ${event.tool}: ${detail}`);
       }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
 import {
   buildArgs, commandParts, describeTool, extractAgentReport, findBundledCline, parseOutput, toActivity,
@@ -10,7 +11,7 @@ import {
 import {
   authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
 } from '../src/executors/codex.js';
-import { appendEvent, describeCommand, formatEvent, readEvents, useColor } from '../src/events.js';
+import { appendEvent, describeCommand, formatEvent, readEvents, supportsLinks, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
 import { relativize } from '../src/executors/common.js';
@@ -494,6 +495,30 @@ test('events: resume órdenes y formatea eventos con hora local', () => {
   assert.match(colored, /\u001b\[/);
   assert.equal(colored.replace(/\u001b\[[0-9;]*m/g, ''), plain);
   assert.doesNotMatch(plain, /\u001b\[/);
+  const root = path.resolve('repo root');
+  const anchor = (relative) => `\u001b]8;;${pathToFileURL(path.resolve(root, relative)).href}\u001b\\${relative}\u001b]8;;\u001b\\`;
+  const read = { type: 'activity', kind: 'tool', tool: 'read_files', detail: 'src/a.js, "docs/my file.md"' };
+  const linked = formatEvent(read, 0, { links: { root } });
+  assert.equal(linked, `  · lee: ${anchor('src/a.js')}, "${anchor('docs/my file.md')}"`);
+  assert.equal(formatEvent(read), '  · lee: src/a.js, "docs/my file.md"');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'edit', detail: 'src/a.js; src/b.js' }, 0, { links: { root } }), `  ✎ edita: ${anchor('src/a.js')}, ${anchor('src/b.js')}`);
+  assert.equal(linked.replace(/\u001b\]8;;[^\u001b]*\u001b\\|\u001b\]8;;\u001b\\/g, ''), formatEvent(read));
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'command', detail: 'cat src/a.js' }, 0, { links: { root } }), `  · lee ${anchor('src/a.js')}`);
+  const codexRead = { type: 'activity', kind: 'tool', tool: 'command', detail: 'Get-Content -Raw src/a.js' };
+  assert.equal(formatEvent(codexRead, 0, { links: { root } }), `  · lee ${anchor('src/a.js')}`);
+  const codexReadPlain = formatEvent(codexRead);
+  assert.equal(codexReadPlain, '  · lee src/a.js');
+  assert.equal(formatEvent(codexRead, 0, { links: { root } }).replace(/\u001b\]8;;[^\u001b]*\u001b\\|\u001b\]8;;\u001b\\/g, ''), codexReadPlain);
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'other', detail: 'src/a.js' }, 0, { links: { root } }), '  · other: src/a.js');
+  assert.equal(formatEvent({ type: 'activity', kind: 'tool', tool: 'read_files', detail: 'archivos, ../outside.js, *.js, "quoted name.js"' }, 0, { links: { root } }), `  · lee: archivos, ../outside.js, *.js, "${anchor('quoted name.js')}"`);
+  assert.equal(supportsLinks({ isTTY: true }, { TERM_PROGRAM: 'vscode' }), true);
+  assert.equal(supportsLinks({ isTTY: true }, { TERM_PROGRAM: 'vscode', TERM: 'dumb' }), false);
+  assert.equal(supportsLinks({ isTTY: false }, { TERM_PROGRAM: 'vscode' }), false);
+  assert.equal(supportsLinks({ isTTY: true }, { WT_SESSION: '1' }), true);
+  assert.equal(supportsLinks({ isTTY: true }, { VTE_VERSION: '4999' }), false);
+  assert.equal(supportsLinks({ isTTY: true }, { VTE_VERSION: '5000' }), true);
+  assert.equal(supportsLinks({ isTTY: false }, { AGENTRELAY_LINKS: '1' }), true);
+  assert.equal(supportsLinks({ isTTY: true }, { TERM_PROGRAM: 'vscode', AGENTRELAY_LINKS: '0' }), false);
   assert.equal(useColor({ isTTY: true }, {}), true);
   assert.equal(useColor({ isTTY: true }, { NO_COLOR: '1' }), false);
   assert.equal(useColor({ isTTY: false }, {}), false);
