@@ -125,13 +125,14 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
     - `agentrelay config refresh` reescribe la lista de modelos sin tocar los valores del usuario.
     - Tareas, en orden: (1) módulo de edición de texto con comentarios (`src/config-file.js`) con pruebas; (2) cargador de 2 capas + migración + `set`/`unset`; (3) lista de modelos + `config refresh`; (4) `init` + `.gitignore` + documentación.
       - [x] (3a) módulo `src/config-models.js` (genera e inserta el bloque de modelos)
-      - [ ] (3b) `agentrelay config refresh` que reúne los modelos de cada ejecutor y actualiza el bloque
+      - [x] (3b) `agentrelay config refresh` que reúne los modelos de cada ejecutor y actualiza el bloque
+        - Pendiente: si `opencode models` falla la primera vez (servicio frío) el bloque dice «sin lista de modelos disponible»; valorar un reintento.
       - [x] (2a) módulo de migración `src/config-migrate.js` (`settings.json` y `.local.json` a los dos archivos nuevos, con copia `.bak`)
       - [x] (2b) `set`/`unset` sobre el archivo, conservando comentarios (parte A hecha: aviso de archivos antiguos, `config migrate` y migración automática al arrancar el CLI, solo desde `bin`)
         - Pendiente cosmético: al activar una opción dentro de un bloque, la sangría queda un nivel menos que en la plantilla (`"model"` con 2 espacios dentro de `executor`); es válido pero mejorable.
     - [ ] (1) módulo de edición `src/config-file.js`
     - [ ] (2) cargador de 2 capas, migración y `set`/`unset`
-    - [ ] (3) lista de modelos y `config refresh`
+    - [x] (3) lista de modelos y `config refresh`
     - [ ] (4) `init`, `.gitignore` y documentación
   - [x] `AGENTS.md` aligerado (de ~2170 a ~1590 palabras): el contexto de diseño (propósito, niveles, configuración, fases, costes) pasó a `docs/DISENO.md`; en `AGENTS.md` quedan solo las reglas de actuación.
   - [ ] Prueba de LongCat 2.5 Preview (gratis en opencode hasta el 10/10) como orquestador: `opencode -m opencode/longcat-2.5-preview-free`. Valorar el resultado y decidir si se mantiene.

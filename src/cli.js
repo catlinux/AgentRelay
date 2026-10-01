@@ -4,10 +4,11 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, LOCAL_CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
+import { applyModelsBlock, renderModelsBlock } from './config-models.js';
 import { getExecutor } from './executors/index.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue } from './settings.js';
@@ -55,6 +56,7 @@ Uso:
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
+  agentrelay config refresh [--only <ejecutor>] [--dry-run] Actualiza la lista de modelos
   agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
   agentrelay unset <clave> [--local]       Restablece un ajuste
   agentrelay models                Lista los modelos del ejecutor actual
@@ -135,6 +137,7 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
+  only: { type: 'string' },
   yes: { type: 'boolean' },
   uninstall: { type: 'boolean' },
   'no-commands': { type: 'boolean' },
@@ -424,6 +427,39 @@ function configLeaves(value, prefix = '', result = {}) {
   return result;
 }
 
+async function cmdConfigRefresh(values, cwd, userFile) {
+  const loaded = loadConfig({ cwd, configPath: values.config });
+  const only = values.only;
+  if (only && !Object.hasOwn(EXECUTOR_DEFAULTS, only)) throw new Error(`Ejecutor no soportado: ${only}`);
+  const types = only ? [only] : Object.keys(EXECUTOR_DEFAULTS);
+  const entries = await Promise.allSettled(types.map(async (type) => {
+    const executor = { ...EXECUTOR_DEFAULTS[type], ...(type === loaded.config.executor.type ? loaded.config.executor : {}) };
+    const adapter = getExecutor(type);
+    if (!adapter.listModels) return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: [] };
+    let timer;
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tiempo máximo de 20 s superado')), 20_000); });
+    let models;
+    try { models = await Promise.race([adapter.listModels(executor), timeout]); }
+    finally { clearTimeout(timer); }
+    return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: models || [] };
+  }));
+  const records = entries.map((result, index) => result.status === 'fulfilled'
+    ? result.value
+    : { executor: types[index], title: CATALOG.find((item) => item.name === types[index])?.title || types[index], current: types[index] === loaded.config.executor.type, models: [], error: result.reason?.message || String(result.reason) });
+  let text = existsSync(userFile) ? readFileSync(userFile, 'utf8') : configTemplate({ scope: 'user' });
+  const block = renderModelsBlock(records);
+  text = applyModelsBlock(text, block);
+  parseJsonc(text, userFile);
+  if (values['dry-run']) process.stdout.write(`${block}\n`);
+  else {
+    mkdirSync(path.dirname(userFile), { recursive: true });
+    writeFileSync(userFile, text, 'utf8');
+  }
+  for (const entry of records) process.stdout.write(`${entry.executor}: ${entry.error ? `no se pudo leer: ${entry.error}` : `${entry.models.length} modelos`}\n`);
+  process.stdout.write(`Archivo: ${userFile}\n`);
+  return 0;
+}
+
 async function cmdConfig(positionals, values, migrationResult) {
   const action = positionals[0] || 'show';
   const requestedCwd = path.resolve(values.cwd || process.cwd());
@@ -434,6 +470,7 @@ async function cmdConfig(positionals, values, migrationResult) {
   const settingsPath = path.join(configHome(), 'settings.json');
   const projectFile = path.join(cwd, CONFIG_FILE);
   const localFile = path.join(cwd, LOCAL_CONFIG_FILE);
+  if (action === 'refresh' && positionals.length === 1) return cmdConfigRefresh(values, cwd, userFile);
   if (action === 'migrate' && positionals.length === 1) {
     let result = migrationResult;
     if (!result) {
