@@ -23,17 +23,22 @@ test('usage agrupa executor/modelo, suma consumo y aplica filtros', () => {
   try {
     save(repo, 'one', { retriesUsed: 1, attempts: [{ n: 1, durationMs: 65000, model: { id: 'gpt-6-luna' }, usage: { inputTokens: 1200, outputTokens: 200, cacheReadTokens: 300, totalCost: 0 } }] });
     save(repo, 'two', { status: 'escalated', config: { executor: { type: 'cline', model: 'x' } }, attempts: [{ durationMs: 1000, model: { id: 'deepseek-v4-pro' }, usage: { inputTokens: 5, outputTokens: 6, cacheReadTokens: 7, totalCost: 0.125 } }] });
+    save(repo, 'z-three', { attempts: [{ n: 1, durationMs: 20, model: { id: 'other-model' }, usage: { inputTokens: 2, outputTokens: 3, cacheReadTokens: 0, totalCost: 0.2 } }] });
     const result = aggregateUsage(repo.dir, { now: Date.parse('2026-10-02T10:00:00Z') });
-    assert.equal(result.groups.length, 2);
+    assert.equal(result.groups.length, 3);
     assert.equal(result.groups[0].inputTokens, 1200);
     assert.equal(result.groups[0].estimatedCost, null);
-    assert.equal(result.groups[1].estimatedCost, 0.125);
+    assert.ok(result.groups[1].estimatedCost > 0);
+    assert.equal(result.groups[1].estimatedCostSource, 'agentrelay');
+    assert.equal(result.groups[2].estimatedCostSource, 'executor');
+    assert.equal(result.totals.estimatedCostSource, 'mixed');
     assert.equal(result.totals.retries, 1);
     assert.equal(result.totals.escalatedRejected, 1);
-    assert.equal(aggregateUsage(repo.dir, { executor: 'codex' }).totals.executions, 1);
+    assert.equal(aggregateUsage(repo.dir, { executor: 'codex' }).totals.executions, 2);
     assert.equal(aggregateUsage(repo.dir, { since: '24h', now: Date.parse('2026-10-02T10:00:01Z') }).totals.executions, 0);
-    assert.equal(aggregateUsage(repo.dir, { since: '2026-10-01' }).totals.executions, 2);
-    assert.match(renderUsage(result), /0,125 USD \(estimado por el ejecutor\)/);
+    assert.equal(aggregateUsage(repo.dir, { since: '2026-10-01' }).totals.executions, 3);
+    assert.match(renderUsage(result), /USD \(estimado por AgentRelay\)/);
+    assert.equal(result.groups[0].estimatedCostSource, null);
     const table = renderUsage(result).split('\n');
     assert.ok(table[1].indexOf('gpt-6-luna') < table[1].indexOf('1,2 mil'));
     assert.ok(!table[1].includes(' | '));
