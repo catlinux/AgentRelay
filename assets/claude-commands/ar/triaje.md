@@ -9,4 +9,4 @@ Estadísticas del triaje:
 
 !`agentrelay triage stats`
 
-Muestra solo la tabla. Nada más.
+Muestra el resultado completo de `stats` (tabla si hay registros; si no, el mensaje «Sin datos todavía», la ruta y el total). Nada más.

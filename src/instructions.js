@@ -40,7 +40,7 @@ export const PROJECT_BLOCK = [
   '',
   'Este proyecto usa AgentRelay para delegar tareas de implementación a un agente ejecutor más económico (por defecto, Codex con GPT-6 Luna) mientras tú planificas, revisas y decides. No edites este bloque: `agentrelay init` lo actualiza.',
   '',
-  '- Delega las tareas de implementación bien acotadas con `agentrelay run -`, pasando por la entrada estándar una tarea JSON con `objective`, `context`, `files`, `constraints`, `acceptanceCriteria`, `validation` (comandos que deben pasar) y `doNotModify`. El repositorio debe estar limpio (sin cambios pendientes) antes de delegar.',
+  '- Delega las tareas de implementación bien acotadas con `agentrelay run -`, pasando por la entrada estándar una tarea JSON con `objective`, `context`, `files`, `constraints`, `acceptanceCriteria`, `validation` (comandos que deben pasar) y `doNotModify`. Por defecto, el repositorio debe estar limpio antes de delegar; `--allow-dirty` permite hacerlo con cambios sin confirmar.',
   '- Haz tú directamente los cambios triviales, las decisiones de diseño y todo lo que no compense delegar.',
   '- Lee el informe (diff, validaciones e informe del ejecutor). La autorrevisión del ejecutor no sustituye tu revisión. Decide con `agentrelay review <id> --decision accept|fix|escalate|reject` (`fix` necesita `--feedback` con los problemas concretos).',
   '- Si la tarea queda escalada o el ejecutor falla repetidamente, resuélvela tú y cierra la ejecución con `--decision accept`.',
@@ -206,8 +206,7 @@ export function setupExplanation(file, removing = false) {
     `Se instalará en ${file}: si el archivo no existe se creará, y si ya tiene el bloque se actualizará.`,
     'No se modifica nada fuera de las marcas.',
     'También se instalarán los comandos de Claude Code; solo se modifican archivos con la marca <!-- agentrelay:managed -->.',
-    'Para retirar también esos comandos, ejecuta "agentrelay setup --uninstall".',
-    'Para quitarlo, ejecuta "agentrelay setup --uninstall".',
+    'Para retirar el bloque y los comandos de Claude Code, ejecuta "agentrelay setup --uninstall".',
   ];
 }
 

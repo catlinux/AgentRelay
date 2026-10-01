@@ -10,4 +10,4 @@ Resultado:
 
 !`if [ -z "$ARGUMENTS" ]; then agentrelay config | grep -E "^(level|  level)" ; else agentrelay set level $ARGUMENTS; fi`
 
-Responde solo con el resultado, en 3 líneas como máximo (más un "Ojo" si aparece) y termina con la línea: Uso: /ar:nivel <1-5>. Sin comentarios ni otras acciones.
+Responde solo con el resultado, en 3 líneas como máximo (más un "Ojo" si aparece) y termina con esta línea de uso en el chat: /ar:nivel <1-5>. Sin comentarios ni otras acciones.

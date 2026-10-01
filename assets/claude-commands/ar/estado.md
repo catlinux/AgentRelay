@@ -11,4 +11,4 @@ Estado de AgentRelay:
 
 !`agentrelay config`
 
-Resume en 4 líneas como máximo: ejecutor y modelo, esfuerzo, nivel, sesión y cualquier [aviso] o [fallo]. Nada más.
+Resume en 4 líneas como máximo: ejecutor y modelo, esfuerzo, nivel, estado de la sesión y cualquier [aviso] o [fallo]. Nada más.

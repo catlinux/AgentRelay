@@ -45,9 +45,9 @@ Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y este paso ya
 agentrelay doctor
 ```
 
-Todas las líneas deben salir con `[ok]`, incluida la de `Sesión`.
+Las comprobaciones de Node.js, Git, el ejecutor y la sesión deben salir con `[ok]`. Como aún no has ejecutado `setup`, es normal que `doctor` avise de que faltan las instrucciones globales y los comandos de Claude Code; también puede avisar de que este proyecto aún no tiene el bloque de AgentRelay.
 
-**5. Prepara tu orquestador y conecta tu cuenta** (una sola vez; te pedirá confirmación, te ofrecerá instalar ejecutores opcionales, como Cline, y al final te propondrá conectar tu cuenta de ChatGPT; puedes decir que no a cualquiera de los dos y hacerlo más tarde con `agentrelay executors add <nombre>` o `agentrelay login`):
+**5. Prepara tu orquestador** (una sola vez; te pedirá confirmación para instalar el bloque global y los comandos de Claude Code, te ofrecerá instalar Cline y solo propondrá iniciar sesión si no hay una sesión activa. Como ya has iniciado sesión en el paso 3, normalmente mostrará que la sesión sigue activa. Si dices que no a instalar Cline, puedes hacerlo más tarde con `agentrelay executors add cline`):
 
 ```powershell
 agentrelay setup
@@ -168,7 +168,7 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 ## Cómo empezar a usarlo
 
 1. Abre tu proyecto en VS Code con la extensión **Claude Code** instalada y con la sesión iniciada.
-2. En el terminal de ese proyecto ejecuta **una vez** `agentrelay init`. Prepara el proyecto (y el repositorio git si todavía no existe) y te pide confirmación.
+2. En el terminal de ese proyecto ejecuta `agentrelay init`. Prepara el proyecto (y el repositorio git si todavía no existe). Según el estado del repositorio, puede pedir confirmación para prepararlo o para crear un commit; si ya hay cambios pendientes, añade el bloque y te indica que confirmes `CLAUDE.md` y dejes limpio el repositorio antes de delegar.
 3. Abre un segundo terminal y deja ejecutándose `agentrelay watch` para ver en directo lo que hace el agente.
 4. Pídele el trabajo a Claude en el chat, con tus palabras. Por ejemplo: *«Añade una función que valide emails y delega la implementación con AgentRelay.»*
 
@@ -199,7 +199,7 @@ npm ci
 
 Usa `npm ci` y no `npm install`: instala exactamente las versiones del `package-lock.json` sin modificarlo, mientras que `npm install` puede reescribirlo y hacer que el siguiente `git pull` falle.
 
-Si `git pull` responde *«Your local changes to the following files would be overwritten by merge: package-lock.json»*, descarta esos cambios (los genera npm; no pierdes nada) y repite:
+Si `git pull` responde *«Your local changes to the following files would be overwritten by merge: package-lock.json»*, revisa primero los cambios con `git diff -- package-lock.json`. Si confirmas que solo los generó npm y no los necesitas, descártalos y repite:
 
 ```sh
 git checkout -- package-lock.json
