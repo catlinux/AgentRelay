@@ -10,4 +10,4 @@ Resultado:
 
 !`if [ -z "$ARGUMENTS" ]; then agentrelay models; else agentrelay set effort $ARGUMENTS; fi`
 
-Muestra el resultado en español, tal cual y sin comentarios adicionales. Si aparece un "Aviso" o un "Ojo", menciónalo. No ejecutes otras acciones.
+Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece). Sin comentarios ni otras acciones.

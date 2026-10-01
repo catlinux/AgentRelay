@@ -9,4 +9,4 @@ Estadísticas del triaje:
 
 !`agentrelay triage stats`
 
-Muestra la tabla tal cual y añade, en una línea, qué combinación está recomendando el triaje ahora. No ejecutes otras acciones.
+Muestra solo la tabla. Nada más.

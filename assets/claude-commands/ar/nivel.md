@@ -10,4 +10,4 @@ Resultado:
 
 !`if [ -z "$ARGUMENTS" ]; then agentrelay config | grep -E "^(level|  level)" ; else agentrelay set level $ARGUMENTS; fi`
 
-Muestra el resultado en español, tal cual y sin comentarios adicionales. Si aparece un "Ojo", menciónalo. No ejecutes otras acciones.
+Responde solo con el resultado, en 3 líneas como máximo (más un "Ojo" si aparece). Sin comentarios ni otras acciones.
