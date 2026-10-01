@@ -412,8 +412,7 @@ After asking for confirmation, it adds a block delimited by `<!-- agentrelay:sta
 agentrelay init
 ```
 
-- Adds the block with the delegation instructions to the project's `CLAUDE.md`. If the project already has an `AGENTS.md`, it also adds or updates the block there. `AGENTS.md` is the agent-neutral project instructions file; `CLAUDE.md` can simply refer to it. When `init` runs again, it only updates what is between the markers in either file and preserves the rest.
-- If the repository was clean, it offers to commit only that file (AgentRelay needs a repository without pending changes to delegate).
+- Prepares the project instructions in a neutral way. In a project with neither `CLAUDE.md` nor `AGENTS.md`, it creates `AGENTS.md` with the delegation block and a `CLAUDE.md` containing only `@AGENTS.md` (Claude Code imports it; opencode, Codex and others read `AGENTS.md`). If `CLAUDE.md` already exists without importing `AGENTS.md`, it adds or updates the block there (and in `AGENTS.md` too if it exists); if `CLAUDE.md` already imports `AGENTS.md`, the block goes only in `AGENTS.md`. Repeating it only updates what is between the markers and never touches the rest of the file.
 - If the folder is **not a git repository**, it prepares one: it shows what it will do and which files will be included, and after your confirmation runs `git init`, creates a `.gitignore` with secret patterns (`.env`, keys, `wp-config.php`…) if there was none, and makes a first commit. It never modifies an existing `.gitignore` and never pushes. It warns if the folder looks served publicly by a web server (`/var/www`, `public_html`…), because `.agentrelay/` must not be reachable from the Internet.
 - `--with-config` also creates `agentrelay.config.json`.
 

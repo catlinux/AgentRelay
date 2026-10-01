@@ -1007,11 +1007,19 @@ function writeConfigIfRequested(root, values) {
 function initInstructionFiles(dir) {
   const claudeFile = path.join(dir, 'CLAUDE.md');
   const agentsFile = path.join(dir, 'AGENTS.md');
-  if (!existsSync(agentsFile)) return [claudeFile];
+  if (!existsSync(agentsFile)) {
+    if (!existsSync(claudeFile)) {
+      return [
+        { file: agentsFile, block: PROJECT_BLOCK },
+        { file: claudeFile, content: '@AGENTS.md' },
+      ];
+    }
+    return [{ file: claudeFile, block: PROJECT_BLOCK }];
+  }
 
   const claude = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
-  if (/^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)) return [agentsFile];
-  return [claudeFile, agentsFile];
+  if (/^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)) return [{ file: agentsFile, block: PROJECT_BLOCK }];
+  return [{ file: claudeFile, block: PROJECT_BLOCK }, { file: agentsFile, block: PROJECT_BLOCK }];
 }
 
 async function cmdInit(values) {
@@ -1032,11 +1040,17 @@ async function cmdInit(values) {
     }
 
     const instructionFiles = initInstructionFiles(dir);
-    for (const instructionFile of instructionFiles) {
-      if (!values.quiet) process.stdout.write(`${initExplanation(instructionFile)}\n`);
-      const { action } = applyBlockToFile(instructionFile, PROJECT_BLOCK);
+    for (const instruction of instructionFiles) {
+      if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined })}\n`);
+      let action;
+      if (instruction.content !== undefined) {
+        writeFileSync(instruction.file, `${instruction.content}\n`);
+        action = 'created';
+      } else {
+        ({ action } = applyBlockToFile(instruction.file, instruction.block));
+      }
       const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
-      process.stdout.write(`${label} ${instructionFile}\n`);
+      process.stdout.write(`${label} ${instruction.file}\n`);
     }
 
     const res = await commitAll(dir, 'Estado inicial (AgentRelay)');
@@ -1053,19 +1067,28 @@ async function cmdInit(values) {
 
   // Estado del repositorio antes de tocar nada.
   const wasClean = await isClean(root);
-  const ignoredFiles = new Set(await Promise.all(instructionFiles.map(async (instructionFile) => (
-    await isIgnored(root, path.relative(root, instructionFile)) ? instructionFile : null
+  const ignoredFiles = new Set(await Promise.all(instructionFiles.map(async ({ file }) => (
+    await isIgnored(root, path.relative(root, file)) ? file : null
   ))));
 
   const changedFiles = [];
-  for (const instructionFile of instructionFiles) {
-    if (!values.quiet) process.stdout.write(`${initExplanation(instructionFile)}\n`);
-    const { action } = applyBlockToFile(instructionFile, PROJECT_BLOCK);
+  for (const instruction of instructionFiles) {
+    if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined })}\n`);
+    let action;
+    if (instruction.content !== undefined) {
+      writeFileSync(instruction.file, `${instruction.content}\n`);
+      action = 'created';
+    } else {
+      ({ action } = applyBlockToFile(instruction.file, instruction.block));
+    }
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
-    process.stdout.write(`${label} ${instructionFile}\n`);
-    if (action !== 'unchanged') changedFiles.push(instructionFile);
+    process.stdout.write(`${label} ${instruction.file}\n`);
+    if (action !== 'unchanged') changedFiles.push(instruction.file);
   }
-  const commitFiles = changedFiles.filter((instructionFile) => !ignoredFiles.has(instructionFile));
+  const hasImportFile = instructionFiles.some(({ content }) => content !== undefined);
+  const commitFiles = hasImportFile && [...ignoredFiles].some((file) => file !== null)
+    ? []
+    : changedFiles.filter((instructionFile) => !ignoredFiles.has(instructionFile));
 
   if (commitFiles.length && wasClean) {
     const ok = await confirm('¿Crear un commit con los archivos de instrucciones?', { yes: values.yes });

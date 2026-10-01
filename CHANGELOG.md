@@ -21,7 +21,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
-- Las instrucciones del proyecto son neutrales: viven en `AGENTS.md` (versionado) y `CLAUDE.md` solo lo importa. `agentrelay init` escribe también el bloque de AgentRelay en `AGENTS.md` cuando existe.
+- Las instrucciones del proyecto son neutrales: viven en `AGENTS.md` (versionado) y `CLAUDE.md` solo lo importa. `agentrelay init` es neutral: en un proyecto nuevo crea `AGENTS.md` con el bloque de AgentRelay y un `CLAUDE.md` que solo lo importa (`@AGENTS.md`); si `AGENTS.md` ya existe, el bloque va también allí, y solo allí si `CLAUDE.md` lo importa.
 
 ## [0.0.3] - 2026-10-01
 

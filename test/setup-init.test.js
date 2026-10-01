@@ -177,44 +177,52 @@ test('setup omite el login para un ejecutor que no lo ofrece', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('init --yes en repo limpio crea CLAUDE.md y hace un commit solo de CLAUDE.md', () => {
+test('init --yes en repo limpio crea instrucciones neutrales y las confirma juntas', () => {
   const repo = makeRepo();
   try {
     const r = run(['init', '--yes'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /<!-- agentrelay:start -->/);
     assert.match(r.stdout, /<!-- agentrelay:end -->/);
-    assert.match(r.stdout, /el resto del archivo se conserva/);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.match(r.stdout, /AGENTS\.md/);
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), PROJECT_BLOCK + '\n');
     // Repo limpio tras el commit.
     assert.equal(git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim(), '');
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
-    assert.deepEqual(names, ['CLAUDE.md']);
+    assert.deepEqual(names, ['AGENTS.md', 'CLAUDE.md']);
   } finally {
     repo.cleanup();
   }
 });
 
-test('init sin --yes en repo limpio crea CLAUDE.md pero no hace commit', () => {
+test('init sin --yes en repo limpio crea instrucciones neutrales pero no hace commit', () => {
   const repo = makeRepo();
   try {
     const r = run(['init'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), PROJECT_BLOCK + '\n');
     const status = git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim();
     assert.ok(status.includes('CLAUDE.md'));
+    assert.ok(status.includes('AGENTS.md'));
   } finally {
     repo.cleanup();
   }
 });
 
-test('init solo escribe en CLAUDE.md cuando no existe AGENTS.md', () => {
+test('init repetido no cambia los archivos de instrucciones neutrales', () => {
   const repo = makeRepo();
   try {
-    const r = run(['init', '--yes'], repo.dir);
-    assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
-    assert.equal(existsSync(path.join(repo.dir, 'AGENTS.md')), false);
+    const first = run(['init', '--yes'], repo.dir);
+    assert.equal(first.status, 0, first.stderr);
+    const claude = readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8');
+    const agents = readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8');
+    const second = run(['init', '--yes'], repo.dir);
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /sin cambios/);
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), claude);
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), agents);
   } finally {
     repo.cleanup();
   }
@@ -276,12 +284,15 @@ test('init --yes en repo con cambios pendientes añade el bloque pero no hace co
     writeFileSync(path.join(repo.dir, 'extra.txt'), 'cambio\n');
     const r = run(['init', '--yes'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), PROJECT_BLOCK + '\n');
     const status = git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim();
     assert.ok(status.includes('extra.txt'));
     assert.ok(status.includes('CLAUDE.md'));
+    assert.ok(status.includes('AGENTS.md'));
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
     assert.ok(!names.includes('CLAUDE.md'));
+    assert.ok(!names.includes('AGENTS.md'));
   } finally {
     repo.cleanup();
   }
@@ -295,8 +306,9 @@ test('init --yes con CLAUDE.md en .gitignore no intenta el commit', () => {
     git(repo.dir, 'commit', '-q', '-m', 'gitignore');
     const r = run(['init', '--yes'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
-    assert.equal(git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim(), '');
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.match(git(repo.dir, 'status', '--porcelain', '--untracked-files=all'), /AGENTS\.md/);
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
     assert.ok(!names.includes('CLAUDE.md'));
   } finally {

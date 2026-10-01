@@ -211,6 +211,9 @@ export function setupExplanation(file, removing = false) {
 }
 
 /** Explica la instalación del bloque de instrucciones de AgentRelay en un proyecto. */
-export function initExplanation(file) {
+export function initExplanation(file, { importOnly = false } = {}) {
+  if (importOnly) {
+    return `Se creará ${file} con la línea @AGENTS.md para que Claude Code utilice las instrucciones compartidas de AGENTS.md.`;
+  }
   return `Se añadirá o actualizará el bloque de instrucciones de AgentRelay en ${file} (solo entre ${START_MARK} y ${END_MARK}; el resto del archivo se conserva) para que el orquestador sepa cómo delegar en este proyecto. Para quitarlo, elimina a mano las líneas entre las marcas.`;
 }

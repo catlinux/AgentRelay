@@ -48,10 +48,11 @@ test('init --yes en una carpeta sin git prepara el repositorio y hace un único 
     assert.equal(r.status, 0, r.stderr);
     assert.ok(existsSync(path.join(dir, '.git')));
     assert.equal(readFileSync(path.join(dir, '.gitignore'), 'utf8'), DEFAULT_GITIGNORE);
-    assert.equal(readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.equal(readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+    assert.equal(readFileSync(path.join(dir, 'AGENTS.md'), 'utf8'), PROJECT_BLOCK + '\n');
     assert.equal(git(dir, 'rev-list', '--count', 'HEAD').trim(), '1');
     const names = git(dir, 'ls-tree', '-r', '--name-only', 'HEAD').split(/\r?\n/).filter(Boolean).sort();
-    assert.deepEqual(names, ['.gitignore', 'CLAUDE.md'].sort());
+    assert.deepEqual(names, ['.gitignore', 'AGENTS.md', 'CLAUDE.md'].sort());
     assert.equal(git(dir, 'status', '--porcelain', '--untracked-files=all').trim(), '');
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -219,4 +220,3 @@ test('describePlan explica el plan y avisa de sensibles y carpetas públicas', (
   const isPublic = describePlan('/tmp/x', scan, { hasGitignore: false, public: true });
   assert.ok(isPublic.some((l) => l.includes('servida públicamente')));
 });
-
