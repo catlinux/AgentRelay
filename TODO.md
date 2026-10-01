@@ -121,7 +121,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [x] Insignias (badges) en la cabecera de README.md y README.en.md, como en AzerothCore: estado de CI de Windows, Linux y macOS (una insignia por flujo), licencia (WNCL-CU-1.0, enlazada a LICENSE), Node >= 20, versión (desde package.json), último commit y ejecutor por defecto (Codex). Añadirlas cuando los tres flujos hayan corrido en verde al menos una vez, para no mostrar «failing» ni «no status».
 - [ ] Arreglar la prueba de timeout de procesos (`proc:`) y revisar el resto de pruebas para que pasen también dentro del sandbox de Codex y en todos los sistemas del CI.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
-- [ ] Recuperación de ejecuciones interrumpidas (estado `running` huérfano).
+- [x] Recuperación de ejecuciones interrumpidas (estado `running` huérfano).
 - [ ] Mejorar el aviso cuando el ejecutor no devuelve el informe estructurado.
 
 ## 0.1.0 — MVP

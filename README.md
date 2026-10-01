@@ -164,6 +164,17 @@ agentrelay review <id> --decision accept
 
 El `<id>` aparece en la primera línea de la ejecución y en `agentrelay list`. Con `fix` verás en directo cómo el ejecutor corrige; `accept` repite las validaciones antes de aceptar.
 
+### Ejecuciones interrumpidas
+
+```sh
+agentrelay recover
+agentrelay recover <id>
+agentrelay check <id>
+agentrelay review <id> --decision fix --feedback "..."
+```
+
+Una ejecución que sigue en estado `running`, cuyo proceso ya no existe y que no tiene actividad reciente se considera huérfana; las ejecuciones de otro equipo nunca se consideran huérfanas. `agentrelay list` la marca como `running (¿interrumpida?)`, `doctor` avisa y `usage` la cuenta como interrumpida; `watch <id>` termina con «Ejecución interrumpida». `recover` lista las huérfanas y `recover <id>` marca una como `interrupted`, actualizando solo los archivos de estado e informe de esa ejecución: nunca toca tu repositorio. Muestra, en modo de solo lectura, los cambios que el ejecutor dejó en el repositorio; después puedes validarlos con `check` y pedir correcciones con `review --decision fix` (el ejecutor continúa) o rechazarlos con `review --decision reject`.
+
 **5. Prueba con otro nivel:** `agentrelay run <tarea> --level 4` añade una self-review en una segunda ejecución; `--level 1` acepta automáticamente si las validaciones pasan. Antes, confirma o descarta los cambios de la prueba anterior (`git stash -u`, `git checkout .` o un commit), porque AgentRelay necesita el repositorio limpio.
 
 ## Ver el trabajo en directo

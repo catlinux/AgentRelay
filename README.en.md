@@ -164,6 +164,17 @@ agentrelay review <id> --decision accept
 
 The `<id>` appears on the first line of the run and in `agentrelay list`. With `fix` you will see the executor correct its work live; `accept` re-runs the validations before accepting.
 
+### Interrupted runs
+
+```sh
+agentrelay recover
+agentrelay recover <id>
+agentrelay check <id>
+agentrelay review <id> --decision fix --feedback "..."
+```
+
+A run still marked `running` whose process no longer exists and that has no recent activity is considered orphaned; runs from another host are never considered orphans. `agentrelay list` labels it `running (possibly interrupted)`, `doctor` warns, and `usage` counts it as interrupted; `watch <id>` ends with “Execution interrupted”. `recover` lists orphans, and `recover <id>` marks one `interrupted`, updating only that run's state and report files: it never touches your repository. It displays the changes the executor left in the repository in read-only mode; you can then validate them with `check` and request fixes with `review --decision fix` (the executor continues) or reject them with `review --decision reject`.
+
 **5. Try another level:** `agentrelay run <task> --level 4` adds a self-review in a second run; `--level 1` accepts automatically when validations pass. First commit or discard the changes from the previous test (`git stash -u`, `git checkout .` or a commit), because AgentRelay needs a clean repository.
 
 ## Watching the work live

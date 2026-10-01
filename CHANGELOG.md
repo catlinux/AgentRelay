@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- `agentrelay recover` detecta y permite recuperar ejecuciones interrumpidas que siguen en estado `running` sin proceso activo ni actividad reciente, sin tocar el repositorio.
+
 - Opciones globales `-q`/`--quiet` para mostrar solo errores, avisos y resultados esenciales, y `-v`/`--verbose` para añadir detalles de diagnóstico; no se pueden combinar y no cambian los códigos de salida.
 
 - `agentrelay usage` muestra el consumo acumulado por ejecutor y modelo, con filtros por fecha y ejecutor y salida JSON.
