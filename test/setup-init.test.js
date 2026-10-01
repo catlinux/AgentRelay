@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,10 +42,10 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.match(r1.stdout, /<!-- agentrelay:end -->/);
     assert.ok(r1.stdout.includes(claude));
     assert.match(r1.stdout, /agentrelay setup --uninstall/);
-    const commandDir = path.join(dir, 'commands', 'agentrelay');
+    const commandDir = path.join(dir, 'commands', 'ar');
     assert.ok(existsSync(path.join(commandDir, 'estado.md')));
     assert.match(r1.stdout, /comandos creados: 6/);
-    assert.match(r1.stdout, /Comandos de Claude Code: \/agentrelay:estado/);
+    assert.match(r1.stdout, /Comandos de Claude Code: \/ar:estado/);
     assert.equal(readFileSync(claude, 'utf8'), GLOBAL_BLOCK + '\n');
 
     // Repetirlo no cambia nada.
@@ -74,6 +74,12 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.match(r4.stdout, /<!-- agentrelay:start -->/);
     assert.equal(existsSync(claude), false);
     assert.equal(existsSync(commandDir), false);
+    const legacyDir = path.join(dir, 'commands', 'agentrelay');
+    mkdirSync(legacyDir, { recursive: true });
+    writeFileSync(path.join(legacyDir, 'estado.md'), '<!-- agentrelay:managed --> old');
+    const r5 = run(['setup', '--uninstall', '--yes', '--claude-dir', dir], dir);
+    assert.equal(r5.status, 0, r5.stderr);
+    assert.equal(existsSync(legacyDir), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -85,7 +91,25 @@ test('setup --no-commands omite la instalación de comandos', () => {
     fakeCodexConfig(dir);
     const result = run(['setup', '--yes', '--no-commands', '--claude-dir', dir], dir);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(existsSync(path.join(dir, 'commands', 'agentrelay')), false);
+    assert.equal(existsSync(path.join(dir, 'commands', 'ar')), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('setup migra comandos gestionados antiguos y conserva archivos propios', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-legacy-'));
+  try {
+    fakeCodexConfig(dir);
+    const oldDir = path.join(dir, 'commands', 'agentrelay');
+    const newDir = path.join(dir, 'commands', 'ar');
+    mkdirSync(oldDir, { recursive: true });
+    writeFileSync(path.join(oldDir, 'estado.md'), '<!-- agentrelay:managed --> viejo');
+    writeFileSync(path.join(oldDir, 'nota.md'), 'archivo propio');
+    const result = run(['setup', '--yes', '--claude-dir', dir], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Comandos antiguos retirados \(ahora son \/ar:/);
+    assert.ok(existsSync(path.join(newDir, 'estado.md')));
+    assert.equal(existsSync(path.join(oldDir, 'estado.md')), false);
+    assert.equal(readFileSync(path.join(oldDir, 'nota.md'), 'utf8'), 'archivo propio');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

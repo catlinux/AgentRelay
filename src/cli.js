@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
-import { commandsStatus, commandsTargetDir, installCommands, removeCommands } from './claude-commands.js';
+import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue, readSettings, setSetting, settingsFile, unsetSetting, writeSettings } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
@@ -309,11 +309,13 @@ async function cmdDoctor(values) {
   else if (globalStatus === 'outdated') warn('Las instrucciones globales del orquestador están desactualizadas. Ejecuta "agentrelay setup".');
   else warn('Las instrucciones globales del orquestador no están instaladas. Ejecuta "agentrelay setup".');
   const commandStatus = commandsStatus(values['claude-dir']);
+  const legacyCommands = legacyCommandsStatus(values['claude-dir']);
+  if (legacyCommands.length) warn('Quedan comandos antiguos /agentrelay:â€¦ de una versión anterior. Ejecuta "agentrelay setup" para sustituirlos por /ar:â€¦.');
   if (commandStatus.details.every(({ state }) => state === 'foreign')) {
     process.stdout.write('[ok]   Los comandos de Claude Code existentes son tuyos; se conservan.\n');
-  } else if (commandStatus.status === 'current') line(true, 'Comandos de Claude Code (/agentrelay:…): al día');
-  else if (commandStatus.status === 'outdated') warn('Los comandos de Claude Code (/agentrelay:…) están desactualizados. Ejecuta "agentrelay setup".');
-  else warn('Los comandos de Claude Code (/agentrelay:…) no están instalados. Ejecuta "agentrelay setup".');
+  } else if (commandStatus.status === 'current') line(true, 'Comandos de Claude Code (/ar:…): al día');
+  else if (commandStatus.status === 'outdated') warn('Los comandos de Claude Code (/ar:…) están desactualizados. Ejecuta "agentrelay setup".');
+  else warn('Los comandos de Claude Code (/ar:…) no están instalados. Ejecuta "agentrelay setup".');
   if (root) {
     const projectStatus = blockStatus(path.join(root, 'CLAUDE.md'), PROJECT_BLOCK);
     if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
@@ -712,7 +714,8 @@ async function cmdSetup(values) {
   if (removing) {
     const { action } = removeBlockFromFile(file);
     const commands = removeCommands(values['claude-dir']);
-    process.stdout.write(`Comandos de Claude Code eliminados: ${commands.removed.length ? commands.removed.join(', ') : 'ninguno'}\n`);
+    const legacy = removeLegacyCommands(values['claude-dir']);
+    process.stdout.write(`Comandos de Claude Code eliminados: ${commands.removed.length + legacy.removed.length ? [...commands.removed, ...legacy.removed].join(', ') : 'ninguno'}\n`);
     if (commands.kept.length) process.stdout.write(`Conservados (archivo tuyo): ${commands.kept.join(', ')}\n`);
     process.stdout.write(`${action === 'removed' ? 'eliminado' : 'no había bloque'} ${file}\n`);
   } else {
@@ -722,8 +725,10 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      process.stdout.write(`Comandos de Claude Code: /agentrelay:estado, /agentrelay:modelo, /agentrelay:esfuerzo, /agentrelay:nivel, /agentrelay:ejecutor y /agentrelay:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
+      const legacy = removeLegacyCommands(values['claude-dir']);
+      if (legacy.removed.length) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
       const counts = [];
       if (result.created.length) counts.push(`comandos creados: ${result.created.length}`);
       if (result.updated.length) counts.push(`actualizados: ${result.updated.length}`);

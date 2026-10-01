@@ -6,10 +6,14 @@ import { fileURLToPath } from 'node:url';
 export const MANAGED_MARK = '<!-- agentrelay:managed -->';
 
 export function commandsSourceDir() {
-  return fileURLToPath(new URL('../assets/claude-commands/agentrelay/', import.meta.url));
+  return fileURLToPath(new URL('../assets/claude-commands/ar/', import.meta.url));
 }
 
 export function commandsTargetDir(claudeDir) {
+  return path.join(claudeDir ?? path.join(os.homedir(), '.claude'), 'commands', 'ar');
+}
+
+export function legacyCommandsDir(claudeDir) {
   return path.join(claudeDir ?? path.join(os.homedir(), '.claude'), 'commands', 'agentrelay');
 }
 
@@ -78,4 +82,29 @@ export function removeCommands(claudeDir, sourceDir = commandsSourceDir()) {
   }
   if (readdirSync(targetDir).length === 0) rmdirSync(targetDir);
   return result;
+}
+
+export function removeLegacyCommands(claudeDir, sourceDir = commandsSourceDir()) {
+  const targetDir = legacyCommandsDir(claudeDir);
+  const result = { removed: [] };
+  if (!existsSync(targetDir)) return result;
+  for (const { name } of listCommands(sourceDir)) {
+    const target = path.join(targetDir, name);
+    if (!existsSync(target) || !readFileSync(target, 'utf8').includes(MANAGED_MARK)) continue;
+    rmSync(target);
+    result.removed.push(name);
+  }
+  if (readdirSync(targetDir).length === 0) rmdirSync(targetDir);
+  return result;
+}
+
+export function legacyCommandsStatus(claudeDir, sourceDir = commandsSourceDir()) {
+  const targetDir = legacyCommandsDir(claudeDir);
+  if (!existsSync(targetDir)) return [];
+  return listCommands(sourceDir)
+    .filter(({ name }) => {
+      const target = path.join(targetDir, name);
+      return existsSync(target) && readFileSync(target, 'utf8').includes(MANAGED_MARK);
+    })
+    .map(({ name }) => name);
 }

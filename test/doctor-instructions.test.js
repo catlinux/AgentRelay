@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,9 +49,15 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex') } });
     writeFileSync(path.join(dir, 'CLAUDE.md'), `${PROJECT_BLOCK.replace('## Delegación con AgentRelay', '## Delegación (versión anterior)')}\n`);
 
-    writeFileSync(path.join(claudeDir, 'commands', 'agentrelay', 'estado.md'), 'anterior\n<!-- agentrelay:managed -->');
+    writeFileSync(path.join(claudeDir, 'commands', 'ar', 'estado.md'), 'anterior\n<!-- agentrelay:managed -->');
     const outdated = doctor(dir, claudeDir);
     assert.match(outdated.stdout, /Los comandos de Claude Code .*desactualizados\. Ejecuta "agentrelay setup"/);
+    const legacyDir = path.join(claudeDir, 'commands', 'agentrelay');
+    mkdirSync(legacyDir, { recursive: true });
+    writeFileSync(path.join(legacyDir, 'modelo.md'), 'anterior\n<!-- agentrelay:managed -->');
+    const legacy = doctor(dir, claudeDir);
+    assert.match(legacy.stdout, /Quedan comandos antiguos \/agentrelay:â€¦ de una versión anterior/);
+    rmSync(legacyDir, { recursive: true, force: true });
     assert.match(outdated.stdout, /Instrucciones globales del orquestador: al día/);
     assert.match(outdated.stdout, /\[aviso\] Las instrucciones de AgentRelay de este proyecto están desactualizadas\. Ejecuta "agentrelay init"/);
 
@@ -61,7 +67,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     assert.match(current.stdout, /Comandos de Claude Code .*al d[aí]a/);
     assert.match(current.stdout, /Instrucciones de AgentRelay en este proyecto: al día/);
     for (const name of ['estado', 'modelo', 'esfuerzo', 'nivel', 'ejecutor', 'triaje']) {
-      writeFileSync(path.join(claudeDir, 'commands', 'agentrelay', `${name}.md`), 'archivo propio');
+      writeFileSync(path.join(claudeDir, 'commands', 'ar', `${name}.md`), 'archivo propio');
     }
     const foreign = doctor(dir, claudeDir);
     assert.match(foreign.stdout, /Los comandos de Claude Code existentes son tuyos/);
