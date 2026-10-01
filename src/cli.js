@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig, stripJsonc } from './config.js';
+import { migrateConfig } from './config-migrate.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
@@ -48,7 +49,7 @@ Uso:
   agentrelay pricing [--json]      Muestra precios y tarifa DeepSeek
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
-  agentrelay config [show|path|init] Muestra, localiza o crea la configuración
+  agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
@@ -132,6 +133,7 @@ const OPTIONS = {
   feedback: { type: 'string' },
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
+  'dry-run': { type: 'boolean' },
   yes: { type: 'boolean' },
   uninstall: { type: 'boolean' },
   'no-commands': { type: 'boolean' },
@@ -421,14 +423,37 @@ function configLeaves(value, prefix = '', result = {}) {
   return result;
 }
 
-async function cmdConfig(positionals, values) {
+async function cmdConfig(positionals, values, migrationResult) {
   const action = positionals[0] || 'show';
   const requestedCwd = path.resolve(values.cwd || process.cwd());
-  const cwd = await repoRoot(requestedCwd) || requestedCwd;
+  let root;
+  try { root = await repoRoot(requestedCwd); } catch {}
+  const cwd = root || requestedCwd;
   const userFile = path.join(configHome(), 'config.json');
   const settingsPath = settingsFile(configHome());
   const projectFile = path.join(cwd, CONFIG_FILE);
   const localFile = path.join(cwd, LOCAL_CONFIG_FILE);
+  if (action === 'migrate' && positionals.length === 1) {
+    let result = migrationResult;
+    if (!result) {
+      try {
+        result = migrateConfig({ home: agentrelayHome(), cwd, dryRun: values['dry-run'] });
+      } catch (error) {
+        process.stderr.write(`[aviso] No se pudo migrar la configuración: ${error.message}\n`);
+        return 0;
+      }
+      for (const { from, error } of result.errors) process.stderr.write(`[aviso] No se pudo migrar ${from}: ${error}\n`);
+    }
+    if (result.failure || (result.errors.length && !result.actions.length)) return 0;
+    if (!result.actions.length) {
+      process.stdout.write('Nada que migrar\n');
+      return 0;
+    }
+    for (const { from, into, backup } of result.actions) {
+      process.stdout.write(`${values['dry-run'] ? 'Se migraría' : 'Migrado'} ${from} → ${into} (copia: ${backup})\n`);
+    }
+    return 0;
+  }
   if (action === 'path' && positionals.length === 1) {
     for (const [label, file] of [['Usuario', userFile], ['Ajustes', settingsPath], ['Proyecto', projectFile], ['Local', localFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
     return 0;
@@ -447,7 +472,7 @@ async function cmdConfig(positionals, values) {
     return 0;
   }
   if ((action !== 'show' || positionals.length > 1) && positionals.length) {
-    process.stderr.write('Uso: agentrelay config [show|path|init [--project|--local] [--force]]\n');
+    process.stderr.write('Uso: agentrelay config [show|path|init [--project|--local] [--force]|migrate [--dry-run]]\n');
     return 1;
   }
   const loaded = loadConfig({ cwd, configPath: values.config });
@@ -1147,6 +1172,27 @@ export async function main(argv, runtime = {}) {
     return 0;
   }
 
+  let migrationResult;
+  if (runtime.autoMigrate && command !== 'completion' && command !== 'completions'
+    && process.env.AGENTRELAY_NO_MIGRATE !== '1') {
+    const requestedCwd = path.resolve(values.cwd || process.cwd());
+    let root;
+    try { root = await repoRoot(requestedCwd); } catch {}
+    const cwd = root || requestedCwd;
+    try {
+      migrationResult = migrateConfig({
+        home: agentrelayHome(),
+        cwd,
+        dryRun: command === 'config' && rest[0] === 'migrate' && values['dry-run'],
+      });
+      for (const { from, error } of migrationResult.errors) process.stderr.write(`[aviso] No se pudo migrar ${from}: ${error}\n`);
+      if (migrationResult.changed) process.stderr.write(`Configuración unificada: ${migrationResult.actions.length} archivo(s) antiguo(s) migrado(s) (copia .bak)\n`);
+    } catch (error) {
+      process.stderr.write(`[aviso] No se pudo migrar la configuración: ${error.message}\n`);
+      if (command === 'config' && rest[0] === 'migrate') migrationResult = { actions: [], changed: false, errors: [], failure: error.message };
+    }
+  }
+
   try {
     switch (command) {
       case 'run': return await cmdRun(rest, values, runtime);
@@ -1159,7 +1205,7 @@ export async function main(argv, runtime = {}) {
       case 'pricing': return await cmdPricing(values, runtime);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
-      case 'config': return await cmdConfig(rest, values);
+      case 'config': return await cmdConfig(rest, values, migrationResult);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
       case 'models': return await cmdModels(values);

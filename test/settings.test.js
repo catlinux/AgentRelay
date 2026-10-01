@@ -11,7 +11,7 @@ import { canonicalSetting, parseSettingValue, readSettings, setSetting, settings
 const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-settings-'));
 function run(args, cwd, home, codexHome) {
-  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home, CODEX_HOME: codexHome } });
+  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home, CODEX_HOME: codexHome, AGENTRELAY_NO_MIGRATE: '1' } });
 }
 
 test('aliases, valores españoles, enteros y errores de parsing', () => {

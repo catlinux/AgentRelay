@@ -158,8 +158,12 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   const projectFiles = configPath ? [path.resolve(root, configPath)] : [path.join(root, CONFIG_FILE), path.join(root, LOCAL_CONFIG_FILE)];
   const layers = [{ data: {}, origin: 'defecto' }];
   const sources = [];
+  const warnings = [];
   if (existsSync(userFile)) { layers.push({ data: readConfig(userFile), origin: userFile }); sources.push(userFile); }
   if (existsSync(settingsFile)) { layers.push({ data: readConfig(settingsFile), origin: settingsFile }); sources.push(settingsFile); }
+  if (existsSync(settingsFile)) warnings.push(`Archivo antiguo ${settingsFile}: ejecuta 'agentrelay config migrate'`);
+  const localFile = path.join(root, LOCAL_CONFIG_FILE);
+  if (existsSync(localFile)) warnings.push(`Archivo antiguo ${localFile}: ejecuta 'agentrelay config migrate'`);
   for (const file of projectFiles) if (configPath || existsSync(file)) { layers.push({ data: readConfig(file), origin: file }); sources.push(file); }
   if (overrides) layers.push({ data: overrides, origin: 'línea de comandos' });
   let mergedUser = {};
@@ -170,7 +174,6 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   let config = merge(merge({}, DEFAULT_CONFIG), { executor: EXECUTOR_DEFAULTS[type] });
   const origins = Object.fromEntries(Object.keys(leaves(DEFAULT_CONFIG)).map((k) => [k, 'defecto']));
   for (const key of Object.keys(EXECUTOR_DEFAULTS[type])) origins[`executor.${key}`] = `defecto del ejecutor ${type}`;
-  const warnings = [];
   for (const layer of layers.slice(1)) {
     if (!isObject(layer.data)) throw new Error(`Configuración no válida en ${layer.origin}: configuración debe ser un objeto`);
     config = merge(config, layer.data);

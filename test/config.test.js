@@ -12,7 +12,7 @@ import { FAKE_CODEX } from './helpers.js';
 const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-new-'));
 function run(args, cwd, home) {
-  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home } });
+  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home, AGENTRELAY_NO_MIGRATE: '1' } });
 }
 function leaves(value, prefix = '', out = []) {
   if (value && typeof value === 'object' && !Array.isArray(value)) for (const [key, child] of Object.entries(value)) leaves(child, prefix ? `${prefix}.${key}` : key, out);
@@ -51,6 +51,20 @@ test('valida valores con el origen y avisa de claves desconocidas con sugerencia
     assert.throws(() => loadConfig({ cwd: dir }), new RegExp(`${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: level`));
     writeFileSync(file, '{"executor":{"modle":"x"}}');
     assert.match(loadConfig({ cwd: dir }).warnings.join(' '), /modle.*quizá quisiste decir model/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('avisa cuando existen archivos de configuración antiguos', () => {
+  const dir = temp(), home = path.join(dir, 'home');
+  try {
+    mkdirSync(home, { recursive: true });
+    const settings = path.join(home, 'settings.json');
+    const local = path.join(dir, 'agentrelay.config.local.json');
+    writeFileSync(settings, '{"level":2}');
+    writeFileSync(local, '{"level":3}');
+    const warnings = loadConfig({ cwd: dir, home }).warnings;
+    assert.ok(warnings.includes(`Archivo antiguo ${settings}: ejecuta 'agentrelay config migrate'`));
+    assert.ok(warnings.includes(`Archivo antiguo ${local}: ejecuta 'agentrelay config migrate'`));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
