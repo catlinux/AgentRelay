@@ -405,6 +405,15 @@ Cada ejecución se guarda en `.agentrelay/runs/<id>/` dentro del repositorio: ta
 
 Por cada intento se registran tokens, duración y el **coste estimado que informa el ejecutor** (Cline lo calcula con sus tablas de precios; Codex no informa de coste y se registran solo los tokens). No es una factura: consulta el consumo real en tu proveedor. AgentRelay no puede medir el consumo del orquestador.
 
+`agentrelay usage` resume ejecuciones e intentos por ejecutor y modelo, con reintentos, escaladas/rechazadas, tokens de entrada/salida/caché, tiempo total y coste positivo informado por el ejecutor (etiquetado «estimado por el ejecutor»). Incluye totales y estados, y avisa de ejecuciones «en curso» desde hace más de 24 h. Filtra por fecha (`YYYY-MM-DD`, `7d` o `24h`) o ejecutor; `--json` devuelve JSON. El consumo propio del orquestador (Claude) no está incluido.
+
+```sh
+agentrelay usage
+agentrelay usage --since 7d
+agentrelay usage --executor codex
+agentrelay usage --json
+```
+
 Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosas distintas: el ejecutor necesita un acceso que su CLI soporte.
 
 ## Seguridad

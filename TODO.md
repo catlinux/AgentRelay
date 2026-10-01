@@ -129,7 +129,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Ajustar los valores por defecto de los niveles con datos de uso reales.
 - [ ] Decisión de self-review y revisión basada también en el tamaño del diff y el tipo de tarea.
 - [ ] Registro de consumo por proveedor y modelo (solicitudes, tokens y coste cuando el proveedor lo informe), sin inventar costes.
-- [ ] Resumen de consumo acumulado (`agentrelay usage`).
+- [x] Resumen de consumo acumulado (`agentrelay usage`).
 - [ ] Plantillas de tareas por tipo (feature, fix, refactor, docs, test).
 - [ ] Modo silencioso y modo detallado en todos los comandos.
 

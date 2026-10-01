@@ -405,6 +405,15 @@ Each run is stored in `.agentrelay/runs/<id>/` inside the repository: task, stat
 
 For each attempt AgentRelay records tokens, duration and the **estimated cost reported by the executor** (Cline computes it from its price tables; Codex reports no cost, so only tokens are recorded). It is not an invoice: check real usage with your provider. AgentRelay cannot measure the orchestrator's usage.
 
+`agentrelay usage` summarizes executions and attempts by executor and model, including retries, escalated/rejected runs, input/output/cache tokens, total time, and positive costs reported by the executor (labelled “estimated by the executor”). It includes totals and status counts, and warns about runs “in progress” for over 24 hours. Filter by date (`YYYY-MM-DD`, `7d`, or `24h`) or executor; `--json` returns JSON. The orchestrator's own usage (Claude) is not included.
+
+```sh
+agentrelay usage
+agentrelay usage --since 7d
+agentrelay usage --executor codex
+agentrelay usage --json
+```
+
 Keep in mind that pay-per-use API access and subscriptions are different things: the executor needs access that its CLI supports.
 
 ## Security
