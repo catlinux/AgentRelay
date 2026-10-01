@@ -8,6 +8,6 @@ model: haiku
 <!-- agentrelay:managed -->
 Resultado:
 
-!`if [ -z "$ARGUMENTS" ]; then agentrelay models; else agentrelay set model $ARGUMENTS; fi`
+!`if [ -z "$ARGUMENTS" ]; then agentrelay models | grep -v "^Cambia"; else agentrelay set model $ARGUMENTS; fi`
 
-Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece). Sin comentarios ni otras acciones.
+Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece) y termina con la línea: Uso: /ar:modelo <id>. Sin comentarios ni otras acciones.

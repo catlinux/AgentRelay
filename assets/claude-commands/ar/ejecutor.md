@@ -8,6 +8,6 @@ model: haiku
 <!-- agentrelay:managed -->
 Resultado:
 
-!`if [ -z "$ARGUMENTS" ]; then agentrelay executors; else agentrelay set executor $ARGUMENTS; fi`
+!`if [ -z "$ARGUMENTS" ]; then agentrelay executors | grep -v "^Añade"; else agentrelay set executor $ARGUMENTS; fi`
 
-Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece). Sin comentarios ni otras acciones.
+Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece) y termina con la línea: Uso: /ar:ejecutor <codex|cline> (para instalar otros, en la terminal: agentrelay executors add <nombre>). Sin comentarios ni otras acciones.
