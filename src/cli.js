@@ -23,6 +23,7 @@ import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
 import { canOpenBrowser } from './platform.js';
+import { aggregateUsage, renderUsage } from './usage.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -35,6 +36,7 @@ Uso:
                                     Registra la revisión del orquestador
   agentrelay check [id]             Repite las validaciones sin cambiar el estado
   agentrelay list                   Lista las ejecuciones del repositorio
+  agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay config [show|path|init] Muestra, localiza o crea la configuración
@@ -101,6 +103,7 @@ Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
 const OPTIONS = {
   cwd: { type: 'string' },
   config: { type: 'string' },
+  since: { type: 'string' },
   json: { type: 'boolean' },
   level: { type: 'string' },
   'self-review': { type: 'string' },
@@ -372,6 +375,14 @@ async function cmdConfig(positionals, values) {
   for (const [section, rows] of sections) process.stdout.write(`${section}\n${rows.join('\n')}\n`);
   process.stdout.write(loaded.sources.length ? `Archivos leídos:\n${loaded.sources.map((file) => `  ${file}`).join('\n')}\n` : 'Archivos leídos: ninguno: se usan los valores por defecto\n');
   for (const warning of loaded.warnings) process.stdout.write(`[aviso] ${warning}\n`);
+  return 0;
+}
+
+async function cmdUsage(values) {
+  const root = await resolveRoot(values);
+  const result = aggregateUsage(root, { since: values.since, executor: values.executor });
+  if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  else process.stdout.write(renderUsage(result));
   return 0;
 }
 
@@ -901,6 +912,7 @@ export async function main(argv) {
       case 'review': return await cmdReview(rest, values);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
+      case 'usage': return await cmdUsage(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
       case 'config': return await cmdConfig(rest, values);
