@@ -22,7 +22,7 @@ Cross-platform AI agent orchestrator for software development. It lets a high-ca
 
 The goal is to reduce premium model usage without giving up supervision: the orchestrator plans, decides and validates; the executor implements.
 
-> **Status:** version 0.0.2, working prototype. The interface may change before 0.1.0.
+> **Status:** version 0.0.3, working prototype. The interface may change before 0.1.0.
 
 ## How it works
 
@@ -64,7 +64,7 @@ The design allows adding other executors and providers later.
 - Git. The working directory must be a git repository.
 - A ChatGPT account (the free one is enough) for the default executor, Codex. With Cline as the executor, a configured provider instead (for example, a DeepSeek API key).
 
-Windows, Linux and macOS (macOS untested: see [Limitations](#limitations-of-version-002)).
+Windows, Linux and macOS (macOS untested: see [Limitations](#limitations-of-version-003)).
 
 ## Installation
 
@@ -388,7 +388,7 @@ Keep in mind that pay-per-use API access and subscriptions are different things:
 - By default it refuses to delegate on a repository with uncommitted changes.
 - It detects whether the executor creates commits or modifies protected files.
 
-## Limitations of version 0.0.2
+## Limitations of version 0.0.3
 
 - Two executors: Codex CLI (bundled, default) and Cline CLI (optional). Codex has been tested on Windows only. Tasks run one at a time.
 - There is no VS Code panel yet: it is used from the terminal (it is on the roadmap).

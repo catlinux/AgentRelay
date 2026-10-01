@@ -6,6 +6,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+## [0.0.3] - 2026-10-01
+
 ### Añadido
 
 - Conectar la cuenta de ChatGPT forma parte de la instalación: `agentrelay setup` propone iniciar sesión al final (`--login` lo hace sin preguntar; `--yes` nunca abre el navegador por sí solo). `login` y `setup` detectan los equipos sin navegador (sesión SSH o Linux sin entorno gráfico) y usan por sí solos el código de dispositivo; `login --browser` fuerza el navegador. La detección está aislada en `src/platform.js`.

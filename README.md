@@ -22,7 +22,7 @@ Orquestador multiplataforma de agentes de IA para desarrollo de software. Permit
 
 El objetivo es reducir el consumo de modelos premium sin renunciar a la supervisión: el orquestador planifica, decide y valida; el ejecutor implementa.
 
-> **Estado:** versión 0.0.2, prototipo funcional. La interfaz puede cambiar antes de la 0.1.0.
+> **Estado:** versión 0.0.3, prototipo funcional. La interfaz puede cambiar antes de la 0.1.0.
 
 ## Cómo funciona
 
@@ -64,7 +64,7 @@ El diseño permite añadir otros ejecutores y proveedores más adelante.
 - Git. El directorio de trabajo debe ser un repositorio git.
 - Una cuenta de ChatGPT (vale la gratuita) para el ejecutor por defecto, Codex. Con Cline como ejecutor, en su lugar, un proveedor configurado (por ejemplo, una API key de DeepSeek).
 
-Windows, Linux y macOS (macOS sin probar: ver [Limitaciones](#limitaciones-de-la-versión-002)).
+Windows, Linux y macOS (macOS sin probar: ver [Limitaciones](#limitaciones-de-la-versión-003)).
 
 ## Instalación
 
@@ -388,7 +388,7 @@ Ten en cuenta que el acceso por API de pago por uso y las suscripciones son cosa
 - Por defecto se niega a delegar sobre un repositorio con cambios sin confirmar.
 - Detecta si el ejecutor crea commits o modifica archivos protegidos.
 
-## Limitaciones de la versión 0.0.2
+## Limitaciones de la versión 0.0.3
 
 - Dos ejecutores: Codex CLI (incluido, por defecto) y Cline CLI (opcional). Codex se ha probado solo en Windows. Las tareas se ejecutan de una en una.
 - Todavía no hay panel en VS Code: se usa desde el terminal (está en la hoja de ruta).

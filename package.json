@@ -1,6 +1,6 @@
 {
   "name": "agentrelay",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Orquestador multiplataforma de agentes de IA: delega tareas de desarrollo a un agente ejecutor, valida el resultado y lo devuelve al orquestador para su revisión.",
   "type": "module",
   "bin": {
