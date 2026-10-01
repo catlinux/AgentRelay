@@ -412,14 +412,14 @@ Añade, tras pedir confirmación, un bloque delimitado con marcas `<!-- agentrel
 agentrelay init
 ```
 
-- Añade al `CLAUDE.md` del proyecto el bloque con las instrucciones de delegación. Si el archivo no existe lo crea; si existe, añade el bloque al final sin tocar nada más, y al repetirlo solo actualiza lo que hay entre las marcas. Puedes añadir tus propias instrucciones en el mismo archivo.
+- Añade al `CLAUDE.md` del proyecto el bloque con las instrucciones de delegación. Si el proyecto ya tiene un `AGENTS.md`, añade o actualiza también allí el bloque. `AGENTS.md` es el archivo neutral de instrucciones del proyecto; `CLAUDE.md` puede limitarse a remitir a él. En ambos archivos, al repetir `init`, solo se actualiza lo que hay entre las marcas y se conserva el resto.
 - Si el repositorio estaba limpio, ofrece confirmar solo ese archivo con un commit (AgentRelay necesita el repositorio sin cambios pendientes para delegar).
 - Si la carpeta **no es un repositorio git**, lo prepara: muestra qué hará y qué archivos entrarán, y tras tu confirmación ejecuta `git init`, crea un `.gitignore` con patrones de secretos (`.env`, claves, `wp-config.php`…) si no existía y hace un primer commit. Nunca modifica un `.gitignore` existente ni hace push. Avisa si la carpeta parece servida públicamente por un servidor web (`/var/www`, `public_html`…), porque `.agentrelay/` no debe quedar accesible desde Internet.
 - `--with-config` crea además `agentrelay.config.json`.
 
 Claude puede ejecutar `agentrelay init` por ti cuando detecta que el proyecto no está preparado; si no hay terminal interactivo, necesita `--yes` (te pedirá confirmación antes en la conversación).
 
-Nota: `CLAUDE.md` suele versionarse. Si el repositorio es público, el bloque de AgentRelay será visible en él.
+Nota: `AGENTS.md` y `CLAUDE.md` suelen versionarse. Si el repositorio es público, las instrucciones del proyecto y el bloque de AgentRelay serán visibles en él.
 
 Para ver en directo lo que hace el ejecutor mientras hablas con el orquestador, deja `agentrelay watch` abierto en un terminal de VS Code.
 

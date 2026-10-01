@@ -412,14 +412,14 @@ After asking for confirmation, it adds a block delimited by `<!-- agentrelay:sta
 agentrelay init
 ```
 
-- Adds the block with the delegation instructions to the project's `CLAUDE.md`. If the file does not exist it is created; if it exists, the block is appended without touching anything else, and running it again only updates what is between the markers. You can add your own instructions in the same file.
+- Adds the block with the delegation instructions to the project's `CLAUDE.md`. If the project already has an `AGENTS.md`, it also adds or updates the block there. `AGENTS.md` is the agent-neutral project instructions file; `CLAUDE.md` can simply refer to it. When `init` runs again, it only updates what is between the markers in either file and preserves the rest.
 - If the repository was clean, it offers to commit only that file (AgentRelay needs a repository without pending changes to delegate).
 - If the folder is **not a git repository**, it prepares one: it shows what it will do and which files will be included, and after your confirmation runs `git init`, creates a `.gitignore` with secret patterns (`.env`, keys, `wp-config.php`…) if there was none, and makes a first commit. It never modifies an existing `.gitignore` and never pushes. It warns if the folder looks served publicly by a web server (`/var/www`, `public_html`…), because `.agentrelay/` must not be reachable from the Internet.
 - `--with-config` also creates `agentrelay.config.json`.
 
 Claude can run `agentrelay init` for you when it detects the project is not prepared; without an interactive terminal it needs `--yes` (it will ask you for confirmation first in the conversation).
 
-Note: `CLAUDE.md` is usually versioned. If the repository is public, the AgentRelay block will be visible in it.
+Note: `AGENTS.md` and `CLAUDE.md` are usually versioned. If the repository is public, the project instructions and AgentRelay block will be visible in it.
 
 To see live what the executor does while you talk to the orchestrator, keep `agentrelay watch` open in a VS Code terminal.
 
