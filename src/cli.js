@@ -1004,6 +1004,16 @@ function writeConfigIfRequested(root, values) {
   }
 }
 
+function initInstructionFiles(dir) {
+  const claudeFile = path.join(dir, 'CLAUDE.md');
+  const agentsFile = path.join(dir, 'AGENTS.md');
+  if (!existsSync(agentsFile)) return [claudeFile];
+
+  const claude = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
+  if (/^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)) return [agentsFile];
+  return [claudeFile, agentsFile];
+}
+
 async function cmdInit(values) {
   const dir = path.resolve(values.cwd || process.cwd());
   const root = await repoRoot(dir);
@@ -1021,9 +1031,7 @@ async function cmdInit(values) {
       return 0;
     }
 
-    const file = path.join(dir, 'CLAUDE.md');
-    const agentsFile = path.join(dir, 'AGENTS.md');
-    const instructionFiles = [file, ...(existsSync(agentsFile) ? [agentsFile] : [])];
+    const instructionFiles = initInstructionFiles(dir);
     for (const instructionFile of instructionFiles) {
       if (!values.quiet) process.stdout.write(`${initExplanation(instructionFile)}\n`);
       const { action } = applyBlockToFile(instructionFile, PROJECT_BLOCK);
@@ -1041,9 +1049,7 @@ async function cmdInit(values) {
     return 1;
   }
 
-  const file = path.join(root, 'CLAUDE.md');
-  const agentsFile = path.join(root, 'AGENTS.md');
-  const instructionFiles = [file, ...(existsSync(agentsFile) ? [agentsFile] : [])];
+  const instructionFiles = initInstructionFiles(root);
 
   // Estado del repositorio antes de tocar nada.
   const wasClean = await isClean(root);

@@ -208,6 +208,56 @@ test('init sin --yes en repo limpio crea CLAUDE.md pero no hace commit', () => {
   }
 });
 
+test('init solo escribe en CLAUDE.md cuando no existe AGENTS.md', () => {
+  const repo = makeRepo();
+  try {
+    const r = run(['init', '--yes'], repo.dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), PROJECT_BLOCK + '\n');
+    assert.equal(existsSync(path.join(repo.dir, 'AGENTS.md')), false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('init escribe en CLAUDE.md y AGENTS.md cuando CLAUDE.md no importa AGENTS.md', () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(path.join(repo.dir, 'CLAUDE.md'), 'Instrucciones de Claude\n');
+    writeFileSync(path.join(repo.dir, 'AGENTS.md'), 'Instrucciones compartidas\n');
+    const r = run(['init', '--yes'], repo.dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), 'Instrucciones de Claude\n\n' + PROJECT_BLOCK + '\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), 'Instrucciones compartidas\n\n' + PROJECT_BLOCK + '\n');
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('init solo escribe en AGENTS.md cuando CLAUDE.md lo importa y es idempotente', () => {
+  const repo = makeRepo();
+  try {
+    const claude = path.join(repo.dir, 'CLAUDE.md');
+    const agents = path.join(repo.dir, 'AGENTS.md');
+    const claudeContent = 'Instrucciones de Claude\n@AGENTS.md\n';
+    writeFileSync(claude, claudeContent);
+    writeFileSync(agents, 'Instrucciones compartidas\n');
+
+    const first = run(['init', '--yes'], repo.dir);
+    assert.equal(first.status, 0, first.stderr);
+    const agentsContent = readFileSync(agents, 'utf8');
+    assert.equal(readFileSync(claude, 'utf8'), claudeContent);
+    assert.equal(agentsContent, 'Instrucciones compartidas\n\n' + PROJECT_BLOCK + '\n');
+
+    const second = run(['init', '--yes'], repo.dir);
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(readFileSync(claude, 'utf8'), claudeContent);
+    assert.equal(readFileSync(agents, 'utf8'), agentsContent);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('init --yes conserva el contenido propio de CLAUDE.md', () => {
   const repo = makeRepo();
   try {
