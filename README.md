@@ -168,10 +168,20 @@ El `<id>` aparece en la primera línea de la ejecución y en `agentrelay list`. 
 
 ## Ver el trabajo en directo
 
-- `agentrelay run` y `agentrelay review` muestran la actividad por la salida de error mientras ocurre (fases, archivos que lee o edita el ejecutor, lo que ejecuta, su razonamiento resumido, tokens, coste y validaciones), con la hora local de cada línea. Usa colores si la terminal lo admite; se desactivan con la variable de entorno `NO_COLOR` o al redirigir la salida a un archivo. `--quiet` la desactiva.
+- `agentrelay run` y `agentrelay review` muestran la actividad por la salida de error mientras ocurre (fases, archivos que lee o edita el ejecutor, lo que ejecuta, su razonamiento resumido, tokens, coste y validaciones), con la hora local de cada línea. Usa colores si la terminal lo admite; se desactivan con la variable de entorno `NO_COLOR` o al redirigir la salida a un archivo. `--quiet` la desactiva también en los demás comandos.
 - `agentrelay watch` sigue desde **otro terminal** las ejecuciones que lance otro proceso, por ejemplo un orquestador como Claude Code. Sin id sigue la más reciente y salta a cada ejecución nueva hasta que pulses Ctrl+C; con un id muestra esa ejecución y termina cuando deja de estar en curso.
 
 En VS Code: abre un terminal dividido, ejecuta `agentrelay watch` en uno y trabaja en el otro o en el chat del orquestador.
+
+### Modo silencioso y detallado
+
+`-q` / `--quiet` muestra solo errores, avisos y el resultado esencial; por ejemplo, `doctor -q` no imprime nada si todo está bien, mientras que `run -q` muestra solo `<id> <estado>` y la ruta del informe. `-v` / `--verbose` añade detalles de diagnóstico; sin estas opciones la salida no cambia. No se pueden combinar y los códigos de salida se mantienen; `-V` sigue mostrando la versión.
+
+```sh
+agentrelay doctor -q
+agentrelay run tarea.json -q
+agentrelay doctor -v
+```
 
 Comprueba el entorno desde el repositorio en el que vas a trabajar:
 

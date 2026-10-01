@@ -168,10 +168,20 @@ The `<id>` appears on the first line of the run and in `agentrelay list`. With `
 
 ## Watching the work live
 
-- `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, what it runs, its summarized reasoning, tokens, cost and validations), with the local time on every line. It uses colours when the terminal supports them; they are turned off by the `NO_COLOR` environment variable or when the output is redirected to a file. `--quiet` turns it off.
+- `agentrelay run` and `agentrelay review` print activity to stderr as it happens (phases, files the executor reads or edits, what it runs, its summarized reasoning, tokens, cost and validations), with the local time on every line. It uses colours when the terminal supports them; they are turned off by the `NO_COLOR` environment variable or when the output is redirected to a file. `--quiet` turns it off for other commands too.
 - `agentrelay watch` follows, from **another terminal**, runs started by another process, for example an orchestrator such as Claude Code. Without an id it follows the latest run and switches to each new one until you press Ctrl+C; with an id it shows that run and exits when it is no longer in progress.
 
 In VS Code: open a split terminal, run `agentrelay watch` in one and work in the other or in the orchestrator's chat.
+
+### Quiet and verbose modes
+
+`-q` / `--quiet` shows only errors, warnings and the essential result; for example, `doctor -q` prints nothing when healthy, while `run -q` prints only `<id> <status>` and the report path. `-v` / `--verbose` adds diagnostic details; without either option, output is unchanged. They cannot be combined, and exit codes never change; `-V` still prints the version.
+
+```sh
+agentrelay doctor -q
+agentrelay run tarea.json -q
+agentrelay doctor -v
+```
 
 Check the environment from the repository you will work on:
 

@@ -131,7 +131,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Registro de consumo por proveedor y modelo (solicitudes, tokens y coste cuando el proveedor lo informe), sin inventar costes.
 - [x] Resumen de consumo acumulado (`agentrelay usage`).
 - [ ] Plantillas de tareas por tipo (feature, fix, refactor, docs, test).
-- [ ] Modo silencioso y modo detallado en todos los comandos.
+- [x] Modo silencioso y modo detallado en todos los comandos.
 
 ## Posteriores
 
