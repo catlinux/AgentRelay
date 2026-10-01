@@ -62,7 +62,7 @@ export function merge(base, override) {
  * tocar los saltos de línea ni el contenido de las cadenas, para que las
  * posiciones de los errores coincidan con las del archivo original.
  */
-function stripComments(text) {
+export function stripJsonc(text) {
   const chars = String(text).split('');
   let quote = false;
   let escaped = false;
@@ -109,7 +109,7 @@ function stripComments(text) {
 /** Lee JSON con comentarios y comas finales; los errores indican línea y columna. */
 export function parseJsonc(text, file = '<configuración>') {
   const source = String(text).replace(/^\uFEFF/, '');
-  const cleaned = stripComments(source);
+  const cleaned = stripJsonc(source);
   try { return JSON.parse(cleaned); } catch (error) {
     const match = /position\s+(\d+)/i.exec(error.message);
     const token = /Unexpected token ['"](.+?)['"]/i.exec(error.message);

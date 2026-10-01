@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -80,6 +80,84 @@ test('set informa cuando el proyecto tiene prioridad sobre settings.json', () =>
     const result = run(['set', 'model', 'personal-model'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Ojo: agentrelay\.config\.json del proyecto lo sustituye por "project-model"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('set --local crea el archivo, conserva otras claves y aparece en config con su origen', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  const file = path.join(dir, 'agentrelay.config.local.json');
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    let result = run(['set', 'effort', 'alto', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { executor: { thinking: 'high' } });
+    result = run(['set', 'level', '4', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    result = run(['config'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /executor\.thinking = "high".*agentrelay\.config\.local\.json/);
+    result = run(['set', 'validation.timeoutSeconds', '30', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { executor: { thinking: 'high' }, level: 4, validation: { timeoutSeconds: 30 } });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('set --local se niega a reescribir comentarios o JSON invÃ¡lido', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  const file = path.join(dir, 'agentrelay.config.local.json');
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const commented = '{\n  // conservar comentario\n  "level": 3\n}\n';
+    writeFileSync(file, commented);
+    let result = run(['set', 'level', '4', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /tiene comentarios o formato propio/);
+    assert.equal(readFileSync(file, 'utf8'), commented);
+    const invalid = '{ "level": }\n';
+    writeFileSync(file, invalid);
+    result = run(['set', 'level', '4', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /tiene comentarios o formato propio/);
+    assert.equal(readFileSync(file, 'utf8'), invalid);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('set --local valida con rollback y unset quita solo esa clave', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  const file = path.join(dir, 'agentrelay.config.local.json');
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const original = '{\n  "level": 4,\n  "executor": { "thinking": "high", "model": "local-model" }\n}\n';
+    writeFileSync(file, original);
+    const invalid = run(['set', 'level', '9', '--local'], dir, home, codexHome);
+    assert.equal(invalid.status, 1);
+    assert.equal(readFileSync(file, 'utf8'), original);
+    const removed = run(['unset', 'effort', '--local'], dir, home, codexHome);
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.match(removed.stdout, /executor\.thinking = null \(.*defecto\)/);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { level: 4, executor: { model: 'local-model' } });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('cambiar de ejecutor con --local limpia modelo, proveedor y comando del archivo local', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  const file = path.join(dir, 'agentrelay.config.local.json');
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    writeFileSync(file, '{"executor":{"type":"codex","model":"saved","provider":"p","command":"custom"}}\n');
+    const result = run(['set', 'executor', 'cline', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Se eliminaron model, provider y command/);
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { executor: { type: 'cline' } });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('--local fuera de un repositorio falla', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  try {
+    const result = run(['set', 'level', '4', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /no es un repositorio git/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -1,10 +1,10 @@
 // Interfaz de línea de comandos.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
+import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig, stripJsonc } from './config.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
@@ -51,8 +51,8 @@ Uso:
   agentrelay setup                  Instala/desinstala el bloque de AgentRelay en el CLAUDE.md global
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y, si hace falta, el repositorio git
 
-  agentrelay set <clave> <valor>   Cambia un ajuste personal (ejemplo: set effort alto)
-  agentrelay unset <clave>         Restablece un ajuste personal (ejemplo: unset effort)
+  agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
+  agentrelay unset <clave> [--local]       Restablece un ajuste
   agentrelay models                Lista los modelos del ejecutor actual
 
 Ajustes rápidos:
@@ -472,12 +472,55 @@ function effectiveDescription(loaded, key) {
   return `${JSON.stringify(value)} (${loaded.origins[key] || 'defecto'})`;
 }
 
+async function setLocalSetting(key, parsed, values) {
+  const root = await resolveRoot(values);
+  const file = path.join(root, LOCAL_CONFIG_FILE);
+  const hadFile = existsSync(file);
+  let previous = {};
+  if (hadFile) {
+    const original = readFileSync(file, 'utf8');
+    try { previous = JSON.parse(original); } catch {
+      throw new Error(`El archivo ${file} tiene comentarios o formato propio y no se reescribe para no perderlos. EdÃ­talo a mano o usa 'agentrelay set' sin --local.`);
+    }
+    if (stripJsonc(original) !== original || !previous || typeof previous !== 'object' || Array.isArray(previous)) {
+      throw new Error(`El archivo ${file} tiene comentarios o formato propio y no se reescribe para no perderlos. EdÃ­talo a mano o usa 'agentrelay set' sin --local.`);
+    }
+  }
+  const home = configHome();
+  let priorConfig;
+  try { priorConfig = loadConfig({ cwd: root, configPath: values.config, home }).config; } catch { priorConfig = null; }
+  let next = parsed.unset ? unsetSetting(previous, key) : setSetting(previous, key, parsed.value);
+  const changedExecutor = key === 'executor.type' && priorConfig && priorConfig.executor.type !== parsed.value;
+  if (changedExecutor) {
+    next = unsetSetting(next, 'executor.model'); next = unsetSetting(next, 'executor.provider'); next = unsetSetting(next, 'executor.command');
+  }
+  const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}.tmp`);
+  mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    writeFileSync(temporary, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+    renameSync(temporary, file);
+    const loaded = loadConfig({ cwd: root, configPath: values.config, home });
+    process.stdout.write(`âœ” ${key} = ${parsed.unset ? effectiveDescription(loaded, key) : JSON.stringify(parsed.value)} (solo en este proyecto: ${LOCAL_CONFIG_FILE})\n`);
+    if (changedExecutor) process.stdout.write('Se eliminaron model, provider y command guardados para el ejecutor anterior.\n');
+    if (!parsed.unset && loaded.origins[key] !== file) {
+      const origin = loaded.origins[key] || 'defecto';
+      const label = path.basename(origin) === CONFIG_FILE ? `${CONFIG_FILE} del proyecto` : path.basename(origin) === LOCAL_CONFIG_FILE ? `${LOCAL_CONFIG_FILE} del proyecto` : origin;
+      process.stdout.write(`Ojo: ${label} lo sustituye por ${effectiveDescription(loaded, key)}\n`);
+    }
+    return 0;
+  } catch (error) {
+    if (hadFile) writeFileSync(file, `${JSON.stringify(previous, null, 2)}\n`, 'utf8'); else rmSync(file, { force: true });
+    throw error;
+  } finally { if (existsSync(temporary)) unlinkSync(temporary); }
+}
+
 async function cmdSet(positionals, values) {
   if (positionals.length !== 2) throw new Error('Uso: agentrelay set <clave> <valor>');
   const [alias, raw] = positionals;
   const key = canonicalSetting(alias);
   if (!key) throw new Error(`Opción no ajustable: ${alias}`);
   const parsed = parseSettingValue(key, raw);
+  if (values.local) return setLocalSetting(key, parsed, values);
   const home = configHome(), file = settingsFile(home);
   const hadFile = existsSync(file);
   const previousText = hadFile ? readFileSync(file, 'utf8') : null;
@@ -499,7 +542,7 @@ async function cmdSet(positionals, values) {
     if (hadFile) writeFileSync(file, previousText, 'utf8'); else rmSync(file, { force: true });
     throw error;
   }
-  const shown = parsed.unset ? '(por defecto)' : JSON.stringify(parsed.value);
+  const shown = parsed.unset ? effectiveDescription(loaded, key) : JSON.stringify(parsed.value);
   process.stdout.write(`✔ ${key} = ${shown}\n`);
   if (changedExecutor) process.stdout.write('Se eliminaron model, provider y command guardados para el ejecutor anterior.\n');
   if (!parsed.unset && loaded.origins[key] !== file) {
@@ -525,6 +568,7 @@ async function cmdUnset(positionals, values) {
   if (positionals.length !== 1) throw new Error('Uso: agentrelay unset <clave>');
   const key = canonicalSetting(positionals[0]);
   if (!key) throw new Error(`Opción no ajustable: ${positionals[0]}`);
+  if (values.local) return setLocalSetting(key, { unset: true }, values);
   const home = configHome();
   writeSettings(home, unsetSetting(readSettings(home), key));
   const loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config, home });
