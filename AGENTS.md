@@ -2,6 +2,8 @@
 
 Este archivo es neutral: lo lee cualquier orquestador (Claude Code, opencode, Codex u otro). `CLAUDE.md` solo lo importa. El contexto de diseño (propósito, niveles, configuración, fases, versionado, costes) está en `docs/DISENO.md`: léelo solo cuando haga falta. Versionado: Semantic Versioning; una versión nueva se acuerda con el usuario, no se inventa. Estado y pendientes: `TODO.md` y `CHANGELOG.md`.
 
+**Si eres el ejecutor** (te han dado una tarea con `agentrelay run`): haz solo esa tarea y sigue sus restricciones; ignora las secciones 22, 23 y 24, que son solo del orquestador. No ejecutes `agentrelay` salvo que la tarea lo pida, no hagas commits ni push y no pares por pasos del protocolo del orquestador.
+
 ## 2. Flujo fundamental
 
 1. **El orquestador piensa:** comprende la petición, inspecciona el contexto necesario, planifica y divide el trabajo cuando convenga.
