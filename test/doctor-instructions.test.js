@@ -72,6 +72,19 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     const foreign = doctor(dir, claudeDir);
     assert.match(foreign.stdout, /Los comandos de Claude Code existentes son tuyos/);
     assert.doesNotMatch(foreign.stdout, /Los comandos de Claude Code .*Ejecuta "agentrelay setup"/);
+
+    writeFileSync(path.join(dir, 'CLAUDE.md'), '@AGENTS.md\n');
+    writeFileSync(path.join(dir, 'AGENTS.md'), `${PROJECT_BLOCK}\n`);
+    const importedCurrent = doctor(dir, claudeDir);
+    assert.match(importedCurrent.stdout, /Instrucciones de AgentRelay en este proyecto: al d.a/);
+
+    writeFileSync(path.join(dir, 'AGENTS.md'), `${PROJECT_BLOCK.replace('AgentRelay', 'Other')}\n`);
+    const importedOutdated = doctor(dir, claudeDir);
+    assert.match(importedOutdated.stdout, /\[aviso\].*desactualizadas.*agentrelay init/);
+
+    writeFileSync(path.join(dir, 'AGENTS.md'), '# Mis notas\n');
+    const importedMissing = doctor(dir, claudeDir);
+    assert.match(importedMissing.stdout, /\[aviso\] Este proyecto no tiene las instrucciones de AgentRelay\. Ejecuta "agentrelay init"/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -404,7 +404,7 @@ async function cmdDoctor(values) {
   if (root) {
     const interrupted = listRunIds(root).filter((id) => { const state = loadState(root, id); return state.status === 'interrupted' || isOrphaned(state, { lastEventMs: lastActivityMs(root, id) }); });
     if (interrupted.length) warn(`Hay ${interrupted.length} ejecución(es) interrumpida(s): ${interrupted.join(', ')}. Ejecuta "agentrelay recover".`);
-    const projectStatus = blockStatus(path.join(root, 'CLAUDE.md'), PROJECT_BLOCK);
+    const projectStatus = projectInstructionStatus(root);
     if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
     else if (projectStatus === 'outdated') warn('Las instrucciones de AgentRelay de este proyecto están desactualizadas. Ejecuta "agentrelay init".');
     else warn('Este proyecto no tiene las instrucciones de AgentRelay. Ejecuta "agentrelay init".');
@@ -1020,6 +1020,20 @@ function initInstructionFiles(dir) {
   const claude = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
   if (/^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)) return [{ file: agentsFile, block: PROJECT_BLOCK }];
   return [{ file: claudeFile, block: PROJECT_BLOCK }, { file: agentsFile, block: PROJECT_BLOCK }];
+}
+
+function projectInstructionStatus(dir) {
+  const claudeFile = path.join(dir, 'CLAUDE.md');
+  const agentsFile = path.join(dir, 'AGENTS.md');
+  const claude = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
+  const files = /^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)
+    ? [agentsFile]
+    : [claudeFile, ...(existsSync(agentsFile) ? [agentsFile] : [])];
+  const statuses = files.map((file) => blockStatus(file, PROJECT_BLOCK));
+  const existingStatuses = statuses.filter((status) => status !== 'nofile');
+  if (existingStatuses.length && existingStatuses.every((status) => status === 'current')) return 'current';
+  if (statuses.includes('outdated')) return 'outdated';
+  return 'missing';
 }
 
 async function cmdInit(values) {

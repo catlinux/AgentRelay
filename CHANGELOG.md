@@ -22,6 +22,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ### Cambiado
 
 - Las instrucciones del proyecto son neutrales: viven en `AGENTS.md` (versionado) y `CLAUDE.md` solo lo importa. `agentrelay init` es neutral: en un proyecto nuevo crea `AGENTS.md` con el bloque de AgentRelay y un `CLAUDE.md` que solo lo importa (`@AGENTS.md`); si `AGENTS.md` ya existe, el bloque va también allí, y solo allí si `CLAUDE.md` lo importa.
+- El bloque de instrucciones del proyecto es más claro y firme: delegar por defecto toda implementación no trivial (y explicar por qué si no se delega), cómo preparar el árbol de git, un ejemplo de tarea con `agentrelay run -`, y cómo revisar y aceptar. `agentrelay doctor` reconoce el bloque en `AGENTS.md`, también cuando `CLAUDE.md` solo lo importa.
 
 ## [0.0.3] - 2026-10-01
 
