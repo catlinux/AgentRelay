@@ -55,6 +55,9 @@ export function orchestratorIndex(model, effort) { return ORCHESTRATOR_LADDER.fi
 export function orchestratorLabel(index) { const x = ORCHESTRATOR_LADDER[Math.max(0, Math.min(ORCHESTRATOR_LADDER.length - 1, index))]; return `${x.model}-${displayLabel('effort', x.effort)}`; }
 export function executorIndex(effort) { return EXECUTOR_LADDER.indexOf(normalizeLabel('effort', effort)); }
 export function executorLabel(index) { return displayLabel('effort', EXECUTOR_LADDER[Math.max(0, Math.min(EXECUTOR_LADDER.length - 1, index))]); }
+export function executorKey(type, model) {
+  return `${String(type ?? '').trim().toLowerCase()}|${String(model ?? '').trim().toLowerCase()}`;
+}
 export const triageFile = (home = agentrelayHome()) => path.join(home, 'triage.jsonl');
 
 export function readRecords(file = triageFile()) {
@@ -76,13 +79,21 @@ function recordStep(record, kind) {
 function stepDescription(step, kind) { return kind === 'orchestrator' ? orchestratorLabel(step) : executorLabel(step); }
 
 /** Recomienda una configuración usando solo resultados del mismo tipo de tarea. */
-export function advise(records, { kind = 'orchestrator', type, size }) {
+export function advise(records, { kind = 'orchestrator', type, size, executor, model, includeLegacy = false }) {
   type = validateLabel('type', type); size = validateLabel('size', size);
-  const exact = records.filter((r) => r.kind === kind && r.type === type && r.size === size).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
-  const samples = exact.length >= 3 ? exact : records.filter((r) => r.kind === kind && r.type === type).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  const kindRecords = records.filter((r) => r.kind === kind);
+  const executorRecords = kind === 'executor'
+    ? kindRecords.filter((r) => (Boolean(executor && model && r.executor && r.model)
+      && executorKey(r.executor, r.model) === executorKey(executor, model))
+      || (includeLegacy && (!r.executor || !r.model)))
+    : kindRecords;
+  const exact = executorRecords.filter((r) => r.type === type && r.size === size).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  const samples = exact.length >= 3 ? exact : executorRecords.filter((r) => r.type === type).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
   const prior = kind === 'orchestrator' ? orchestratorIndex(...ORCHESTRATOR_PRIORS[type][size]) : executorIndex(EXECUTOR_PRIORS.effort[size]);
   let step = prior, level = kind === 'executor' ? EXECUTOR_PRIORS.level[size] : undefined;
-  let reason = 'Sin datos: valor inicial', exploring = false;
+  let reason = kind === 'executor' && !executorRecords.length
+    ? `Sin datos para ${executor} · ${model}: valor inicial`
+    : 'Sin datos: valor inicial', exploring = false;
   const valid = samples.filter((r) => recordStep(r, kind) >= 0 && OUTCOMES.includes(r.outcome));
   const last = valid.at(-1);
   const lastUnder = valid.findLastIndex((r) => r.outcome === 'under');
