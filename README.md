@@ -305,18 +305,18 @@ agentrelay unset effort          # vuelve al valor por defecto
 
 Estos comandos escriben en `~/.agentrelay/settings.json`, un archivo que gestionan ellos (no lo edites a mano: así tu `config.json` explicado conserva sus comentarios). Tiene prioridad sobre `config.json` y la pierde frente a los archivos del proyecto; si un archivo del proyecto sustituye lo que acabas de cambiar, `set` te lo avisa. Se valida el resultado y, si no es válido, no se guarda. `agentrelay config` muestra de dónde viene cada valor. Con Codex y GPT-6 Luna el modelo del ejecutor es fijo: lo que se ajusta es el esfuerzo y el nivel.
 
-**Comandos dentro del chat de Claude Code.** `agentrelay setup` instala además unos comandos `/` personalizados que aparecen en el menú al escribir `/agentrelay`, con autocompletado y una pista de los argumentos. Llevan el prefijo `agentrelay:` para no confundirse con los propios de Claude Code (`/model`, `/effort`, que cambian *tu* modelo, el del orquestador):
+**Comandos dentro del chat de Claude Code.** `agentrelay setup` instala además unos comandos `/` personalizados que aparecen en el menú al escribir `/ar`, con autocompletado y una pista de los argumentos. Llevan el prefijo `ar:` para no confundirse con los propios de Claude Code (`/model`, `/effort`, que cambian *tu* modelo, el del orquestador):
 
 | Comando | Qué hace |
 |---|---|
-| `/agentrelay:estado` | Resumen: ejecutor, modelo, esfuerzo, nivel, sesión y avisos. |
-| `/agentrelay:modelo [id]` | Sin argumento, lista los modelos de tu cuenta; con un id, cambia el modelo del ejecutor. |
-| `/agentrelay:esfuerzo [bajo\|medio\|alto\|extremo\|máximo]` | Muestra o cambia el esfuerzo de razonamiento del ejecutor. |
-| `/agentrelay:nivel [1-5]` | Muestra o cambia el nivel de orquestación. |
-| `/agentrelay:ejecutor [codex\|cline]` | Lista los ejecutores o cambia de ejecutor. |
-| `/agentrelay:triaje` | Estadísticas del triaje adaptativo. |
+| `/ar:estado` | Resumen: ejecutor, modelo, esfuerzo, nivel, sesión y avisos. |
+| `/ar:modelo [id]` | Sin argumento, lista los modelos de tu cuenta; con un id, cambia el modelo del ejecutor. |
+| `/ar:esfuerzo [bajo\|medio\|alto\|extremo\|máximo]` | Muestra o cambia el esfuerzo de razonamiento del ejecutor. |
+| `/ar:nivel [1-5]` | Muestra o cambia el nivel de orquestación. |
+| `/ar:ejecutor [codex\|cline]` | Lista los ejecutores o cambia de ejecutor. |
+| `/ar:triaje` | Estadísticas del triaje adaptativo. |
 
-Cada uno ejecuta el comando `agentrelay` equivalente (`models`, `set`, `config`…) y usa un modelo pequeño para gastar lo mínimo. Se instalan en `~/.claude/commands/agentrelay/`; solo se tocan los archivos con la marca `<!-- agentrelay:managed -->` (uno tuyo con el mismo nombre nunca se sobrescribe), `agentrelay doctor` avisa si están desactualizados y `agentrelay setup --uninstall` los retira. `agentrelay setup --no-commands` omite este paso. No completan valores dinámicamente (por ejemplo, tus modelos): para verlos, usa `/agentrelay:modelo` sin argumento.
+Cada uno ejecuta el comando `agentrelay` equivalente (`models`, `set`, `config`…) y usa un modelo pequeño para gastar lo mínimo. Se instalan en `~/.claude/commands/ar/`; solo se tocan los archivos con la marca `<!-- agentrelay:managed -->` (uno tuyo con el mismo nombre nunca se sobrescribe), `agentrelay doctor` avisa si están desactualizados y `agentrelay setup --uninstall` los retira. `agentrelay setup --no-commands` omite este paso. No completan valores dinámicamente (por ejemplo, tus modelos): para verlos, usa `/ar:modelo` sin argumento.
 
 ```sh
 agentrelay config init            # crea tu archivo personal, explicado opción por opción

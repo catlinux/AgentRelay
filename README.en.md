@@ -305,18 +305,18 @@ agentrelay unset effort          # back to the default
 
 These commands write to `~/.agentrelay/settings.json`, a file they manage themselves (do not edit it by hand: that way your explained `config.json` keeps its comments). It has priority over `config.json` and loses to the project files; if a project file overrides what you just changed, `set` warns you. The result is validated and, if invalid, it is not saved. `agentrelay config` shows where each value comes from. With Codex and GPT-6 Luna the executor's model is fixed: what you tune is the effort and the level.
 
-**Commands inside the Claude Code chat.** `agentrelay setup` also installs some custom `/` commands that show up in the menu when you type `/agentrelay`, with autocompletion and an argument hint. They carry the `agentrelay:` prefix so they are not confused with Claude Code's own (`/model`, `/effort`, which change *your* model, the orchestrator's):
+**Commands inside the Claude Code chat.** `agentrelay setup` also installs some custom `/` commands that show up in the menu when you type `/ar`, with autocompletion and an argument hint. They carry the `ar:` prefix so they are not confused with Claude Code's own (`/model`, `/effort`, which change *your* model, the orchestrator's):
 
 | Command | What it does |
 |---|---|
-| `/agentrelay:estado` | Summary: executor, model, effort, level, session and warnings. |
-| `/agentrelay:modelo [id]` | Without an argument, lists your account's models; with an id, changes the executor's model. |
-| `/agentrelay:esfuerzo [bajo\|medio\|alto\|extremo\|máximo]` | Shows or changes the executor's reasoning effort. |
-| `/agentrelay:nivel [1-5]` | Shows or changes the orchestration level. |
-| `/agentrelay:ejecutor [codex\|cline]` | Lists executors or switches executor. |
-| `/agentrelay:triaje` | Statistics of the adaptive triage. |
+| `/ar:estado` | Summary: executor, model, effort, level, session and warnings. |
+| `/ar:modelo [id]` | Without an argument, lists your account's models; with an id, changes the executor's model. |
+| `/ar:esfuerzo [bajo\|medio\|alto\|extremo\|máximo]` | Shows or changes the executor's reasoning effort. |
+| `/ar:nivel [1-5]` | Shows or changes the orchestration level. |
+| `/ar:ejecutor [codex\|cline]` | Lists executors or switches executor. |
+| `/ar:triaje` | Statistics of the adaptive triage. |
 
-Each one runs the equivalent `agentrelay` command (`models`, `set`, `config`…) and uses a small model to spend as little as possible. They are installed in `~/.claude/commands/agentrelay/`; only files carrying the `<!-- agentrelay:managed -->` mark are touched (a file of yours with the same name is never overwritten), `agentrelay doctor` warns if they are out of date and `agentrelay setup --uninstall` removes them. `agentrelay setup --no-commands` skips this step. They do not complete dynamic values (for example, your models): to see them, use `/agentrelay:modelo` without an argument.
+Each one runs the equivalent `agentrelay` command (`models`, `set`, `config`…) and uses a small model to spend as little as possible. They are installed in `~/.claude/commands/ar/`; only files carrying the `<!-- agentrelay:managed -->` mark are touched (a file of yours with the same name is never overwritten), `agentrelay doctor` warns if they are out of date and `agentrelay setup --uninstall` removes them. `agentrelay setup --no-commands` skips this step. They do not complete dynamic values (for example, your models): to see them, use `/ar:modelo` without an argument.
 
 ```sh
 agentrelay config init            # creates your personal file, explained option by option
