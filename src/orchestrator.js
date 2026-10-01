@@ -8,6 +8,7 @@
 //   accept (con validación final) | fix (nuevo intento) | escalate | reject
 
 import path from 'node:path';
+import os from 'node:os';
 import { getExecutor } from './executors/index.js';
 import { diffFromBase, head, pendingChanges } from './git.js';
 import { buildFixPrompt, buildImplementPrompt, buildSelfReviewPrompt } from './prompts.js';
@@ -267,6 +268,8 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
     id,
     agentrelayVersion: VERSION,
     status: 'running',
+    pid: process.pid,
+    host: os.hostname(),
     statusReasons: [],
     createdAt: new Date().toISOString(),
     task,
@@ -312,6 +315,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
   const state = loadState(root, id);
   if (FINAL_STATUSES.includes(state.status)) throw new Error(`La ejecución ${id} ya está cerrada (${state.status})`);
   if (state.status === 'running') throw new Error(`La ejecución ${id} todavía está en curso`);
+  if (state.status === 'interrupted' && !['fix', 'reject', 'accept', 'escalate'].includes(decision)) throw new Error(`La ejecución ${id} está interrumpida`);
 
   const ctx = context(root, state, onEvent);
   const review = { at: new Date().toISOString(), decision, feedback: feedback || null };
@@ -327,6 +331,8 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.reviews.push(review);
     state.retriesUsed += 1;
     state.status = 'running';
+    state.pid = process.pid;
+    state.host = os.hostname();
     saveState(root, state);
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
     ctx.emit({ type: 'status', runId: state.id, status: 'running', reasons: [] });
@@ -371,6 +377,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
 /** Vuelve a ejecutar las validaciones sin cambiar el estado (p. ej. tras un cambio manual). */
 export async function recheck({ root, id, onEvent }) {
   const state = loadState(root, id);
+  if (!['awaiting_review', 'escalated', 'interrupted'].includes(state.status)) throw new Error(`No se puede validar la ejecución ${id} en estado ${state.status}`);
   const ctx = context(root, state, onEvent);
   const check = await evaluate(ctx);
   writeReport(root, state, check.patch);

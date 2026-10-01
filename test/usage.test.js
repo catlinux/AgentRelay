@@ -49,7 +49,7 @@ test('usage cuenta estados ilegibles y ejecuciones obsoletas, y formatea duraci√
     mkdirSync(bad, { recursive: true }); writeFileSync(path.join(bad, 'state.json'), '{');
     const result = aggregateUsage(repo.dir, { now: Date.parse('2026-10-01T10:00:00Z') });
     assert.equal(result.unreadable, 1); assert.equal(result.stale, 1);
-    assert.match(renderUsage(result), /m?s de 24 h/);
+    assert.match(renderUsage(result), /1 ejecuci√≥n.*interrumpida/);
     assert.equal(formatDuration(3900000), '1 h 05 min');
     assert.equal(formatDuration(723000), '12 min 03 s');
   } finally { repo.cleanup(); }

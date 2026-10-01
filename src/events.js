@@ -87,6 +87,7 @@ function humanDuration(ms) {
 
 const KIND_NAMES = { implement: 'implementación', fix: 'corrección' };
 const STATUS_LINES = {
+  interrupted: '■ Interrumpida',
   running: '■ En curso', awaiting_review: '■ Listo para tu revisión', accepted: '✔ Aceptada',
   failed: '✖ Fallida', escalated: '↻ Escalada', rejected: '✖ Rechazada',
 };

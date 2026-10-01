@@ -2,6 +2,7 @@
 
 const STATUS_LABELS = {
   running: 'en curso',
+  interrupted: 'interrumpida',
   awaiting_review: 'pendiente de revisión',
   accepted: 'aceptada',
   escalated: 'escalada al orquestador',
@@ -65,7 +66,7 @@ function selfReviewLine(state) {
 
 function nextSteps(state) {
   const id = state.id;
-  if (state.status === 'awaiting_review' || state.status === 'escalated') {
+  if (state.status === 'awaiting_review' || state.status === 'escalated' || state.status === 'interrupted') {
     return [
       `- Aceptar (ejecuta la validación final): \`agentrelay review ${id} --decision accept\``,
       `- Pedir corrección: \`agentrelay review ${id} --decision fix --feedback "..."\``,

@@ -6,6 +6,9 @@ import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import path from 'node:path';
 import { formatEvent, useColor } from './events.js';
 import { latestRunId, runDir } from './store.js';
+import { isOrphaned, lastActivityMs } from './orphans.js';
+import { loadState } from './store.js';
+import { existsSync as pathExists } from 'node:fs';
 
 /** Ruta del events.ndjson de una ejecución. */
 function eventsFile(root, runId) {
@@ -106,6 +109,13 @@ async function watchRun({ root, id, write, intervalMs, signal, color }) {
 
   for (;;) {
     if (signal?.aborted) return;
+    if (pathExists(path.join(runDir(root, id), 'state.json'))) {
+      const runState = loadState(root, id);
+      if (runState.status === 'interrupted' || isOrphaned(runState, { lastEventMs: lastActivityMs(root, id) })) {
+        write('Ejecución interrumpida');
+        return;
+      }
+    }
     const events = parseLines(readNewLines(root, id, state));
     if (events.length === 0) {
       if (lastStatus !== null && lastStatus !== 'running') {

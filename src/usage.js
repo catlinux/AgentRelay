@@ -1,8 +1,9 @@
 import { listRunIds, loadState } from './store.js';
+import { isOrphaned, lastActivityMs } from './orphans.js';
 
 const STATUS_LABELS = {
   accepted: 'aceptadas', awaiting_review: 'pendientes de revisión', running: 'en curso',
-  failed: 'fallidas', escalated: 'escaladas', rejected: 'rechazadas',
+  failed: 'fallidas', escalated: 'escaladas', rejected: 'rechazadas', interrupted: 'interrumpidas',
 };
 
 function number(value) { return typeof value === 'number' && Number.isFinite(value) ? value : 0; }
@@ -29,7 +30,7 @@ export function aggregateUsage(root, { since, executor, now = Date.now() } = {})
     const type = state.config?.executor?.type || 'desconocido';
     if (executor && type !== executor) continue;
     statuses[state.status] = (statuses[state.status] || 0) + 1;
-    if (state.status === 'running' && now - Date.parse(state.updatedAt) > 86400000) stale++;
+    if (state.status === 'running' && isOrphaned(state, { now, lastEventMs: lastActivityMs(root, id) })) stale++;
     const attempts = Array.isArray(state.attempts) ? state.attempts : [];
     const model = attempts[0]?.model?.id || state.config?.executor?.model || 'modelo por defecto';
     const key = `${type} · ${model}`;
@@ -87,6 +88,6 @@ export function renderUsage(result) {
   const row = (label, data) => [label, fmt(data.executions), fmt(data.attempts), fmt(data.retries), fmt(data.escalatedRejected), compact(data.inputTokens), compact(data.outputTokens), compact(data.cacheReadTokens), formatDuration(data.durationMs), cost(data.estimatedCost)];
   const rows = [...result.groups.map((group) => row(`${group.executor} · ${group.model}`, group)), row('Totales', result.totals)];
   const lines = [...renderTable(headings, rows), '', ...Object.entries({ ...Object.fromEntries(Object.entries(STATUS_LABELS).map(([key, label]) => [label, result.statuses[key] || 0])), ...Object.fromEntries(Object.entries(result.statuses).filter(([key]) => !STATUS_LABELS[key]).map(([key, value]) => [key, value])) }).map(([label, value]) => `${label}: ${fmt(value)}`), `${fmt(result.unreadable)} ejecuciones ilegibles omitidas`];
-  if (result.stale) lines.push(`Ojo: ${result.stale} ejecución(es) en curso desde hace más de 24 h (¿interrumpidas?)`);
+  if (result.stale) lines.push(`Ojo: ${result.stale} ejecución(es) interrumpida(s). Ejecuta agentrelay recover.`);
   return `${lines.join('\n')}\n`;
 }

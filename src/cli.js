@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
 import { configTemplate } from './config-template.js';
@@ -25,6 +26,10 @@ import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeL
 import { canOpenBrowser } from './platform.js';
 import { aggregateUsage, renderUsage } from './usage.js';
 import { createOutput } from './output.js';
+import { isOrphaned, lastActivityMs } from './orphans.js';
+import { appendEvent } from './events.js';
+import { renderReport } from './report.js';
+import { pendingChanges } from './git.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -37,6 +42,7 @@ Uso:
                                     Registra la revisión del orquestador
   agentrelay check [id]             Repite las validaciones sin cambiar el estado
   agentrelay list                   Lista las ejecuciones del repositorio
+  agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
@@ -253,7 +259,8 @@ async function cmdList(values) {
   const root = await resolveRoot(values);
   const runs = listRunIds(root).map((id) => {
     const s = loadState(root, id);
-    return { id, status: s.status, level: s.policy.level, attempts: s.attempts.length, title: s.task.title };
+    const orphaned = isOrphaned(s, { lastEventMs: lastActivityMs(root, id) });
+    return { id, status: orphaned ? 'running (¿interrumpida?)' : s.status, level: s.policy.level, attempts: s.attempts.length, title: s.task.title };
   });
   if (values.json) process.stdout.write(`${JSON.stringify(runs, null, 2)}\n`);
   else if (!runs.length) process.stdout.write('No hay ejecuciones.\n');
@@ -277,6 +284,37 @@ async function cmdWatch(positionals, values) {
   } finally {
     process.removeListener('SIGINT', onSigint);
   }
+  return 0;
+}
+
+async function cmdRecover(positionals, values) {
+  const root = await resolveRoot(values);
+  const isOrphan = (id) => isOrphaned(loadState(root, id), { lastEventMs: lastActivityMs(root, id) });
+  if (!positionals[0]) {
+    const ids = listRunIds(root).filter(isOrphan);
+    if (!ids.length) process.stdout.write('Ninguna ejecución interrumpida.\n');
+    else for (const id of ids) { const state = loadState(root, id); process.stdout.write(`${id}  ${state.createdAt || '-'}  ${state.task?.title || '-'}\n`); }
+    return 0;
+  }
+  const id = positionals[0];
+  const state = loadState(root, id);
+  if (!isOrphan(id)) {
+    process.stderr.write(state.status === 'running' ? `La ejecución ${id} sigue en curso (proceso ${state.pid ?? 'desconocido'}).\n` : `La ejecución ${id} no está en curso.\n`);
+    return 1;
+  }
+  state.status = 'interrupted';
+  state.statusReasons = ['el proceso que la ejecutaba terminó sin cerrarla'];
+  const attempt = state.attempts?.at(-1);
+  if (attempt && attempt.startedAt && attempt.durationMs == null) { attempt.ok = false; attempt.error = 'interrumpido'; }
+  const dir = runDir(root, id);
+  writeFileSync(path.join(dir, 'state.json'), `${JSON.stringify({ ...state, updatedAt: new Date().toISOString() }, null, 2)}\n`);
+  appendEvent(root, id, { type: 'status', status: 'interrupted', runId: id, reasons: state.statusReasons });
+  let patch = ''; try { patch = readFileSync(path.join(dir, 'diff.patch'), 'utf8'); } catch {}
+  writeFileSync(path.join(dir, 'report.md'), renderReport(state, patch, state.config?.report));
+  const changes = await pendingChanges(root);
+  const paths = changes.slice(0, 10).map((line) => line.slice(3));
+  const count = `${changes.length} archivo(s) modificado(s)`;
+  process.stdout.write(`El ejecutor dejó en el repositorio: ${count}${paths.length ? `\n${paths.join('\n')}` : ''}\n\nSiguientes pasos:\nagentrelay check ${id}\nagentrelay review ${id} --decision fix --feedback "..."\nagentrelay review ${id} --decision reject\n`);
   return 0;
 }
 
@@ -346,6 +384,8 @@ async function cmdDoctor(values) {
   else if (commandStatus.status === 'outdated') warn('Los comandos de Claude Code (/ar:…) están desactualizados. Ejecuta "agentrelay setup".');
   else warn('Los comandos de Claude Code (/ar:…) no están instalados. Ejecuta "agentrelay setup".');
   if (root) {
+    const interrupted = listRunIds(root).filter((id) => { const state = loadState(root, id); return state.status === 'interrupted' || isOrphaned(state, { lastEventMs: lastActivityMs(root, id) }); });
+    if (interrupted.length) warn(`Hay ${interrupted.length} ejecución(es) interrumpida(s): ${interrupted.join(', ')}. Ejecuta "agentrelay recover".`);
     const projectStatus = blockStatus(path.join(root, 'CLAUDE.md'), PROJECT_BLOCK);
     if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
     else if (projectStatus === 'outdated') warn('Las instrucciones de AgentRelay de este proyecto están desactualizadas. Ejecuta "agentrelay init".');
@@ -952,6 +992,7 @@ export async function main(argv) {
       case 'review': return await cmdReview(rest, values);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
+      case 'recover': return await cmdRecover(rest, values);
       case 'usage': return await cmdUsage(values);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
