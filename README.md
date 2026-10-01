@@ -80,7 +80,7 @@ agentrelay login    # conecta tu cuenta de ChatGPT (se abre el navegador)
 
 Sin `npm link` también puedes usar `node <ruta>/bin/agentrelay.js`.
 
-`agentrelay login` se hace una sola vez, y `agentrelay setup` te lo ofrece al final (`agentrelay setup --login` lo hace sin preguntar). Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y no hace falta. En un equipo sin navegador (por ejemplo, por SSH o un Linux sin entorno gráfico), AgentRelay lo detecta y usa por sí solo el código de dispositivo: te muestra un código que introduces desde otro dispositivo (`--device` lo fuerza y `--browser` fuerza el navegador). `agentrelay doctor` comprueba que la sesión está activa, y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no la hay.
+`agentrelay login` se hace una sola vez, y `agentrelay setup` te lo ofrece al final (`agentrelay setup --login` fuerza el inicio de sesión sin preguntar). Si ya usas Codex en VS Code con tu cuenta, la sesión se comparte y no hace falta. En un equipo sin navegador (por ejemplo, por SSH o un Linux sin entorno gráfico), AgentRelay lo detecta y usa por sí solo el código de dispositivo: te muestra un código que introduces desde otro dispositivo (`--device` lo fuerza y `--browser` fuerza el navegador). `agentrelay doctor` comprueba que la sesión está activa, y `agentrelay run` se detiene antes de empezar, con un aviso claro, si no la hay.
 
 La copia de Codex se instala como dependencia de AgentRelay y se usa antes que cualquier otra que tengas en el `PATH` o en la extensión de VS Code.
 
@@ -91,7 +91,7 @@ agentrelay executors               # lista los ejecutores, cuáles tienes instal
 agentrelay executors add cline     # instala Cline (DeepSeek u otros proveedores con clave de API)
 ```
 
-`agentrelay setup` también te ofrece instalarlos (o `agentrelay setup --executors cline`, sin preguntas). Al instalar Cline, AgentRelay te muestra el comando para configurar su proveedor; si ya usas la extensión de Cline en VS Code, comparte su configuración (`~/.cline/data`) y no hace falta. Para usarlo, pon `{ "executor": { "type": "cline" } }` en `agentrelay.config.local.json`.
+`agentrelay setup` también te ofrece instalarlos (o `agentrelay setup --executors cline`, que selecciona Cline directamente, sin el aviso para elegir ejecutores opcionales). Al instalar Cline, AgentRelay te muestra el comando para configurar su proveedor; si ya usas la extensión de Cline en VS Code, comparte su configuración (`~/.cline/data`) y no hace falta. Para usarlo, pon `{ "executor": { "type": "cline" } }` en `agentrelay.config.local.json`.
 
 Para actualizar más adelante, en la carpeta de AgentRelay: `git pull` y después `npm ci` (instala exactamente las versiones del `package-lock.json` sin modificarlo; `npm install` puede reescribirlo y hacer que el siguiente `git pull` falle). Si `git pull` dice que tus cambios locales en `package-lock.json` se sobrescribirían, descártalos con `git checkout -- package-lock.json` (npm los regenera; no pierdes nada) y repite `git pull`. Después ejecuta `agentrelay doctor`: te avisa (`[aviso]`) si hay que repetir `agentrelay setup` (instrucciones globales del orquestador) o `agentrelay init` (instrucciones del proyecto), cosa que ocurre cuando una versión nueva cambia esas instrucciones. Si tenías `agentrelay watch` abierto, ciérralo (Ctrl+C) y vuelve a lanzarlo para que use el código nuevo.
 
@@ -173,9 +173,9 @@ agentrelay check <id>
 agentrelay review <id> --decision fix --feedback "..."
 ```
 
-Una ejecución que sigue en estado `running`, cuyo proceso ya no existe y que no tiene actividad reciente se considera huérfana; las ejecuciones de otro equipo nunca se consideran huérfanas. `agentrelay list` la marca como `running (¿interrumpida?)`, `doctor` avisa y `usage` la cuenta como interrumpida; `watch <id>` termina con «Ejecución interrumpida». `recover` lista las huérfanas y `recover <id>` marca una como `interrupted`, actualizando solo los archivos de estado e informe de esa ejecución: nunca toca tu repositorio. Muestra, en modo de solo lectura, los cambios que el ejecutor dejó en el repositorio; después puedes validarlos con `check` y pedir correcciones con `review --decision fix` (el ejecutor continúa) o rechazarlos con `review --decision reject`.
+Una ejecución que sigue en estado `running`, cuyo proceso ya no existe y que no tiene actividad reciente se considera huérfana; las ejecuciones de otro equipo nunca se consideran huérfanas. `agentrelay list` la marca como `running (¿interrumpida?)`, `doctor` avisa y `usage` la cuenta como interrumpida; `watch <id>` termina con «Ejecución interrumpida». `recover` lista las huérfanas y `recover <id>` marca una como `interrupted`, actualizando los archivos de estado, eventos e informe de esa ejecución: nunca toca tu repositorio. Muestra, en modo de solo lectura, los cambios que el ejecutor dejó en el repositorio; después puedes validarlos con `check` y pedir correcciones con `review --decision fix` (el ejecutor continúa) o rechazarlos con `review --decision reject`.
 
-**5. Prueba con otro nivel:** `agentrelay run <tarea> --level 4` añade una self-review en una segunda ejecución; `--level 1` acepta automáticamente si las validaciones pasan. Antes, confirma o descarta los cambios de la prueba anterior (`git stash -u`, `git checkout .` o un commit), porque AgentRelay necesita el repositorio limpio.
+**5. Prueba con otro nivel:** `agentrelay run <tarea> --level 4` puede añadir una self-review en una segunda ejecución; `--level 1` acepta automáticamente si las validaciones pasan y no hay señales graves que requieran revisión. Antes, confirma o descarta los cambios de la prueba anterior (`git stash -u`, `git checkout .` o un commit), porque AgentRelay necesita el repositorio limpio.
 
 ## Ver el trabajo en directo
 
@@ -300,7 +300,7 @@ La self-review no sustituye la revisión del orquestador: el ejecutor comprueba 
 - Si fallan las validaciones o el ejecutor termina con error, AgentRelay le envía los errores para que corrija (niveles 1-4), hasta el máximo de reintentos.
 - Si el ejecutor declara que está bloqueado o pide escalado, la tarea se escala sin más reintentos.
 - Al agotar los reintentos la tarea queda **escalada**: el orquestador la asume.
-- Las correcciones pedidas por el orquestador (`fix`) comparten el mismo límite (`--force` permite un intento más).
+- Las correcciones pedidas por el orquestador (`fix`) comparten el mismo límite; `--force` permite ese intento aunque ya se haya alcanzado el límite.
 
 ## Configuración
 
@@ -325,7 +325,7 @@ agentrelay set executor cline    # cambia de ejecutor (olvida el modelo guardado
 agentrelay unset effort          # vuelve al valor por defecto
 ```
 
-Estos comandos escriben en `~/.agentrelay/settings.json`, un archivo que gestionan ellos (no lo edites a mano: así tu `config.json` explicado conserva sus comentarios). Tiene prioridad sobre `config.json` y la pierde frente a los archivos del proyecto; si un archivo del proyecto sustituye lo que acabas de cambiar, `set` te lo avisa. Se valida el resultado y, si no es válido, no se guarda. `agentrelay config` muestra de dónde viene cada valor. Con Codex y GPT-6 Luna el modelo del ejecutor es fijo: lo que se ajusta es el esfuerzo y el nivel.
+Estos comandos de terminal escriben en `~/.agentrelay/settings.json`, un archivo que gestionan ellos (no lo edites a mano: así tu `config.json` explicado conserva sus comentarios). Tiene prioridad sobre `config.json` y la pierde frente a los archivos del proyecto; si un archivo del proyecto sustituye lo que acabas de cambiar, `set` te lo avisa. Se valida el resultado y, si no es válido, no se guarda. `agentrelay config` muestra de dónde viene cada valor. GPT-6 Luna es el modelo de Codex por defecto; puedes cambiarlo con `agentrelay set model <id>` o en la configuración del proyecto, y ajustar el esfuerzo y el nivel.
 
 Para fijar un ajuste **solo en el proyecto actual**, añade `--local`: `agentrelay set effort alto --local` (y `unset … --local`) lo guarda en `agentrelay.config.local.json`. Si ese archivo ya tiene comentarios o formato propio, AgentRelay **no lo reescribe** (te pide editarlo a mano) para no perderlos.
 
@@ -340,7 +340,9 @@ Para fijar un ajuste **solo en el proyecto actual**, añade `--local`: `agentrel
 | `/ar:ejecutor [codex\|cline]` | Lista los ejecutores o cambia de ejecutor. |
 | `/ar:triaje` | Estadísticas del triaje adaptativo. |
 
-Cada uno ejecuta el comando `agentrelay` equivalente (`models`, `set`, `config`…) y usa un modelo pequeño para gastar lo mínimo. Se instalan en `~/.claude/commands/ar/`; solo se tocan los archivos con la marca `<!-- agentrelay:managed -->` (uno tuyo con el mismo nombre nunca se sobrescribe), `agentrelay doctor` avisa si están desactualizados y `agentrelay setup --uninstall` los retira. `agentrelay setup --no-commands` omite este paso. No completan valores dinámicamente (por ejemplo, tus modelos): para verlos, usa `/ar:modelo` sin argumento.
+En el chat de Claude Code, escribe `/ar:esfuerzo alto` para cambiar el esfuerzo del ejecutor. Este comando es para el chat, no para la terminal.
+
+Cada uno ejecuta el comando `agentrelay` equivalente (`models`, `set`, `config`…) y usa un modelo pequeño para gastar lo mínimo. Se instalan en `~/.claude/commands/ar/`; solo se tocan los archivos con la marca `<!-- agentrelay:managed -->` (uno tuyo con el mismo nombre nunca se sobrescribe), `agentrelay doctor` avisa si están desactualizados y `agentrelay setup --uninstall` los retira. `agentrelay setup --no-commands` omite este paso. No completan valores dinámicamente (por ejemplo, tus modelos): para verlos, usa `/ar:modelo` sin argumento. El historial del triaje adaptativo se guarda en `~/.agentrelay/triage.jsonl`.
 
 ```sh
 agentrelay config init            # crea tu archivo personal, explicado opción por opción
@@ -376,7 +378,7 @@ Valores por defecto:
 
 - `executor.type`: `codex` (por defecto) o `cline`. Al elegir uno, `command`, `provider` y `model` toman sus valores por defecto (con `cline`: `cline`, `deepseek`, `deepseek-v4-pro`), que puedes sobrescribir.
 - `executor.command`: programa a ejecutar; también admite un array, p. ej. `["node", "/ruta/a/cline"]`.
-- `executor.thinking`: `none`, `low`, `medium`, `high` o `xhigh`; `null` usa el valor del proveedor.
+- `executor.thinking`: `null`, `low`, `medium`, `high`, `xhigh` o `max`; `none` también se admite con Cline. `null` usa el valor del proveedor.
 - `validation.commands`: comandos que se ejecutan en todas las tareas, además de los de la tarea.
 - `policy`: sustituye valores del nivel, p. ej. `{ "maxRetries": 3, "review": "selective", "selfReview": { "normal": "pass" } }`.
 
@@ -384,7 +386,7 @@ Las credenciales no se guardan en la configuración de AgentRelay: las gestiona 
 
 ### Usar Codex (cuenta de ChatGPT)
 
-Es el ejecutor por defecto y trabaja con la sesión de tu cuenta de ChatGPT, sin API de pago por uso. AgentRelay usa la copia instalada con él (`@openai/codex`) y, si no existe, busca una en el `PATH` y, por último, la que incluye la extensión de OpenAI para VS Code. Conecta tu cuenta una vez con `agentrelay login`. Para usar otro modelo de los que ofrezca tu cuenta, cámbialo en `agentrelay.config.local.json`:
+Es el ejecutor por defecto y trabaja con la sesión de tu cuenta de ChatGPT, sin API de pago por uso. AgentRelay usa la copia instalada con él (`@openai/codex`) y, si no existe, busca una en el `PATH` y, por último, la que incluye la extensión de OpenAI para VS Code. Conecta tu cuenta una vez con `agentrelay login`. GPT-6 Luna es el modelo de Codex por defecto; para usar otro modelo que ofrezca tu cuenta, cámbialo en `agentrelay.config.local.json`:
 
 ```json
 { "executor": { "model": "gpt-5.5" } }
