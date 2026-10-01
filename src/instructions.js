@@ -66,6 +66,7 @@ export const PROJECT_BLOCK = [
   '### Otros',
   '',
   '- Si `agentrelay` indica que el proyecto no es un repositorio git, pide confirmación al usuario y ejecuta `agentrelay init --yes`.',
+  '- **En Windows (PowerShell o cmd)** usa `agentrelay.cmd` en lugar de `agentrelay` (el segundo es un script de Unix y falla con errores de `sed`, `dirname` o `uname`). Nunca modifiques ese script. El `<<EOF` no existe en PowerShell: guarda el JSON de la tarea en un archivo temporal FUERA del repositorio (por ejemplo `$env:TEMP\\tarea.json`) y lanza `agentrelay.cmd run $env:TEMP\\tarea.json`; un archivo dentro del repositorio ensuciaría el árbol.',
   '- Si una ejecución falla por una causa externa (sesión caducada, PowerShell bloqueado), díselo al usuario en lugar de hacer el trabajo tú en silencio.',
   '<!-- agentrelay:end -->',
 ].join('\n');
