@@ -42,6 +42,10 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.match(r1.stdout, /<!-- agentrelay:end -->/);
     assert.ok(r1.stdout.includes(claude));
     assert.match(r1.stdout, /agentrelay setup --uninstall/);
+    const commandDir = path.join(dir, 'commands', 'agentrelay');
+    assert.ok(existsSync(path.join(commandDir, 'estado.md')));
+    assert.match(r1.stdout, /comandos creados: 6/);
+    assert.match(r1.stdout, /Comandos de Claude Code: \/agentrelay:estado/);
     assert.equal(readFileSync(claude, 'utf8'), GLOBAL_BLOCK + '\n');
 
     // Repetirlo no cambia nada.
@@ -49,6 +53,7 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     const r2 = run(['setup', '--yes', '--claude-dir', dir], dir);
     assert.equal(r2.status, 0, r2.stderr);
     assert.equal(readFileSync(claude, 'utf8'), before);
+    assert.match(r2.stdout, /sin cambios/);
 
     // Con contenido previo lo conserva.
     const dir2 = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-'));
@@ -68,9 +73,20 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.equal(r4.status, 0, r4.stderr);
     assert.match(r4.stdout, /<!-- agentrelay:start -->/);
     assert.equal(existsSync(claude), false);
+    assert.equal(existsSync(commandDir), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('setup --no-commands omite la instalación de comandos', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-no-commands-'));
+  try {
+    fakeCodexConfig(dir);
+    const result = run(['setup', '--yes', '--no-commands', '--claude-dir', dir], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(path.join(dir, 'commands', 'agentrelay')), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('setup sin --yes y sin TTY no escribe y sale con código 1', () => {

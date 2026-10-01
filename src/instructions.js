@@ -205,6 +205,8 @@ export function setupExplanation(file, removing = false) {
     'Indica a Claude cuándo y cómo delegar tareas con AgentRelay en cualquier proyecto.',
     `Se instalará en ${file}: si el archivo no existe se creará, y si ya tiene el bloque se actualizará.`,
     'No se modifica nada fuera de las marcas.',
+    'También se instalarán los comandos de Claude Code; solo se modifican archivos con la marca <!-- agentrelay:managed -->.',
+    'Para retirar también esos comandos, ejecuta "agentrelay setup --uninstall".',
     'Para quitarlo, ejecuta "agentrelay setup --uninstall".',
   ];
 }

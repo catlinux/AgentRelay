@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, agentrelayHome, loadConfig } from './config.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
+import { commandsStatus, commandsTargetDir, installCommands, removeCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue, readSettings, setSetting, settingsFile, unsetSetting, writeSettings } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
@@ -111,6 +112,7 @@ const OPTIONS = {
   force: { type: 'boolean' },
   yes: { type: 'boolean' },
   uninstall: { type: 'boolean' },
+  'no-commands': { type: 'boolean' },
   'claude-dir': { type: 'string' },
   'with-config': { type: 'boolean' },
   project: { type: 'boolean' },
@@ -306,6 +308,12 @@ async function cmdDoctor(values) {
   if (globalStatus === 'current') line(true, 'Instrucciones globales del orquestador: al día');
   else if (globalStatus === 'outdated') warn('Las instrucciones globales del orquestador están desactualizadas. Ejecuta "agentrelay setup".');
   else warn('Las instrucciones globales del orquestador no están instaladas. Ejecuta "agentrelay setup".');
+  const commandStatus = commandsStatus(values['claude-dir']);
+  if (commandStatus.details.every(({ state }) => state === 'foreign')) {
+    process.stdout.write('[ok]   Los comandos de Claude Code existentes son tuyos; se conservan.\n');
+  } else if (commandStatus.status === 'current') line(true, 'Comandos de Claude Code (/agentrelay:…): al día');
+  else if (commandStatus.status === 'outdated') warn('Los comandos de Claude Code (/agentrelay:…) están desactualizados. Ejecuta "agentrelay setup".');
+  else warn('Los comandos de Claude Code (/agentrelay:…) no están instalados. Ejecuta "agentrelay setup".');
   if (root) {
     const projectStatus = blockStatus(path.join(root, 'CLAUDE.md'), PROJECT_BLOCK);
     if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
@@ -703,6 +711,9 @@ async function cmdSetup(values) {
 
   if (removing) {
     const { action } = removeBlockFromFile(file);
+    const commands = removeCommands(values['claude-dir']);
+    process.stdout.write(`Comandos de Claude Code eliminados: ${commands.removed.length ? commands.removed.join(', ') : 'ninguno'}\n`);
+    if (commands.kept.length) process.stdout.write(`Conservados (archivo tuyo): ${commands.kept.join(', ')}\n`);
     process.stdout.write(`${action === 'removed' ? 'eliminado' : 'no había bloque'} ${file}\n`);
   } else {
     const { action } = applyBlockToFile(file, GLOBAL_BLOCK);
@@ -710,6 +721,16 @@ async function cmdSetup(values) {
     process.stdout.write(`${label} ${file}\n`);
   }
   if (!removing) {
+    if (!values['no-commands']) {
+      process.stdout.write(`Comandos de Claude Code: /agentrelay:estado, /agentrelay:modelo, /agentrelay:esfuerzo, /agentrelay:nivel, /agentrelay:ejecutor y /agentrelay:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      const result = installCommands(values['claude-dir']);
+      const counts = [];
+      if (result.created.length) counts.push(`comandos creados: ${result.created.length}`);
+      if (result.updated.length) counts.push(`actualizados: ${result.updated.length}`);
+      if (result.unchanged.length) counts.push('sin cambios');
+      process.stdout.write(`${counts.join(' · ') || 'sin cambios'}\n`);
+      if (result.skipped.length) process.stdout.write(`omitidos (ya existía un archivo tuyo con ese nombre): ${result.skipped.join(', ')}\n`);
+    }
     const dir = executorsDir();
     const requested = [...new Set((values.executors || '').split(',').map((item) => item.trim()).filter(Boolean))];
     for (const name of requested) {
