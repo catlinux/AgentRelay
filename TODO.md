@@ -124,6 +124,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
     - `set`/`unset` editan ese mismo archivo línea a línea, conservando los comentarios (`--local` pasa a significar «el archivo del proyecto»).
     - `agentrelay config refresh` reescribe la lista de modelos sin tocar los valores del usuario.
     - Tareas, en orden: (1) módulo de edición de texto con comentarios (`src/config-file.js`) con pruebas; (2) cargador de 2 capas + migración + `set`/`unset`; (3) lista de modelos + `config refresh`; (4) `init` + `.gitignore` + documentación.
+      - [x] (2a) módulo de migración `src/config-migrate.js` (`settings.json` y `.local.json` a los dos archivos nuevos, con copia `.bak`)
+      - [ ] (2b) cargador de 2 capas, migración automática al arrancar y `set`/`unset` sobre el archivo
     - [ ] (1) módulo de edición `src/config-file.js`
     - [ ] (2) cargador de 2 capas, migración y `set`/`unset`
     - [ ] (3) lista de modelos y `config refresh`
