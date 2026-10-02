@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
@@ -57,6 +58,7 @@ Uso:
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
+  agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
   agentrelay config refresh [--only <ejecutor>] [--dry-run] Actualiza la lista de modelos
@@ -142,6 +144,7 @@ const OPTIONS = {
   'dry-run': { type: 'boolean' },
   only: { type: 'string' },
   yes: { type: 'boolean' },
+  check: { type: 'boolean' },
   uninstall: { type: 'boolean' },
   'no-commands': { type: 'boolean' },
   'claude-dir': { type: 'string' },
@@ -1049,6 +1052,62 @@ async function cmdSetup(values) {
   return 0;
 }
 
+async function cmdUpdate(values) {
+  const root = path.resolve(process.env.AGENTRELAY_INSTALL_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
+  if (!existsSync(path.join(root, '.git'))) {
+    process.stderr.write('Esta instalación no puede actualizarse sola. La instalación global con npm i -g todavía no es compatible.\n');
+    return 1;
+  }
+  const git = async (args) => runProcess('git', args, { cwd: root, windowsShell: false, timeoutMs: 120_000 });
+  const dirty = await git(['status', '--porcelain']);
+  if (dirty.code !== 0) { process.stderr.write(`No se pudo comprobar el estado de la instalación: ${dirty.stderr.trim()}\n`); return 1; }
+  if (dirty.stdout.trim()) {
+    process.stderr.write(`La instalación tiene cambios locales; no se modificó nada:\n${dirty.stdout.trim()}\n`);
+    return 1;
+  }
+  const fetched = await git(['fetch']);
+  if (fetched.code !== 0) { process.stderr.write(`git fetch falló: ${fetched.stderr.trim()}\n`); return 1; }
+  const old = (await git(['rev-parse', 'HEAD'])).stdout.trim();
+  let upstreamResult = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+  const upstream = upstreamResult.code === 0 ? upstreamResult.stdout.trim() : 'origin/main';
+  const upstreamHead = await git(['rev-parse', '--verify', upstream]);
+  if (upstreamHead.code !== 0) { process.stderr.write(`No se encuentra la rama remota ${upstream}. Comprueba el remoto con: git -C "${root}" remote -v\n`); return 1; }
+  const counts = await git(['rev-list', '--left-right', '--count', `HEAD...${upstream}`]);
+  const [ahead, behind] = counts.stdout.trim().split(/\s+/).map(Number);
+  if (ahead > 0) {
+    process.stderr.write(`La rama local tiene ${ahead} commit(s) que no están en ${upstream}; no se modificó nada. Inspecciona con:\ngit -C "${root}" log --oneline ${upstream}..HEAD\ngit -C "${root}" status\n`);
+    return 1;
+  }
+  if (behind === 0) { process.stdout.write(`Ya tienes la última versión (${old.slice(0, 7)})\n`); return 0; }
+  const incoming = await git(['log', '--format=%h %s', '--max-count=20', `HEAD..${upstream}`]);
+  process.stdout.write(`Cambios disponibles:\n${incoming.stdout.trim()}\n`);
+  const total = Number((await git(['rev-list', '--count', `HEAD..${upstream}`])).stdout.trim());
+  if (total > 20) process.stdout.write(`… y ${total - 20} más\n`);
+  if (values.check) return 0;
+  if (!values.yes) {
+    if (!process.stdin.isTTY) { process.stdout.write('Para aplicar la actualización, ejecuta: agentrelay update --yes\n'); return 0; }
+    const answer = await confirm('¿Actualizar AgentRelay ahora?', { yes: false });
+    if (answer !== true) { process.stdout.write(answer === null ? 'Para aplicar la actualización, ejecuta: agentrelay update --yes\n' : 'Cancelado.\n'); return answer === null ? 0 : 1; }
+  }
+  const pulled = upstreamResult.code === 0
+    ? await git(['pull', '--ff-only'])
+    : await git(['pull', '--ff-only', 'origin', 'main']);
+  if (pulled.code !== 0) { process.stderr.write(`No se pudo avanzar sin conflictos. Inspecciona con:\ngit -C "${root}" status\ngit -C "${root}" log --oneline --graph --decorate -20\n${pulled.stderr.trim()}\n`); return 1; }
+  process.stdout.write('Instalando dependencias (npm ci)…\n');
+  const npm = await runProcess('npm', ['ci'], { cwd: root, timeoutMs: 10 * 60 * 1000 });
+  if (npm.code !== 0 || npm.error || npm.timedOut) {
+    const output = [npm.stdout, npm.stderr].filter(Boolean).join('\n').trim();
+    process.stderr.write(`npm ci falló${output ? `:\n${output.split(/\r?\n/).slice(-30).join('\n')}` : ''}\n`);
+    return 1;
+  }
+  const setup = await cmdSetup({ yes: true, cwd: root });
+  if (setup !== 0) return setup;
+  const doctor = await cmdDoctor({ cwd: root });
+  const updated = (await git(['rev-parse', 'HEAD'])).stdout.trim();
+  process.stdout.write(`Actualización: ${old.slice(0, 7)} → ${updated.slice(0, 7)}. Reinicia agentrelay watch y el chat del orquestador si estaban abiertos.\n`);
+  return doctor;
+}
+
 /** Crea agentrelay.config.json si se pidió con --with-config y no existe. */
 function writeConfigIfRequested(root, values) {
   if (!values['with-config']) return;
@@ -1318,6 +1377,7 @@ export async function main(argv, runtime = {}) {
       case 'pricing': return await cmdPricing(values, runtime);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
+      case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);

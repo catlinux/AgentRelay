@@ -122,7 +122,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
         - HECHO: el estado se actualiza solo tras `run`/`review`/`recover`/`init` y el bloque de instrucciones dice al orquestador que lo lea al empezar.
         - HECHO (seguridad): `doctor` muestra el final de la clave de API de OpenAI que enseña Codex (`sk-proj-***xxxxx`); mostrar solo «clave de API» para no filtrarla al compartir la salida.
       - [ ] 2. Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIAR primero (¿cadena automática de ejecutores o un menú?). No empezar sin hablarlo.
-      - [ ] 3. `agentrelay update`: `git pull`, `npm ci`, `setup` y `doctor` de la copia instalada. Confirmado.
+      - [x] 3. `agentrelay update`: `git pull`, `npm ci`, `setup` y `doctor` de la copia instalada. Confirmado.
+        - Nota: la copia instalada de producción tenía 6 commits locales (merges e `init`) que impedían actualizar; `update` se niega a tocarla. Restablecer una vez a mano a `origin/main` y no ejecutar `init` en esa carpeta.
       - [ ] 4. `doctor --fix`: arreglar solo lo que se sepa arreglar bien (sandbox de Windows, ejecuciones colgadas, `.gitignore`). Hablarlo con más detalle antes: asegurar que lo hace bien y sin riesgo.
       - [ ] 5. Estado vivo del proyecto (qué se hizo, qué falta, ejecuciones), mantenido por AgentRelay para que un orquestador nuevo continúe sin preguntar. Necesario: el usuario se pierde con tanta configuración.
         - [x] Base hecha: `src/project-state.js` y `agentrelay status [--write] [--json]` (resumen de git, ejecutor, instrucciones, ejecuciones, commits y pendientes, con consejos de qué hacer ahora). Falta: actualizarlo solo tras cada `run`/`review`, y que el bloque de instrucciones diga al orquestador que lo lea al empezar.
