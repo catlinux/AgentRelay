@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-10-03
+
+MVP: configuración en un solo archivo, ejecutores Codex y OpenCode, triaje adaptativo, `start`, `status`, `update` y comandos `/` de Claude Code.
+
 ### Añadido
 
 - Ejecutor **OpenCode** (`agentrelay set executor opencode`): usa `opencode run --auto --format json` con los modelos gratuitos de OpenCode (por ejemplo `opencode/nemotron-3-ultra-free`) o los de Ollama en la nube (`ollama/...:cloud`). Lee los tokens y no inventa costes (los modelos gratuitos salen a 0). Tras una comparativa con la misma tarea en seis modelos gratuitos, `nemotron-3-ultra-free` fue el más fiable.

@@ -4,7 +4,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 
 ## Ahora (lo que toca hacer; `agentrelay status` enseña esta sección)
 
-- [ ] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
+- [x] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
