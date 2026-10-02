@@ -9,7 +9,9 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
 - [ ] `agentrelay models --all`: inventario de modelos en un solo sitio (dónde corre cada uno, gratis o de pago, probado o no); ver `docs/MODELOS.md`.
-- [ ] Pulir: sangría de las opciones que activa `set`, y reintento si `opencode models` falla en frío.
+- [ ] Pulir: sangría de las opciones que activa `set`.
+- [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.
+- [ ] Aviso de `start`/`init` dentro de la copia instalada: no se distingue de forma fiable de la copia de desarrollo (ambas son «la raíz del paquete»); decidir con el usuario cómo detectarla.
 
 ## 0.0.x — Prototipo
 

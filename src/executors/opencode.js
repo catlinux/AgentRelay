@@ -23,11 +23,14 @@ export const loginHint = 'Ejecuta "opencode auth login" para conectar tu cuenta.
 export async function listModels(executor, { run = runProcess } = {}) {
   try {
     const [command, ...prefix] = commandParts(executor.command);
-    const res = await run(command, [...prefix, 'models'], { timeoutMs: 60_000 });
-    if (res.code !== 0) return [];
-    return res.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((id) => ({
-      id, efforts: null, defaultEffort: null,
-    }));
+    // En frío la primera llamada a veces falla o sale vacía: se reintenta una vez.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await run(command, [...prefix, 'models'], { timeoutMs: 60_000 });
+      if (res.code !== 0) continue;
+      const ids = res.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (ids.length) return ids.map((id) => ({ id, efforts: null, defaultEffort: null }));
+    }
+    return [];
   } catch {
     return [];
   }

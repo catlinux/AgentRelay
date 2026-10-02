@@ -9,6 +9,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ### Añadido
 
 - Ejecutor **OpenCode** (`agentrelay set executor opencode`): usa `opencode run --auto --format json` con los modelos gratuitos de OpenCode (por ejemplo `opencode/nemotron-3-ultra-free`) o los de Ollama en la nube (`ollama/...:cloud`). Lee los tokens y no inventa costes (los modelos gratuitos salen a 0). Tras una comparativa con la misma tarea en seis modelos gratuitos, `nemotron-3-ultra-free` fue el más fiable.
+- Si `opencode models` falla o sale vacío en frío, se reintenta una vez antes de dar la lista por vacía.
 - El bloque de instrucciones del proyecto incluye una nota para Windows: usar `agentrelay.cmd` y guardar la tarea JSON en un archivo temporal fuera del repositorio.
 - `agentrelay set` y `unset` con `--local` (o `--project`): guardan un ajuste solo en el proyecto actual, en `agentrelay.config.json`, sin perder los comentarios del archivo.
 - Rutas clicables en la salida en directo (`watch`, `run`, `review`): las rutas de lo que el ejecutor lee o edita son enlaces de terminal (OSC 8) a la ruta absoluta, que se abren con Ctrl+clic desde cualquier carpeta. Se activan solos en las terminales compatibles; `AGENTRELAY_LINKS=1` los fuerza y `=0` los desactiva.
