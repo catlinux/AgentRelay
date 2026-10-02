@@ -34,7 +34,7 @@ import { appendEvent } from './events.js';
 import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
 import { PRICES_SOURCE, loadPrices, localWindows, nextChange, tariffAt } from './pricing.js';
-import { collectProjectState, renderProjectState, writeProjectState } from './project-state.js';
+import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -1081,14 +1081,17 @@ function initInstructionFiles(dir) {
 
 function ensureProjectConfigIgnored(root) {
   const file = path.join(root, '.gitignore');
+  const requiredEntries = [CONFIG_FILE, '.agentrelay/'];
   if (!existsSync(file)) {
-    writeFileSync(file, `${CONFIG_FILE}\n`, 'utf8');
+    writeFileSync(file, `${requiredEntries.join('\n')}\n`, 'utf8');
     return true;
   }
   const text = readFileSync(file, 'utf8');
-  if (text.split(/\r?\n/).includes(CONFIG_FILE)) return false;
+  const lines = text.split(/\r?\n/);
+  const missingEntries = requiredEntries.filter((entry) => !lines.includes(entry));
+  if (!missingEntries.length) return false;
   const newline = text.includes('\r\n') ? '\r\n' : '\n';
-  writeFileSync(file, `${text}${text && !text.endsWith('\n') ? newline : ''}${CONFIG_FILE}${newline}`, 'utf8');
+  writeFileSync(file, `${text}${text && !text.endsWith('\n') ? newline : ''}${missingEntries.join(newline)}${newline}`, 'utf8');
   return true;
 }
 
@@ -1332,5 +1335,14 @@ export async function main(argv, runtime = {}) {
   } catch (error) {
     process.stderr.write(`Error: ${error.message}\n`);
     return 1;
+  } finally {
+    if (['run', 'review', 'recover', 'init'].includes(command) && process.env.AGENTRELAY_NO_STATE !== '1') {
+      try {
+        const root = await repoRoot(path.resolve(values.cwd || process.cwd()));
+        if (root) await refreshProjectState(root);
+      } catch {
+        // La actualización automática del estado nunca altera el comando.
+      }
+    }
   }
 }

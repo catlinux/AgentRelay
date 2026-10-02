@@ -112,3 +112,12 @@ export async function writeProjectState(root, options) {
   renameSync(temp, file);
   return file;
 }
+
+export async function refreshProjectState(root) {
+  if (process.env.AGENTRELAY_NO_STATE === '1') return;
+  try {
+    await writeProjectState(root);
+  } catch {
+    // El refresco del estado es auxiliar y nunca debe afectar al comando.
+  }
+}

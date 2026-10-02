@@ -307,7 +307,7 @@ test('init crea .gitignore en un repo existente y confirma junto a las instrucci
     const r = run(['init', '--yes'], repo.dir);
     assert.equal(r.status, 0, r.stderr);
     const ignored = readFileSync(path.join(repo.dir, '.gitignore'), 'utf8');
-    assert.equal(ignored, 'node_modules/\r\nagentrelay.config.json\r\n');
+    assert.equal(ignored, 'node_modules/\r\nagentrelay.config.json\r\n.agentrelay/\r\n');
     assert.equal(ignored.split(/\r?\n/).filter((line) => line === 'agentrelay.config.json').length, 1);
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
     assert.ok(names.includes('.gitignore'));

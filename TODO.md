@@ -119,8 +119,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
   - [ ] Simplificar y automatizar el arranque y la continuación de un proyecto (hoy hay que hacer `git commit`, `init`, `doctor`, `watch` y reiniciar el chat a mano). Idea: un solo comando que prepare el proyecto, y que el orquestador retome el estado leyendo el repositorio.
     - Prioridades acordadas el 2026-10-02 (máxima prioridad: facilidad y automatización):
       - [x] 1. `agentrelay start`: un solo comando para empezar o continuar un proyecto (prepara la carpeta, commit inicial, comprueba ejecutor y orquestador, deja un archivo de estado legible por cualquier orquestador). Confirmado.
-        - Pendiente: el estado debe actualizarse solo tras `run`/`review`/`init`, y el bloque de instrucciones debe decir al orquestador que lea `.agentrelay/ESTADO.md` al empezar.
-        - Pendiente (seguridad): `doctor` muestra el final de la clave de API de OpenAI que enseña Codex (`sk-proj-***xxxxx`); mostrar solo «clave de API» para no filtrarla al compartir la salida.
+        - HECHO: el estado se actualiza solo tras `run`/`review`/`recover`/`init` y el bloque de instrucciones dice al orquestador que lo lea al empezar.
+        - HECHO (seguridad): `doctor` muestra el final de la clave de API de OpenAI que enseña Codex (`sk-proj-***xxxxx`); mostrar solo «clave de API» para no filtrarla al compartir la salida.
       - [ ] 2. Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIAR primero (¿cadena automática de ejecutores o un menú?). No empezar sin hablarlo.
       - [ ] 3. `agentrelay update`: `git pull`, `npm ci`, `setup` y `doctor` de la copia instalada. Confirmado.
       - [ ] 4. `doctor --fix`: arreglar solo lo que se sepa arreglar bien (sandbox de Windows, ejecuciones colgadas, `.gitignore`). Hablarlo con más detalle antes: asegurar que lo hace bien y sin riesgo.

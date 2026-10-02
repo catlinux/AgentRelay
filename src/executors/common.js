@@ -8,6 +8,10 @@ import { realpathSync } from 'node:fs';
 
 const toArray = (value) => (Array.isArray(value) ? value : value ? [value] : []);
 
+export function maskSecrets(text) {
+  return String(text ?? '').replace(/\bsk-(?:proj-)?[A-Za-z0-9_*\-]+/gi, 'clave de API');
+}
+
 /** Busca el último bloque JSON del texto final con el informe del ejecutor. */
 export function extractAgentReport(text) {
   if (!text) return null;

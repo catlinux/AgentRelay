@@ -85,7 +85,7 @@ test('init --yes respeta un .gitignore existente', () => {
     writeFileSync(path.join(dir, '.gitignore'), existing);
     const r = runCli(['init', '--yes'], dir, { env: fullEnv(GIT_IDENT) });
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(dir, '.gitignore'), 'utf8'), `${existing}agentrelay.config.json\n`);
+    assert.equal(readFileSync(path.join(dir, '.gitignore'), 'utf8'), `${existing}agentrelay.config.json\n.agentrelay/\n`);
     assert.ok(r.stdout.includes('Se respetará el .gitignore existente'), r.stdout);
   } finally {
     rmSync(dir, { recursive: true, force: true });

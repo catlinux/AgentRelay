@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInteractive, runProcess } from '../proc.js';
-import { clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, relativize, tail } from './common.js';
+import { clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, relativize, tail } from './common.js';
 
 export const name = 'codex';
 
@@ -286,11 +286,11 @@ export async function authStatus(executor) {
   try {
     const [command, ...prefix] = commandParts(executor.command);
     const res = await runProcess(command, [...prefix, 'login', 'status'], { timeoutMs: 60_000 });
-    const message = `${res.stdout}\n${res.stderr}`.split(/\r?\n/).find((line) => line.trim())?.trim();
+    const message = maskSecrets(`${res.stdout}\n${res.stderr}`.split(/\r?\n/).find((line) => line.trim())?.trim());
     if (res.code === 0) return { ok: true, message: message || 'Sesión activa' };
-    return { ok: false, message: res.error?.message || `No hay sesión iniciada. ${loginHint}` };
+    return { ok: false, message: maskSecrets(res.error?.message || `No hay sesión iniciada. ${loginHint}`) };
   } catch (error) {
-    return { ok: false, message: error.message };
+    return { ok: false, message: maskSecrets(error.message) };
   }
 }
 
