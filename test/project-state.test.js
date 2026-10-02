@@ -107,3 +107,13 @@ test('status --json imprime JSON y status rechaza carpetas fuera de git', () => 
     rmSync(temp, { recursive: true, force: true });
   }
 });
+
+test('collectProjectState prefiere la sección «Ahora» del TODO.md y, sin ella, usa todo el archivo', async () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(path.join(repo.dir, 'TODO.md'), '# TODO\n\n- [ ] Antiguo\n\n## Ahora\n\n- [ ] Lo de ahora\n- [x] Hecho\n\n## Más adelante\n\n- [ ] Lejano\n');
+    assert.deepEqual((await collectProjectState(repo.dir, { now: new Date() })).todo, ['Lo de ahora']);
+    writeFileSync(path.join(repo.dir, 'TODO.md'), '# TODO\n\n- [ ] Uno\n- [ ] Dos\n');
+    assert.deepEqual((await collectProjectState(repo.dir, { now: new Date() })).todo, ['Uno', 'Dos']);
+  } finally { repo.cleanup(); }
+});

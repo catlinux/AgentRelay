@@ -39,9 +39,16 @@ export async function collectProjectState(root, { now = new Date() } = {}) {
     objective: short(state.task?.objective || state.task?.title || '', 100),
   }));
   const todoFile = path.join(absoluteRoot, 'TODO.md');
-  const todo = existsSync(todoFile)
-    ? readFileSync(todoFile, 'utf8').split(/\r?\n/).filter((line) => /^\s*- \[ \]/.test(line)).slice(0, 10).map((line) => short(line.replace(/^\s*- \[ \]\s*/, ''), 140))
-    : [];
+  const todoLines = existsSync(todoFile) ? readFileSync(todoFile, 'utf8').split(/\r?\n/) : [];
+  // Si el TODO.md tiene una sección «## Ahora», solo se muestra lo pendiente de esa sección.
+  const nowStart = todoLines.findIndex((line) => /^##\s+Ahora\b/.test(line));
+  let scope = todoLines;
+  if (nowStart >= 0) {
+    const rest = todoLines.slice(nowStart + 1);
+    const nowEnd = rest.findIndex((line) => /^##\s/.test(line));
+    scope = nowEnd >= 0 ? rest.slice(0, nowEnd) : rest;
+  }
+  const todo = scope.filter((line) => /^\s*- \[ \]/.test(line)).slice(0, 10).map((line) => short(line.replace(/^\s*- \[ \]\s*/, ''), 140));
   const branchResult = await runProcess('git', ['branch', '--show-current'], { cwd: absoluteRoot, windowsShell: false });
   if (branchResult.code !== 0) throw new Error(`git branch ha fallado: ${branchResult.stderr.trim()}`);
   const awaitingReview = allRuns.filter(({ state }) => state.status === 'awaiting_review').map(({ id }) => id);

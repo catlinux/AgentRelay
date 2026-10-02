@@ -2,6 +2,15 @@
 
 Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://semver.org/lang/es/): `0.0.x` prototipo y correcciones, `0.1.0` MVP, `1.0.0` primera versión estable.
 
+## Ahora (lo que toca hacer; `agentrelay status` enseña esta sección)
+
+- [ ] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
+- [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
+- [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
+- [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
+- [ ] `agentrelay models --all`: inventario de modelos en un solo sitio (dónde corre cada uno, gratis o de pago, probado o no); ver `docs/MODELOS.md`.
+- [ ] Pulir: sangría de las opciones que activa `set`, y reintento si `opencode models` falla en frío.
+
 ## 0.0.x — Prototipo
 
 - [x] Salida en directo y comando `watch` (0.0.2).
