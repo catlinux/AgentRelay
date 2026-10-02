@@ -91,7 +91,7 @@ agentrelay executors               # lists executors, which ones are installed a
 agentrelay executors add cline     # installs Cline (DeepSeek or other providers with an API key)
 ```
 
-`agentrelay setup` also offers to install them (or `agentrelay setup --executors cline`, which selects Cline directly without the optional-executor prompt). When Cline is installed, AgentRelay shows the command to configure its provider; if you already use the Cline extension in VS Code, it shares its configuration (`~/.cline/data`) and nothing else is needed. To use it, set `{ "executor": { "type": "cline" } }` in `agentrelay.config.local.json`.
+`agentrelay setup` also offers to install them (or `agentrelay setup --executors cline`, which selects Cline directly without the optional-executor prompt). When Cline is installed, AgentRelay shows the command to configure its provider; if you already use the Cline extension in VS Code, it shares its configuration (`~/.cline/data`) and nothing else is needed. To use it in a project, run `agentrelay set --local executor cline`.
 
 To update later, in the AgentRelay folder: `git pull` and then `npm ci` (it installs exactly the versions in `package-lock.json` without changing it; `npm install` may rewrite it and make the next `git pull` fail). If `git pull` says your local changes to `package-lock.json` would be overwritten, discard them with `git checkout -- package-lock.json` (npm regenerates them; you lose nothing) and run `git pull` again. Then run `agentrelay doctor`: it warns you (`[aviso]`) if you need to repeat `agentrelay setup` (the orchestrator's global instructions) or `agentrelay init` (the project's instructions), which happens when a new version changes those instructions. If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code.
 
@@ -304,13 +304,12 @@ Self-review does not replace the orchestrator's review: the executor checks whet
 
 ## Configuration
 
-All configuration can be done in text files with **comments** (`//` and `/* */`) and trailing commas (JSON with comments). There are three places, from lowest to highest priority:
+All configuration can be done in text files with **comments** (`//` and `/* */`) and trailing commas (JSON with comments). There are two files, from lowest to highest priority:
 
 | File | Purpose |
 |---|---|
-| `~/.agentrelay/config.json` (or `AGENTRELAY_HOME/config.json`) | **Your personal settings**, valid in every project: executor, model, reasoning effort (`thinking`), level, timeouts. |
-| `agentrelay.config.json` at the repository root (optional) | Project-specific things: validation commands, policy, level. It can be versioned. |
-| `agentrelay.config.local.json` (optional) | Local project settings that should not be versioned. |
+| `~/.agentrelay/config.json` (or `AGENTRELAY_HOME/config.json`) | Your general settings and personal defaults. |
+| `agentrelay.config.json` at the repository root | Your preferences for this project: executor, model and effort. AgentRelay adds it to `.gitignore` when you run `agentrelay init`, so it is not shared. |
 
 Command-line options take precedence over all of them.
 
@@ -319,15 +318,17 @@ Command-line options take precedence over all of them.
 ```sh
 agentrelay models                # models of your account and the efforts each one supports; marks the active one
 agentrelay set model gpt-5.5     # change the executor's model
-agentrelay set effort alto       # terminal command; effort values also accept low, medium, high, xhigh or max
+agentrelay set effort alto       # effort: low, medium, high, xhigh or max (also bajo, medio, alto, extremo or máximo)
 agentrelay set level 4           # orchestration level (1-5)
 agentrelay set executor cline    # switch executor (forgets the previous one's saved model)
 agentrelay unset effort          # back to the default
 ```
 
-These terminal commands write to `~/.agentrelay/settings.json`, a file they manage themselves (do not edit it by hand: that way your explained `config.json` keeps its comments). It has priority over `config.json` and loses to the project files; if a project file overrides what you just changed, `set` warns you. The result is validated and, if invalid, it is not saved. `agentrelay config` shows where each value comes from. GPT-6 Luna is the default Codex model; you can change the model with `agentrelay set model <id>` or in project configuration, and tune effort and level.
+`agentrelay set <key> <value>` and `agentrelay unset <key>` save changes to the global file; add `--project` (or `--local`) to change project preferences. If the file does not exist yet, it is created with every option explained. Changes preserve comments. AgentRelay validates values before saving. GPT-6 Luna is the default Codex model; you can change it with `agentrelay set model <id>` or in the project preferences, and adjust effort and level.
 
-To save a setting **only for the current project**, add `--local`: `agentrelay set effort alto --local` (and `unset … --local`) stores it in `agentrelay.config.local.json`. If that file already has comments or its own format, AgentRelay **does not rewrite it** (it asks you to edit it by hand) so no comments are lost.
+To set something **only for the current project**, use `agentrelay set effort alto --local` or `agentrelay unset effort --local`.
+
+Priority, from lowest to highest: AgentRelay defaults, executor defaults, global configuration, project preferences and command-line options.
 
 **Commands inside the Claude Code chat.** `agentrelay setup` also installs some custom `/` commands that show up in the menu when you type `/ar`, with autocompletion and an argument hint. They carry the `ar:` prefix so they are not confused with Claude Code's own (`/model`, `/effort`, which change *your* model, the orchestrator's):
 
@@ -347,11 +348,16 @@ Each one runs the equivalent `agentrelay` command (`models`, `set`, `config`…)
 ```sh
 agentrelay config init            # creates your personal file, explained option by option
 agentrelay config init --project  # creates the project one
-agentrelay config                 # shows the effective configuration and where each value comes from
-agentrelay config path            # shows where the files are and which exist
+agentrelay config init --force    # recreates the file even if it already exists
+agentrelay config refresh         # updates the commented model list in the global file
+agentrelay config refresh --only codex  # updates only that executor's list
+agentrelay config migrate         # migrates files from earlier versions
+agentrelay config migrate --dry-run  # shows what would be migrated without changing files
+agentrelay config show            # shows effective values and where each comes from
+agentrelay config path            # shows the paths of the two files
 ```
 
-The file created by `config init` contains **every option commented out** with its explanation, valid values and default: uncomment only what you want to change, and whatever you leave commented keeps following the default even if it changes in future versions. AgentRelay validates the values with clear messages and warns about typos ("did you mean `model`?").
+`config init` creates the file with every option commented, what it does and which values it accepts. The global file also includes the model list for Codex, Cline/DeepSeek and OpenCode, with the model in use marked. `config refresh --only <executor>` updates that list for one executor; add `--dry-run` to preview the changes. If old files (`settings.json` or `agentrelay.config.local.json`) are still present, AgentRelay automatically migrates them when any command starts and keeps a `.bak` copy; you can also run the migration by hand. AgentRelay warns if an old file is still found and has not been migrated.
 
 Default values:
 
@@ -386,7 +392,7 @@ Credentials are not stored in AgentRelay's configuration: the executor manages t
 
 ### Using Codex (ChatGPT account)
 
-It is the default executor and works with your ChatGPT account session, without pay-per-use API access. AgentRelay uses the copy installed with it (`@openai/codex`) and, if it is missing, looks for one on the `PATH` and finally in the one bundled with the OpenAI extension for VS Code. Connect your account once with `agentrelay login`. GPT-6 Luna is the default Codex model; to use another model your account offers, change it in `agentrelay.config.local.json`:
+It is the default executor and works with your ChatGPT account session, without pay-per-use API access. AgentRelay uses the copy installed with it (`@openai/codex`) and, if it is missing, looks for one on the `PATH` and finally in the one bundled with the OpenAI extension for VS Code. Connect your account once with `agentrelay login`. GPT-6 Luna is the default Codex model; to use another model your account offers, run `agentrelay set --local model gpt-5.5`:
 
 ```json
 { "executor": { "model": "gpt-5.5" } }
