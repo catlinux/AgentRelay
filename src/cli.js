@@ -17,7 +17,7 @@ import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
 import { applyBlockToFile, blockStatus, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
-import { prepareRepository } from './prepare.js';
+import { prepareRepository, scanFolder } from './prepare.js';
 import { formatEvent, supportsLinks, useColor } from './events.js';
 import { SELF_REVIEW_MODES } from './policy.js';
 import { runProcess } from './proc.js';
@@ -48,6 +48,7 @@ Uso:
   agentrelay check [id]             Repite las validaciones sin cambiar el estado
   agentrelay list                   Lista las ejecuciones del repositorio
   agentrelay status [--write] [--json] Resume el estado del proyecto
+  agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
   agentrelay pricing [--json]      Muestra precios y tarifa DeepSeek
@@ -1199,6 +1200,65 @@ async function cmdInit(values) {
   return 0;
 }
 
+async function cmdStart(values) {
+  const dir = path.resolve(values.cwd || process.cwd());
+  process.stdout.write('1/4 Preparar el proyecto\n');
+  const initStatus = await cmdInit(values);
+  const root = await repoRoot(dir);
+  if (initStatus !== 0 || !root) return 1;
+
+  const gitignorePath = path.join(root, '.gitignore');
+  const gitignore = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf8') : '';
+  if (!gitignore.split(/\r?\n/).includes('.agentrelay/')) {
+    const newline = gitignore.includes('\r\n') ? '\r\n' : '\n';
+    writeFileSync(gitignorePath, `${gitignore}${gitignore && !gitignore.endsWith('\n') ? newline : ''}.agentrelay/${newline}`, 'utf8');
+  }
+
+  process.stdout.write('2/4 Dejar el árbol limpio\n');
+  let changes = await pendingChanges(root);
+  if (changes.length) {
+    process.stdout.write(`Hay ${changes.length} cambio(s) sin confirmar:\n`);
+    for (const change of changes) process.stdout.write(`  ${change.slice(3)}\n`);
+    const sensitive = scanFolder(root).sensitive;
+    const sensitiveChanges = changes.map((change) => change.slice(3).replace(/\\/g, '/'))
+      .filter((file) => sensitive.includes(file));
+    if (sensitiveChanges.length) {
+      if (!values.yes) {
+        await confirm('¿Confirmar esos cambios en un commit «Estado inicial»?', { yes: values.yes });
+      }
+      process.stderr.write(`No se creará el commit inicial porque hay archivos sensibles: ${sensitiveChanges.join(', ')}. Revísalos y retíralos o confírmalos manualmente.\n`);
+    } else {
+      if (sensitiveChanges.length) process.stdout.write(`Aviso: parecen sensibles: ${sensitiveChanges.join(', ')}\n`);
+      const answer = await confirm('¿Confirmar esos cambios en un commit «Estado inicial»?', { yes: values.yes });
+      if (answer === true) {
+        const committed = await commitAll(root, 'Estado inicial');
+        if (!committed.ok) process.stderr.write(`No se pudo crear el commit: ${committed.error}\n`);
+      } else {
+        process.stderr.write('AgentRelay necesita un árbol limpio para delegar. Confirma los cambios con: git add … && git commit …\n');
+      }
+    }
+    changes = await pendingChanges(root);
+    if (changes.length) {
+      process.stderr.write('AgentRelay necesita un árbol limpio para delegar. Confirma los cambios manualmente con: git add … && git commit …\n');
+    }
+  }
+  const treeClean = changes.length === 0;
+
+  process.stdout.write('3/4 Comprobar el entorno\n');
+  const doctorStatus = await cmdDoctor(values);
+
+  process.stdout.write('4/4 Estado del proyecto\n');
+  const state = await collectProjectState(root);
+  await writeProjectState(root);
+  const rendered = renderProjectState(state);
+  const section = rendered.match(/## Qué hacer ahora\n[\s\S]*?(?=\n## |$)/);
+  if (section) process.stdout.write(`${section[0]}\n`);
+  process.stdout.write('\nMensaje para tu orquestador (pégalo en su chat):\n');
+  process.stdout.write('Lee AGENTS.md y .agentrelay/ESTADO.md, ejecuta git status --short y agentrelay list, y continúa con lo pendiente. Eres el orquestador: no escribas código tú, delégalo con agentrelay run (en Windows usa agentrelay.cmd), en tareas pequeñas, y revisa cada resultado. Si tienes dudas, pregúntame antes de empezar.\n');
+  process.stdout.write('\nSigue lo que hace el ejecutor con: agentrelay watch (en otra terminal, en esta carpeta).\n');
+  return doctorStatus === 0 && treeClean ? 0 : 1;
+}
+
 export async function main(argv, runtime = {}) {
   let parsed;
   try {
@@ -1264,6 +1324,7 @@ export async function main(argv, runtime = {}) {
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
+      case 'start': return await cmdStart(values);
       default:
         process.stderr.write(`Comando desconocido: ${command}\n\n${HELP}`);
         return 1;

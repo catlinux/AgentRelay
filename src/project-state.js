@@ -53,7 +53,7 @@ export async function collectProjectState(root, { now = new Date() } = {}) {
   else if (running.length) next.push('Hay una ejecución en curso: sigue con agentrelay watch');
   else if (!clean) next.push(`Hay ${pending.length} cambios sin confirmar: confírmalos antes de delegar`);
   else if ([instructions.agents, instructions.claude].some((status) => ['missing', 'outdated', 'nofile'].includes(status))) next.push('Ejecuta agentrelay init');
-  else next.push('Todo en orden: continúa con lo primero pendiente de TODO.md');
+  else next.push(todo.length ? 'Todo en orden: continúa con lo primero pendiente de TODO.md' : 'Todo en orden: cuéntale a tu orquestador qué quieres construir');
 
   return {
     name: path.basename(absoluteRoot), root: absoluteRoot, date: now.toISOString(),
