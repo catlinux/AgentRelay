@@ -119,7 +119,7 @@ test('setup --executors cline usa un npm falso y escribe solo en la carpeta de e
     const setup = cli(cwd, ['setup', '--yes', '--claude-dir', cwd, '--executors', 'cline'], env);
     assert.equal(setup.status, 0, setup.stderr);
     assert.match(setup.stdout, /Cline instalado en/);
-    assert.match(setup.stdout, /agentrelay\.config\.local\.json/);
+    assert.match(setup.stdout, /agentrelay\.config\.json/);
     assert.ok(existsSync(path.join(dir, 'package.json')));
     assert.ok(readFileSync(log, 'utf8').includes('install'));
     assert.ok(readFileSync(path.join(cwd, 'CLAUDE.md'), 'utf8').includes('agentrelay:start'));

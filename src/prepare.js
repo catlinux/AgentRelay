@@ -23,6 +23,7 @@ export const DEFAULT_GITIGNORE = [
   '.htpasswd',
   'node_modules/',
   '.agentrelay/',
+  'agentrelay.config.json',
   '*.log',
   '.DS_Store',
   'Thumbs.db',
@@ -94,7 +95,7 @@ export function describePlan(dir, scan, { hasGitignore, public: isPublic }) {
   const lines = [
     `La carpeta ${dir} no es un repositorio git. Se hará:`,
     'git init',
-    hasGitignore ? 'Se respetará el .gitignore existente' : 'Crear .gitignore con patrones de secretos',
+    hasGitignore ? 'Se respetará el .gitignore existente y se añadirá agentrelay.config.json' : 'Crear .gitignore con patrones de secretos y agentrelay.config.json',
     `Crear un primer commit con ${scan.count - excluded.size} archivo(s)${scan.truncated ? ' (recuento parcial)' : ''}:`,
   ];
   for (const file of included) lines.push(`  ${file}`);

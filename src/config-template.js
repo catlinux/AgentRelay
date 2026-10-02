@@ -34,9 +34,9 @@ export function configTemplate({ scope } = {}) {
   const user = scope === 'user';
   const lines = [
     user
-      ? '// Configuración personal de AgentRelay. Ubicación: ~/.agentrelay/config.json (o AGENTRELAY_HOME/config.json).'
+      ? '// Configuración personal de AgentRelay. Ubicación global: ~/.agentrelay/config.json (o AGENTRELAY_HOME/config.json).'
       : '// Configuración específica del proyecto. Los valores comentados conservan sus valores predeterminados.',
-    ...(user ? ['// Para ajustes propios del repositorio, usa agentrelay.config.json y agentrelay.config.local.json.'] : []),
+    ...(user ? ['// Para ajustes del proyecto, usa agentrelay.config.json; contiene preferencias personales y nunca debe confirmarse en git.'] : []),
     '// Todo lo que está comentado (//) conserva su valor por defecto: descomenta solo lo que quieras cambiar.',
     '{',
   ];

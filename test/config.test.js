@@ -11,8 +11,8 @@ import { FAKE_CODEX } from './helpers.js';
 
 const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-new-'));
-function run(args, cwd, home) {
-  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home, AGENTRELAY_NO_MIGRATE: '1' } });
+function run(args, cwd, home, codexHome) {
+  return spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: home, CODEX_HOME: codexHome, AGENTRELAY_NO_MIGRATE: '1' } });
 }
 function leaves(value, prefix = '', out = []) {
   if (value && typeof value === 'object' && !Array.isArray(value)) for (const [key, child] of Object.entries(value)) leaves(child, prefix ? `${prefix}.${key}` : key, out);
@@ -112,11 +112,33 @@ test('config init, show, path y protección frente a sobrescritura', () => {
     assert.equal(run(['config', 'init'], dir, home).status, 1);
     assert.equal(run(['config', 'init', '--force'], dir, home).status, 0);
     assert.equal(run(['config', 'init', '--project'], dir, home).status, 0);
-    assert.match(run(['config', 'path'], dir, home).stdout, /Proyecto: .*existe/);
+    const paths = run(['config', 'path'], dir, home).stdout;
+    assert.match(paths, /Proyecto: .*existe/);
+    assert.deepEqual(paths.trim().split(/\r?\n/).map((line) => line.split(':')[0]), ['Usuario', 'Proyecto']);
     writeFileSync(userFile, '{"executor":{"model":"gpt-5.5"}}');
     assert.match(run(['config'], dir, home).stdout, /executor\.model = "gpt-5\.5".*config\.json/);
     writeFileSync(path.join(dir, 'agentrelay.config.json'), '{"executor":{"model":"project-model"}}');
     assert.match(run(['config'], dir, home).stdout, /executor\.model = "project-model"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('config init --only codex escribe el bloque de modelos y --local es alias de --project', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
+  try {
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(path.join(codexHome, 'models_cache.json'), JSON.stringify({ models: [
+      { slug: 'gpt-test', visibility: 'list', supported_reasoning_levels: [{ effort: 'low' }], default_reasoning_level: 'low' },
+    ] }));
+    const result = run(['config', 'init', '--only', 'codex'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    const userFile = readFileSync(path.join(home, 'config.json'), 'utf8');
+    assert.match(userFile, /agentrelay:models:start/);
+    assert.match(userFile, /gpt-test/);
+
+    const alias = run(['config', 'init', '--local'], dir, home, codexHome);
+    assert.equal(alias.status, 0, alias.stderr);
+    assert.ok(existsSync(path.join(dir, 'agentrelay.config.json')));
+    assert.ok(!existsSync(path.join(dir, 'agentrelay.config.local.json')));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

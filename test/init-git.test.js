@@ -85,7 +85,7 @@ test('init --yes respeta un .gitignore existente', () => {
     writeFileSync(path.join(dir, '.gitignore'), existing);
     const r = runCli(['init', '--yes'], dir, { env: fullEnv(GIT_IDENT) });
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(readFileSync(path.join(dir, '.gitignore'), 'utf8'), existing);
+    assert.equal(readFileSync(path.join(dir, '.gitignore'), 'utf8'), `${existing}agentrelay.config.json\n`);
     assert.ok(r.stdout.includes('Se respetará el .gitignore existente'), r.stdout);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -157,7 +157,7 @@ test('init --yes sin identidad de git deja el repositorio creado y explica cómo
 
 test('prepare.js exporta los símbolos esperados', () => {
   assert.equal(typeof DEFAULT_GITIGNORE, 'string');
-  const patrones = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', 'id_rsa*', 'id_ed25519*', 'credentials.json', 'secrets.json', 'node_modules/', '.agentrelay/', '*.log', '.DS_Store', 'Thumbs.db'];
+  const patrones = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', 'id_rsa*', 'id_ed25519*', 'credentials.json', 'secrets.json', 'node_modules/', '.agentrelay/', 'agentrelay.config.json', '*.log', '.DS_Store', 'Thumbs.db'];
   for (const pattern of patrones) assert.ok(DEFAULT_GITIGNORE.includes(pattern), pattern);
   assert.ok(Array.isArray(SENSITIVE_PATTERNS));
   assert.ok(SENSITIVE_PATTERNS.length >= 4);

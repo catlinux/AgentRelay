@@ -31,7 +31,7 @@ test('set crea config.json desde la plantilla y conserva sus comentarios', () =>
     const text = readFileSync(path.join(home, 'config.json'), 'utf8');
     assert.match(text, /Configuración personal de AgentRelay/);
     assert.match(text, /"level": 4,/);
-    assert.ok(text.includes('// Para ajustes propios del repositorio'));
+    assert.ok(text.includes('// Para ajustes del proyecto, usa agentrelay.config.json'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

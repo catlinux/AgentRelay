@@ -190,7 +190,7 @@ test('init --yes en repo limpio crea instrucciones neutrales y las confirma junt
     // Repo limpio tras el commit.
     assert.equal(git(repo.dir, 'status', '--porcelain', '--untracked-files=all').trim(), '');
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
-    assert.deepEqual(names, ['AGENTS.md', 'CLAUDE.md']);
+    assert.deepEqual(names, ['.gitignore', 'AGENTS.md', 'CLAUDE.md']);
   } finally {
     repo.cleanup();
   }
@@ -293,6 +293,26 @@ test('init --yes en repo con cambios pendientes añade el bloque pero no hace co
     const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
     assert.ok(!names.includes('CLAUDE.md'));
     assert.ok(!names.includes('AGENTS.md'));
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('init crea .gitignore en un repo existente y confirma junto a las instrucciones', () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(path.join(repo.dir, '.gitignore'), 'node_modules/\r\n');
+    git(repo.dir, 'add', '.gitignore');
+    git(repo.dir, 'commit', '-q', '-m', 'gitignore');
+    const r = run(['init', '--yes'], repo.dir);
+    assert.equal(r.status, 0, r.stderr);
+    const ignored = readFileSync(path.join(repo.dir, '.gitignore'), 'utf8');
+    assert.equal(ignored, 'node_modules/\r\nagentrelay.config.json\r\n');
+    assert.equal(ignored.split(/\r?\n/).filter((line) => line === 'agentrelay.config.json').length, 1);
+    const names = git(repo.dir, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').split(/\r?\n/).filter(Boolean);
+    assert.ok(names.includes('.gitignore'));
+    assert.ok(names.includes('AGENTS.md'));
+    assert.ok(names.includes('CLAUDE.md'));
   } finally {
     repo.cleanup();
   }

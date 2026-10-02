@@ -134,6 +134,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
     - [ ] (2) cargador de 2 capas, migración y `set`/`unset`
     - [x] (3) lista de modelos y `config refresh`
     - [ ] (4) `init`, `.gitignore` y documentación
+      - [x] (4a) código: `init` ignora `agentrelay.config.json` y lo confirma con las instrucciones, `config init` escribe el bloque de modelos, mensajes sin `settings.json` ni `.local.json`
+      - [ ] (4b) documentación: README es/en, CHANGELOG, INSTALL es/en (un archivo por encargo)
   - [x] `AGENTS.md` aligerado (de ~2170 a ~1590 palabras): el contexto de diseño (propósito, niveles, configuración, fases, costes) pasó a `docs/DISENO.md`; en `AGENTS.md` quedan solo las reglas de actuación.
   - [ ] Prueba de LongCat 2.5 Preview (gratis en opencode hasta el 10/10) como orquestador: `opencode -m opencode/longcat-2.5-preview-free`. Valorar el resultado y decidir si se mantiene.
   - [x] `init` en una carpeta sin git: `git init`, `.gitignore` con patrones de secretos si no existe y primer commit, pidiendo confirmación y mostrando qué archivos entrarán; avisar si la carpeta parece servida públicamente (`/var/www`, `public_html`…) porque `.agentrelay/` no debe quedar expuesto. Sin confirmación interactiva (p. ej. lo ejecuta el orquestador) requiere `--yes`.

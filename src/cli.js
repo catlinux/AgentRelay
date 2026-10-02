@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, LOCAL_CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
@@ -116,7 +116,7 @@ Opciones de init:
 
 Opciones de config init:
   --project               Crea ${CONFIG_FILE} en el proyecto
-  --local                 Crea ${LOCAL_CONFIG_FILE}
+  --local                 Alias obsoleto de --project
   --force                 Sobrescribe el archivo de configuración existente
 
 Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
@@ -467,9 +467,7 @@ async function cmdConfig(positionals, values, migrationResult) {
   try { root = await repoRoot(requestedCwd); } catch {}
   const cwd = root || requestedCwd;
   const userFile = path.join(configHome(), 'config.json');
-  const settingsPath = path.join(configHome(), 'settings.json');
   const projectFile = path.join(cwd, CONFIG_FILE);
-  const localFile = path.join(cwd, LOCAL_CONFIG_FILE);
   if (action === 'refresh' && positionals.length === 1) return cmdConfigRefresh(values, cwd, userFile);
   if (action === 'migrate' && positionals.length === 1) {
     let result = migrationResult;
@@ -493,12 +491,11 @@ async function cmdConfig(positionals, values, migrationResult) {
     return 0;
   }
   if (action === 'path' && positionals.length === 1) {
-    for (const [label, file] of [['Usuario', userFile], ['Ajustes', settingsPath], ['Proyecto', projectFile], ['Local', localFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
+    for (const [label, file] of [['Usuario', userFile], ['Proyecto', projectFile]]) process.stdout.write(`${label}: ${file} (${existsSync(file) ? 'existe' : 'no existe'})\n`);
     return 0;
   }
   if (action === 'init' && positionals.length === 1) {
-    const target = values.local ? localFile : values.project ? projectFile : userFile;
-    if (values.local && values.project) throw new Error('Usa --project o --local, no ambos.');
+    const target = values.local || values.project ? projectFile : userFile;
     if (existsSync(target) && !values.force) {
       process.stdout.write(`${target} ya existe\n`);
       return 1;
@@ -506,11 +503,15 @@ async function cmdConfig(positionals, values, migrationResult) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, configTemplate({ scope: values.project || values.local ? 'project' : 'user' }), 'utf8');
     process.stdout.write(`Creado ${target}\n`);
+    if (!values.project && !values.local) {
+      try { await cmdConfigRefresh(values, cwd, target); }
+      catch (error) { process.stderr.write(`[aviso] No se pudo añadir el bloque de modelos: ${error.message}\n`); }
+    }
     if (!values.quiet) process.stdout.write('Descomenta las opciones para cambiar sus valores.\n');
     return 0;
   }
   if ((action !== 'show' || positionals.length > 1) && positionals.length) {
-    process.stderr.write('Uso: agentrelay config [show|path|init [--project|--local] [--force]|migrate [--dry-run]]\n');
+    process.stderr.write('Uso: agentrelay config [show|path|init [--project|--local (obsoleto)] [--force]|migrate [--dry-run]]\n');
     return 1;
   }
   const loaded = loadConfig({ cwd, configPath: values.config });
@@ -894,7 +895,7 @@ async function installOptionalExecutor(name, dir = executorsDir()) {
   }
   process.stdout.write(`✔ ${entry.title} instalado en ${dir}\n`);
   if (entry.connect) process.stdout.write(`Conéctalo con: ${entry.connect}\n`);
-  process.stdout.write(`Para usarlo: pon { "executor": { "type": "${name}" } } en agentrelay.config.local.json\n`);
+  process.stdout.write(`Para usarlo: ejecuta "agentrelay set --local executor ${name}" o edita agentrelay.config.json\n`);
   return 0;
 }
 
@@ -1066,6 +1067,19 @@ function initInstructionFiles(dir) {
   return [{ file: claudeFile, block: PROJECT_BLOCK }, { file: agentsFile, block: PROJECT_BLOCK }];
 }
 
+function ensureProjectConfigIgnored(root) {
+  const file = path.join(root, '.gitignore');
+  if (!existsSync(file)) {
+    writeFileSync(file, `${CONFIG_FILE}\n`, 'utf8');
+    return true;
+  }
+  const text = readFileSync(file, 'utf8');
+  if (text.split(/\r?\n/).includes(CONFIG_FILE)) return false;
+  const newline = text.includes('\r\n') ? '\r\n' : '\n';
+  writeFileSync(file, `${text}${text && !text.endsWith('\n') ? newline : ''}${CONFIG_FILE}${newline}`, 'utf8');
+  return true;
+}
+
 function projectInstructionStatus(dir) {
   const claudeFile = path.join(dir, 'CLAUDE.md');
   const agentsFile = path.join(dir, 'AGENTS.md');
@@ -1096,6 +1110,8 @@ async function cmdInit(values) {
       process.stdout.write('Cancelado.\n');
       return 0;
     }
+
+    ensureProjectConfigIgnored(dir);
 
     const instructionFiles = initInstructionFiles(dir);
     for (const instruction of instructionFiles) {
@@ -1143,15 +1159,18 @@ async function cmdInit(values) {
     process.stdout.write(`${label} ${instruction.file}\n`);
     if (action !== 'unchanged') changedFiles.push(instruction.file);
   }
+  const gitignoreChanged = ensureProjectConfigIgnored(root);
+  if (gitignoreChanged) process.stdout.write(`Añadido ${CONFIG_FILE} a .gitignore\n`);
   const hasImportFile = instructionFiles.some(({ content }) => content !== undefined);
   const commitFiles = hasImportFile && [...ignoredFiles].some((file) => file !== null)
     ? []
     : changedFiles.filter((instructionFile) => !ignoredFiles.has(instructionFile));
 
-  if (commitFiles.length && wasClean) {
-    const ok = await confirm('¿Crear un commit con los archivos de instrucciones?', { yes: values.yes });
+  const filesToCommit = [...commitFiles, ...(gitignoreChanged ? [path.join(root, '.gitignore')] : [])];
+  if (filesToCommit.length && wasClean) {
+    const ok = await confirm(`¿Crear un commit con los archivos de instrucciones${gitignoreChanged ? ' y .gitignore' : ''}?`, { yes: values.yes });
     if (ok === true) {
-      const res = await commitPaths(root, commitFiles.map((instructionFile) => path.relative(root, instructionFile)), 'Añade las instrucciones de AgentRelay');
+      const res = await commitPaths(root, filesToCommit.map((file) => path.relative(root, file)), 'Añade las instrucciones de AgentRelay');
       if (!res.ok) {
         process.stderr.write(`No se pudo crear el commit de las instrucciones: ${res.error}\n`);
       } else {
