@@ -117,7 +117,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
   - [x] Ejecutor gratuito alternativo mientras Luna no tenga crédito (hasta el 24/10): adaptador **opencode** como ejecutor (`opencode run --auto --format json -m opencode/<modelo>-free`; probado: edita archivos y emite eventos JSON con tokens y coste 0). Candidatos gratuitos: nemotron-3-ultra-free, longcat-2.5-preview-free (hasta el 10/10), mimo-v2.6-flash-free. Segunda opción: Gemini CLI con cuenta de Google (~1000 peticiones/día), sin instalar.
     - Comparativa 2026-10-01 (misma tarea, 6 modelos gratuitos de opencode; prueba oculta de 26 casos): nemotron-3-ultra-free 26/26, 174 s, 24 tests propios, informe OK (elegido); space-bunny-free 26/26, 126 s; mimo-v2.6-flash-free 25/26, 60 s (el más rápido); longcat-2.5-preview-free código correcto 26/26 pero con errores de API; nemotron-3.5-lightning-free falló la validación y se colgó; fledge-alpha-free y ling-3.0-flash-fin-free fallaron al instante. Muestra de una sola tarea: repetir con una más difícil antes de fiarse.
   - [ ] Simplificar y automatizar el arranque y la continuación de un proyecto (hoy hay que hacer `git commit`, `init`, `doctor`, `watch` y reiniciar el chat a mano). Idea: un solo comando que prepare el proyecto, y que el orquestador retome el estado leyendo el repositorio.
-  - [ ] **Configuración en un solo archivo** (petición reiterada del usuario; prioridad alta). Hoy hay 5 capas (valores por defecto, `~/.agentrelay/config.json`, `~/.agentrelay/settings.json`, `agentrelay.config.json`, `agentrelay.config.local.json`). Diseño acordado el 2026-10-01 (estable y fácil para quien no es técnico):
+  - [x] **Configuración en un solo archivo** (petición reiterada del usuario; prioridad alta). Hoy hay 5 capas (valores por defecto, `~/.agentrelay/config.json`, `~/.agentrelay/settings.json`, `agentrelay.config.json`, `agentrelay.config.local.json`). Diseño acordado el 2026-10-01 (estable y fácil para quien no es técnico):
     - Un archivo global `~/.agentrelay/config.json` con TODAS las opciones, cada una con su comentario (qué hace y qué valores admite), y al final una lista comentada de los modelos instalados y disponibles de cada ejecutor (para copiar el nombre).
     - Un único archivo por proyecto, `agentrelay.config.json`, con solo lo que cambia ahí; `init` lo añade al `.gitignore` (lleva ejecutor y modelo personales).
     - Desaparecen `settings.json` y `.local.json`: migración automática con copia de seguridad (`.bak`) al primer arranque; mientras tanto se siguen leyendo con un aviso.
@@ -133,9 +133,9 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
     - [ ] (1) módulo de edición `src/config-file.js`
     - [ ] (2) cargador de 2 capas, migración y `set`/`unset`
     - [x] (3) lista de modelos y `config refresh`
-    - [ ] (4) `init`, `.gitignore` y documentación
+    - [x] (4) `init`, `.gitignore` y documentación
       - [x] (4a) código: `init` ignora `agentrelay.config.json` y lo confirma con las instrucciones, `config init` escribe el bloque de modelos, mensajes sin `settings.json` ni `.local.json`
-      - [ ] (4b) documentación: README es/en, CHANGELOG, INSTALL es/en (un archivo por encargo)
+      - [x] (4b) documentación: README es/en, CHANGELOG, INSTALL es/en (un archivo por encargo)
   - [x] `AGENTS.md` aligerado (de ~2170 a ~1590 palabras): el contexto de diseño (propósito, niveles, configuración, fases, costes) pasó a `docs/DISENO.md`; en `AGENTS.md` quedan solo las reglas de actuación.
   - [ ] Prueba de LongCat 2.5 Preview (gratis en opencode hasta el 10/10) como orquestador: `opencode -m opencode/longcat-2.5-preview-free`. Valorar el resultado y decidir si se mantiene.
   - [x] `init` en una carpeta sin git: `git init`, `.gitignore` con patrones de secretos si no existe y primer commit, pidiendo confirmación y mostrando qué archivos entrarán; avisar si la carpeta parece servida públicamente (`/var/www`, `public_html`…) porque `.agentrelay/` no debe quedar expuesto. Sin confirmación interactiva (p. ej. lo ejecuta el orquestador) requiere `--yes`.
