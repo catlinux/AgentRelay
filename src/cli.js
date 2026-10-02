@@ -34,6 +34,7 @@ import { appendEvent } from './events.js';
 import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
 import { PRICES_SOURCE, loadPrices, localWindows, nextChange, tariffAt } from './pricing.js';
+import { collectProjectState, renderProjectState, writeProjectState } from './project-state.js';
 
 const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
@@ -46,6 +47,7 @@ Uso:
                                     Registra la revisión del orquestador
   agentrelay check [id]             Repite las validaciones sin cambiar el estado
   agentrelay list                   Lista las ejecuciones del repositorio
+  agentrelay status [--write] [--json] Resume el estado del proyecto
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
   agentrelay pricing [--json]      Muestra precios y tarifa DeepSeek
@@ -151,6 +153,7 @@ const OPTIONS = {
   executors: { type: 'string' },
   type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' }, executor: { type: 'string' },
   'include-legacy': { type: 'boolean' },
+  write: { type: 'boolean' },
   effort: { type: 'string' }, outcome: { type: 'string' }, run: { type: 'string' }, note: { type: 'string' }, signals: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
@@ -288,6 +291,14 @@ async function cmdList(values) {
   if (values.json) process.stdout.write(`${JSON.stringify(runs, null, 2)}\n`);
   else if (!runs.length) process.stdout.write('No hay ejecuciones.\n');
   else for (const r of runs) process.stdout.write(`${r.id}  ${r.status.padEnd(16)} nivel ${r.level}  intentos ${r.attempts}  ${r.title}\n`);
+  return 0;
+}
+
+async function cmdStatus(values) {
+  const root = await resolveRoot(values);
+  const state = await collectProjectState(root);
+  if (values.write) await writeProjectState(root);
+  process.stdout.write(values.json ? `${JSON.stringify(state, null, 2)}\n` : renderProjectState(state));
   return 0;
 }
 
@@ -1238,6 +1249,7 @@ export async function main(argv, runtime = {}) {
       case 'review': return await cmdReview(rest, values, runtime);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
+      case 'status': return await cmdStatus(values);
       case 'recover': return await cmdRecover(rest, values);
       case 'usage': return await cmdUsage(values);
       case 'pricing': return await cmdPricing(values, runtime);
