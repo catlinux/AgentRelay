@@ -130,7 +130,7 @@ function readConfig(file) {
   }
 }
 const KNOWN = {
-  '': ['level', 'executor', 'validation', 'policy', 'report'],
+  '': ['level', 'executor', 'validation', 'policy', 'report', 'profiles'],
   executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs'],
   validation: ['commands', 'timeoutSeconds'],
   policy: ['review', 'maxRetries', 'autoFix', 'requireValidation', 'selfReview', 'skipPassMaxFiles'],
@@ -193,7 +193,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
         if (!(KNOWN[parent] || []).includes(key)) {
           const candidate = Object.keys(KNOWN[parent] || {}).length ? KNOWN[parent].find((k) => distance(key, k) <= 2) : null;
           warnings.push(`Clave desconocida ${prefix ? `${prefix}.` : ''}${key} en ${layer.origin}${candidate ? `; quizá quisiste decir ${candidate}` : ''}.`);
-        } else checkKeys(value, prefix ? `${prefix}.${key}` : key);
+        } else if (!(prefix === '' && key === 'profiles')) checkKeys(value, prefix ? `${prefix}.${key}` : key);
       }
     };
     checkKeys(layer.data);
@@ -216,6 +216,13 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (config.policy.selfReview !== undefined) {
     if (!isObject(config.policy.selfReview)) invalid('policy.selfReview', 'debe ser un objeto');
     for (const [k, v] of Object.entries(config.policy.selfReview)) if (!COMPLEXITIES.includes(k) || !SELF_REVIEW_MODES.includes(v)) invalid(`policy.selfReview.${k}`, `debe usar trivial, normal o complex y un modo ${SELF_REVIEW_MODES.join(', ')}`);
+  }
+  // Perfiles de `agentrelay use --save`: { nombre: { type, model, thinking } }.
+  if (config.profiles !== undefined) {
+    if (!isObject(config.profiles)) invalid('profiles', 'debe ser un objeto');
+    for (const [name, profile] of Object.entries(config.profiles)) {
+      if (!isObject(profile) || !Object.hasOwn(EXECUTOR_DEFAULTS, profile.type)) invalid(`profiles.${name}`, `debe indicar un ejecutor válido (${Object.keys(EXECUTOR_DEFAULTS).join(', ')})`);
+    }
   }
   if (config.policy.skipPassMaxFiles !== undefined && (!Number.isInteger(config.policy.skipPassMaxFiles) || config.policy.skipPassMaxFiles < 0)) invalid('policy.skipPassMaxFiles', 'debe ser un entero mayor o igual que 0');
   return { config, sources, origins, warnings };

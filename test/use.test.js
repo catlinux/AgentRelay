@@ -1,0 +1,109 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseJsonc } from '../src/config.js';
+import { choiceEdits, parseUseArgs } from '../src/use.js';
+import { main } from '../src/cli.js';
+
+const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
+const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-use-'));
+function env(dir) {
+  return { ...process.env, AGENTRELAY_HOME: path.join(dir, 'home'), CODEX_HOME: path.join(dir, 'codex'), AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex'), AGENTRELAY_NO_MIGRATE: '1', AGENTRELAY_NO_STATE: '1' };
+}
+function run(args, dir) {
+  return spawnSync(process.execPath, [bin, ...args], { cwd: dir, encoding: 'utf8', env: env(dir) });
+}
+const userConfig = (dir) => parseJsonc(readFileSync(path.join(dir, 'home', 'config.json'), 'utf8'));
+
+test('parseUseArgs reconoce ejecutor, modelo, esfuerzo y perfil en cualquier orden', () => {
+  assert.deepEqual(parseUseArgs(['opencode']), { type: 'opencode' });
+  assert.deepEqual(parseUseArgs(['codex', 'gpt-5.5', 'alto']), { type: 'codex', model: 'gpt-5.5', thinking: 'high' });
+  assert.deepEqual(parseUseArgs(['bajo']), { thinking: 'low' });
+  assert.deepEqual(parseUseArgs(['gpt-5.5']), { model: 'gpt-5.5' });
+  assert.deepEqual(parseUseArgs(['codex', 'defecto']), { type: 'codex', thinking: null });
+  assert.deepEqual(parseUseArgs(['barato'], { barato: { type: 'codex' } }), { profile: 'barato' });
+  assert.throws(() => parseUseArgs(['a', 'b']), /No entiendo "b"/);
+});
+
+test('choiceEdits borra modelo, proveedor y comando del ejecutor anterior', () => {
+  const edits = choiceEdits({ type: 'opencode' }, { type: 'codex' });
+  assert.deepEqual(edits, [['executor.type', 'opencode'], ['executor.model', undefined], ['executor.provider', undefined], ['executor.command', undefined]]);
+  assert.deepEqual(choiceEdits({ type: 'codex', thinking: null }, { type: 'codex' }), [['executor.type', 'codex'], ['executor.thinking', undefined]]);
+});
+
+test('use cambia de ejecutor, modelo y esfuerzo con un solo comando', () => {
+  const dir = temp();
+  try {
+    let result = run(['use', 'opencode', 'alto'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Ahora: opencode · opencode\/nemotron-3-ultra-free · esfuerzo alto/);
+    assert.equal(userConfig(dir).executor.type, 'opencode');
+    result = run(['use', 'codex', 'gpt-5.5'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    const config = userConfig(dir);
+    assert.equal(config.executor.model, 'gpt-5.5');
+    assert.equal(config.executor.thinking, 'high');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('use --save guarda un perfil y use <perfil> lo aplica', () => {
+  const dir = temp();
+  try {
+    assert.equal(run(['use', 'opencode', 'bajo'], dir).status, 0);
+    let result = run(['use', '--save', 'gratis'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Perfil "gratis" guardado/);
+    assert.equal(run(['use', 'codex'], dir).status, 0);
+    result = run(['use', 'gratis'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    const config = userConfig(dir);
+    assert.equal(config.executor.type, 'opencode');
+    assert.equal(config.executor.thinking, 'low');
+    assert.match(run(['use'], dir).stdout, /Perfiles: gratis/);
+    assert.notEqual(run(['use', '--save', 'codex'], dir).status, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('use sin argumentos y sin terminal muestra el estado sin cambiar nada', () => {
+  const dir = temp();
+  try {
+    const result = run(['use'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /En uso: codex · gpt-6-luna/);
+    assert.match(result.stdout, /agentrelay use <ejecutor>/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('use interactivo elige ejecutor, modelo y esfuerzo con números', async () => {
+  const dir = temp();
+  const saved = { ...process.env };
+  const write = process.stdout.write;
+  Object.assign(process.env, env(dir));
+  mkdirSync(path.join(dir, 'codex'), { recursive: true });
+  writeFileSync(path.join(dir, 'codex', 'models_cache.json'), JSON.stringify({ models: [
+    { slug: 'gpt-6-luna', visibility: 'list', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }], default_reasoning_level: 'low' },
+    { slug: 'gpt-5.5', visibility: 'list', supported_reasoning_levels: [{ effort: 'medium' }, { effort: 'high' }], default_reasoning_level: 'medium' },
+  ] }));
+  // Codex (1), segundo modelo (2), esfuerzo «alto» (3: por defecto, medio, alto) y guardar como perfil «bueno».
+  const answers = ['1', '2', '3', 'bueno'];
+  let output = '';
+  process.stdout.write = (chunk) => { output += chunk; return true; };
+  try {
+    const code = await main(['use', '--cwd', dir], { ask: async () => answers.shift() ?? '' });
+    process.stdout.write = write;
+    assert.equal(code, 0, output);
+    const config = userConfig(dir);
+    assert.equal(config.executor.model, 'gpt-5.5');
+    assert.equal(config.executor.thinking, 'high');
+    assert.equal(config.profiles.bueno.model, 'gpt-5.5');
+  } finally {
+    process.stdout.write = write;
+    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+    Object.assign(process.env, saved);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

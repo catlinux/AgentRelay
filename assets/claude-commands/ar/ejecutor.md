@@ -1,6 +1,6 @@
 ---
 description: Muestra los ejecutores o cambia de ejecutor (AgentRelay)
-argument-hint: [codex|cline]
+argument-hint: [codex|cline|opencode]
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku
@@ -12,6 +12,6 @@ Resultado:
 
 Responde solo con el resultado, en 3 líneas como máximo (más un "Aviso"/"Ojo" si aparece). Termina con esta línea independiente para el chat:
 
-Uso en el chat: /ar:ejecutor <codex|cline>
+Uso en el chat: /ar:ejecutor <codex|cline|opencode>
 
 Si Cline no está instalado, indícalo por separado como comando de terminal: `agentrelay executors add cline`. Sin comentarios ni otras acciones.
