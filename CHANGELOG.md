@@ -10,6 +10,13 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 - `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. En el chat de Claude Code: `/ar:usar`.
 
+- Manual de uso con ejemplos, organizado por tareas («quiero hacer X»): `docs/MANUAL.md`.
+
+### Cambiado
+
+- README (es/en) reescrito y reducido de 494 a 119 líneas: qué es, ejecutores, instalación, empezar en 3 pasos y seguridad; la referencia de comandos pasa al manual. Estaba desfasado (decía 0.0.3 y no mencionaba OpenCode).
+- INSTALL (es/en): «Cómo empezar» usa `agentrelay start`, se menciona `agentrelay update` para actualizar y los enlaces a secciones retiradas del README apuntan al manual.
+
 ### Corregido
 
 - `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.
