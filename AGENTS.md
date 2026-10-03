@@ -147,4 +147,21 @@ EOF
 - Si `agentrelay` indica que el proyecto no es un repositorio git, pide confirmación al usuario y ejecuta `agentrelay init --yes`.
 - **En Windows (PowerShell o cmd)** usa `agentrelay.cmd` en lugar de `agentrelay` (el segundo es un script de Unix y falla con errores de `sed`, `dirname` o `uname`). Nunca modifiques ese script. El `<<EOF` no existe en PowerShell: guarda el JSON de la tarea en un archivo temporal FUERA del repositorio (por ejemplo `$env:TEMP\tarea.json`) y lanza `agentrelay.cmd run $env:TEMP\tarea.json`; un archivo dentro del repositorio ensuciaría el árbol.
 - Si una ejecución falla por una causa externa (sesión caducada, PowerShell bloqueado), díselo al usuario en lugar de hacer el trabajo tú en silencio.
+  
+## Validación semántica de entregas
+
+Los tests en verde no implican por sí solos que una entrega sea correcta.
+
+Antes de aceptar una implementación, el orquestador debe comprobar:
+
+1. Que cumple exactamente el contrato funcional de la tarea.
+2. Que respeta todas las restricciones y el scope establecido.
+3. Que el comportamiento real coincide con la semántica requerida, especialmente en operaciones con efectos secundarios, concurrencia, retries, cachés, permisos y aislamiento.
+4. Que no introduce cambios funcionales no solicitados aunque la implementación sea técnicamente válida.
+5. Que los tests realmente validan el comportamiento requerido y no únicamente el camino feliz.
+
+Si existe una contradicción, ambigüedad o requisito que no pueda determinarse de forma segura, el orquestador debe detenerse y solicitar aclaración en lugar de inventar una interpretación.
+
+Una entrega puede ser rechazada aunque todos los tests pasen si no cumple semánticamente el contrato.
+
 <!-- agentrelay:end -->
