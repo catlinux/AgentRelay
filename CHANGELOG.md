@@ -11,6 +11,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. En el chat de Claude Code: `/ar:usar`.
 
 - Manual de uso con ejemplos, organizado por tareas («quiero hacer X»): `docs/MANUAL.md`.
+- Plan de trabajo paso a paso para cada punto pendiente, pensado para que lo siga un orquestador con un modelo pequeño: `docs/PLAN.md`.
 
 ### Cambiado
 
