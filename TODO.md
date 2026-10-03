@@ -5,7 +5,6 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 ## Ahora (lo que toca hacer; `agentrelay status` enseña esta sección)
 
 - [x] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
-- [ ] Subir los últimos commits (con permiso del usuario) y confirmar que CI Windows y Linux pasan: en cc65ff4 fallaban por la identidad de git de `start`, no por safe.directory (arreglado en test/start.test.js, sin verificar en CI).
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
@@ -169,7 +168,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 
 - [x] Probar el flujo completo en Linux: Debian (Node 20.20.2) con Claude Code en VS Code y DeepSeek, proyecto de prueba (calculadora) completado.
 - [ ] Probar el flujo completo en macOS.
-- [ ] Integración continua con tests en Windows, Linux y macOS (tres flujos en `.github/workflows/`). Primera ejecución real (cc65ff4): macOS y los contenedores Linux pasan; Windows y Linux nativos fallaban (causa: identidad git de `start`; corregida, falta confirmar).
+- [x] Integración continua con tests en Windows, Linux y macOS (tres flujos en `.github/workflows/`). Verde en los tres con da8e699 (el fallo inicial de cc65ff4 era la identidad git de `start` en los runners).
 - [x] Insignias (badges) en la cabecera de README.md y README.en.md, como en AzerothCore: estado de CI de Windows, Linux y macOS (una insignia por flujo), licencia (WNCL-CU-1.0, enlazada a LICENSE), Node >= 20, versión (desde package.json), último commit y ejecutor por defecto (Codex). Añadirlas cuando los tres flujos hayan corrido en verde al menos una vez, para no mostrar «failing» ni «no status».
 - [ ] Arreglar la prueba de timeout de procesos (`proc:`) y revisar el resto de pruebas para que pasen también dentro del sandbox de Codex y en todos los sistemas del CI.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
