@@ -168,11 +168,11 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 ## Cómo empezar a usarlo
 
 1. Abre tu proyecto en VS Code con la extensión **Claude Code** instalada y con la sesión iniciada.
-2. En el terminal de ese proyecto ejecuta `agentrelay init`. Prepara el proyecto (y el repositorio git si todavía no existe). Según el estado del repositorio, puede pedir confirmación para prepararlo o para crear un commit; si ya hay cambios pendientes, añade el bloque y te indica que confirmes `CLAUDE.md` y dejes limpio el repositorio antes de delegar.
+2. En el terminal de ese proyecto ejecuta `agentrelay start`. Prepara el proyecto (y el repositorio git si todavía no existe), deja el repositorio limpio y comprueba que todo funciona; pide confirmación antes de cambiar nada.
 3. Abre un segundo terminal y deja ejecutándose `agentrelay watch` para ver en directo lo que hace el agente.
 4. Pídele el trabajo a Claude en el chat, con tus palabras. Por ejemplo: *«Añade una función que valide emails y delega la implementación con AgentRelay.»*
 
-¿Quieres probarlo antes en un proyecto de demostración? Sigue la sección [«Probar AgentRelay en 5 minutos»](README.md#probar-agentrelay-en-5-minutos) del README.
+¿Quieres probarlo antes en un proyecto de demostración? Sigue el apartado [«Delegar a mano»](docs/MANUAL.md#8-delegar-a-mano-sin-orquestador) del manual.
 
 ---
 
@@ -184,13 +184,13 @@ Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 | `agentrelay doctor` marca fallo en el ejecutor | Ejecuta `npm install` otra vez en la carpeta de AgentRelay y repite `doctor`. |
 | `doctor` o `run` dicen que no hay sesión iniciada | Ejecuta `agentrelay login` y entra con tu cuenta de ChatGPT. Si el equipo no tiene navegador (por ejemplo, por SSH), usa `agentrelay login --device`. |
 | Avisos `EBADENGINE` durante `npm install` | Son avisos: algunas dependencias prefieren Node 22. Con Node 20 funciona. Si quieres evitarlos, actualiza a Node 22. |
-| «Authentication Fails» al delegar (solo si usas Cline) | La clave del proveedor no está configurada o es incorrecta: repite la configuración de Cline descrita en el README. |
-| `doctor` dice que Cline no está disponible | Instálalo con `agentrelay executors add cline`. |
-| «no es un repositorio git» | Ejecuta `agentrelay init` en la carpeta del proyecto. |
+| «Authentication Fails» al delegar (solo si usas Cline) | La clave del proveedor no está configurada o es incorrecta: repite el comando de configuración de Cline que se mostró al instalarlo (`npx cline auth …`). |
+| `doctor` dice que Cline u OpenCode no está disponible | Ejecuta `agentrelay use` y elígelo: te indica cómo instalarlo. |
+| «no es un repositorio git» | Ejecuta `agentrelay start` en la carpeta del proyecto. |
 
 ## Actualizar y desinstalar
 
-**Actualizar:** dentro de la carpeta de AgentRelay:
+**Actualizar:** `agentrelay update` lo hace todo (descarga, dependencias, `setup` y `doctor`). A mano, dentro de la carpeta de AgentRelay:
 
 ```sh
 git pull
