@@ -15,6 +15,10 @@ function run(cwd, args = ['start', '--yes']) {
       AGENTRELAY_HOME: path.join(cwd, 'home'),
       AGENTRELAY_EXECUTORS_DIR: path.join(cwd, 'executors'),
       AGENTRELAY_NO_MIGRATE: '1',
+      GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? 'Test',
+      GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? 'test@example.invalid',
+      GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? 'Test',
+      GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'test@example.invalid',
     },
   });
 }
