@@ -12,6 +12,22 @@ export function maskSecrets(text) {
   return String(text ?? '').replace(/\bsk-(?:proj-)?[A-Za-z0-9_*\-]+/gi, 'clave de API');
 }
 
+/** Clasifica errores recuperables solo tras corregir credenciales o cuota. */
+export function classifyExecutorError(text) {
+  const value = String(text ?? '').toLowerCase();
+  if (/\b(?:unauthorized|authentication fails?|invalid api key|incorrect api key|invalid_api_key|not logged in|session expired)\b/.test(value)
+    || /\b401\s+unauthorized\b/.test(value)
+    || /\b(?:status|http|error|code)[^a-z0-9]{0,3}401\b/.test(value)) {
+    return 'credentials';
+  }
+  if (/\b(?:insufficient_quota|quota exceeded|exceeded your current quota|billing|insufficient balance|out of credits|payment required)\b/.test(value)
+    || /\b402\s+payment required\b/.test(value)
+    || /\b(?:status|http|error|code)[^a-z0-9]{0,3}402\b/.test(value)) {
+    return 'quota';
+  }
+  return null;
+}
+
 /** Busca el último bloque JSON del texto final con el informe del ejecutor. */
 export function extractAgentReport(text) {
   if (!text) return null;

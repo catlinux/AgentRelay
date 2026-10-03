@@ -35,8 +35,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 - Las opciones que activan `set` y `use` dentro de un bloque de la configuración (`executor`, `policy`, `validation`, `report`) quedan con 2 espacios más de sangría que su bloque.
 
-- `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.
-
+- Si el ejecutor falla por credenciales (clave inválida, 401, sesión caducada) o por cuota/saldo, AgentRelay se detiene sin reintentos ni escaladas, marca la ejecución como `failed` y explica qué revisar (`agentrelay doctor`, `agentrelay login`, saldo del proveedor o `agentrelay set`). Un 429 por límite de velocidad sigue el camino normal. Los errores guardados en el estado y en los eventos ocultan las claves de API.
+- La prueba de timeout de `proc` ya no tarda 30 s cuando `taskkill` está restringido (sandbox de Codex).
 - `agentrelay update` ya no devuelve error cuando `doctor` avisa de algo (por ejemplo, que no hay sesión iniciada): la actualización se considera hecha y `doctor` solo informa.
 - Los tests no dependen de la identidad global de git (`start` hacía un primer commit y fallaba en los runners de Windows y Linux de GitHub Actions, que no la tienen) y son robustos frente a `safe.directory` y a los finales de línea. Confirmado con una ejecución real de CI en Windows, Linux y macOS.
 
