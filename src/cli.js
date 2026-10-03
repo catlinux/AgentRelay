@@ -1102,10 +1102,10 @@ async function cmdUpdate(values) {
   }
   const setup = await cmdSetup({ yes: true, cwd: root });
   if (setup !== 0) return setup;
-  const doctor = await cmdDoctor({ cwd: root });
+  await cmdDoctor({ cwd: root });
   const updated = (await git(['rev-parse', 'HEAD'])).stdout.trim();
   process.stdout.write(`Actualización: ${old.slice(0, 7)} → ${updated.slice(0, 7)}. Reinicia agentrelay watch y el chat del orquestador si estaban abiertos.\n`);
-  return doctor;
+  return 0;
 }
 
 /** Crea agentrelay.config.json si se pidió con --with-config y no existe. */
