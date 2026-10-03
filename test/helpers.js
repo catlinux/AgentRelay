@@ -11,8 +11,20 @@ export const FAKE_CLINE = fileURLToPath(new URL('./fixtures/fake-cline.mjs', imp
 export const FAKE_CODEX = fileURLToPath(new URL('./fixtures/fake-codex.mjs', import.meta.url));
 export const FAKE_OPENCODE = fileURLToPath(new URL('./fixtures/fake-opencode.mjs', import.meta.url));
 
+// Los procesos hijos de los tests deben poder abrir repositorios temporales
+// creados por otra identidad (como sucede en runners de CI).
+const parsedGitConfigCount = Number.parseInt(process.env.GIT_CONFIG_COUNT ?? '0', 10);
+const gitConfigCount = Number.isFinite(parsedGitConfigCount) ? parsedGitConfigCount : 0;
+process.env.GIT_CONFIG_COUNT = String(gitConfigCount + 1);
+process.env[`GIT_CONFIG_KEY_${gitConfigCount}`] = 'safe.directory';
+process.env[`GIT_CONFIG_VALUE_${gitConfigCount}`] = '*';
+
+export function normalizeLineEndings(text) {
+  return text.replace(/\r\n?/g, '\n');
+}
+
 export function git(cwd, ...args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' });
+  return execFileSync('git', ['-c', `safe.directory=${cwd}`, ...args], { cwd, encoding: 'utf8' });
 }
 
 /** Repositorio temporal con un commit inicial y un script de validación. */
@@ -37,7 +49,7 @@ export function makeRepo() {
     logFile,
     calls: () => {
       try {
-        return readFileSync(logFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+        return normalizeLineEndings(readFileSync(logFile, 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
       } catch {
         return [];
       }
