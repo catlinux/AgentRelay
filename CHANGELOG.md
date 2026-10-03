@@ -6,6 +6,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Corregido
+
+- `agentrelay update` ya no devuelve error cuando `doctor` avisa de algo (por ejemplo, que no hay sesión iniciada): la actualización se considera hecha y `doctor` solo informa.
+- Los tests no dependen de la identidad global de git (`start` hacía un primer commit y fallaba en los runners de Windows y Linux de GitHub Actions, que no la tienen) y son robustos frente a `safe.directory` y a los finales de línea. Pendiente de confirmar con una ejecución real de CI tras subirlo.
+
 ## [0.1.0] - 2026-10-03
 
 MVP: configuración en un solo archivo, ejecutores Codex y OpenCode, triaje adaptativo, `start`, `status`, `update` y comandos `/` de Claude Code.

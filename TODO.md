@@ -5,6 +5,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 ## Ahora (lo que toca hacer; `agentrelay status` enseña esta sección)
 
 - [x] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
+- [ ] Subir los últimos commits (con permiso del usuario) y confirmar que CI Windows y Linux pasan: en cc65ff4 fallaban por la identidad de git de `start`, no por safe.directory (arreglado en test/start.test.js, sin verificar en CI).
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
@@ -152,8 +153,8 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
       - [x] (2a) módulo de migración `src/config-migrate.js` (`settings.json` y `.local.json` a los dos archivos nuevos, con copia `.bak`)
       - [x] (2b) `set`/`unset` sobre el archivo, conservando comentarios (parte A hecha: aviso de archivos antiguos, `config migrate` y migración automática al arrancar el CLI, solo desde `bin`)
         - Pendiente cosmético: al activar una opción dentro de un bloque, la sangría queda un nivel menos que en la plantilla (`"model"` con 2 espacios dentro de `executor`); es válido pero mejorable.
-    - [ ] (1) módulo de edición `src/config-file.js`
-    - [ ] (2) cargador de 2 capas, migración y `set`/`unset`
+    - [x] (1) módulo de edición `src/config-file.js`
+    - [x] (2) cargador de 2 capas, migración y `set`/`unset`
     - [x] (3) lista de modelos y `config refresh`
     - [x] (4) `init`, `.gitignore` y documentación
       - [x] (4a) código: `init` ignora `agentrelay.config.json` y lo confirma con las instrucciones, `config init` escribe el bloque de modelos, mensajes sin `settings.json` ni `.local.json`
@@ -168,7 +169,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 
 - [x] Probar el flujo completo en Linux: Debian (Node 20.20.2) con Claude Code en VS Code y DeepSeek, proyecto de prueba (calculadora) completado.
 - [ ] Probar el flujo completo en macOS.
-- [x] Integración continua con tests en Windows, Linux y macOS (tres flujos en `.github/workflows/`; pendiente ver la primera ejecución real tras el push y corregir lo que falle, especialmente en macOS).
+- [ ] Integración continua con tests en Windows, Linux y macOS (tres flujos en `.github/workflows/`). Primera ejecución real (cc65ff4): macOS y los contenedores Linux pasan; Windows y Linux nativos fallaban (causa: identidad git de `start`; corregida, falta confirmar).
 - [x] Insignias (badges) en la cabecera de README.md y README.en.md, como en AzerothCore: estado de CI de Windows, Linux y macOS (una insignia por flujo), licencia (WNCL-CU-1.0, enlazada a LICENSE), Node >= 20, versión (desde package.json), último commit y ejecutor por defecto (Codex). Añadirlas cuando los tres flujos hayan corrido en verde al menos una vez, para no mostrar «failing» ni «no status».
 - [ ] Arreglar la prueba de timeout de procesos (`proc:`) y revisar el resto de pruebas para que pasen también dentro del sandbox de Codex y en todos los sistemas del CI.
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
