@@ -26,6 +26,7 @@ import { latestRunId, listRunIds, loadState, runDir } from './store.js';
 import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
+import { cmdUse } from './use.js';
 import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
 import { canOpenBrowser } from './platform.js';
 import { aggregateUsage, renderUsage } from './usage.js';
@@ -42,6 +43,9 @@ const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
 Uso:
+  agentrelay use                    Cambia de IA (ejecutor, modelo y esfuerzo) de forma interactiva
+  agentrelay use <ejecutor> [modelo] [esfuerzo]   Cambia directamente (ej.: use opencode, use codex alto)
+  agentrelay use <perfil>           Aplica un perfil guardado; guarda el actual con: use --save <nombre>
   agentrelay run <tarea.json | ->   Delega una tarea (JSON en archivo o por stdin)
   agentrelay show [id]              Muestra el informe de una ejecución (por defecto, la última)
   agentrelay review <id> --decision <accept|fix|escalate|reject> [--feedback <texto>]
@@ -155,6 +159,7 @@ const OPTIONS = {
   browser: { type: 'boolean' },
   login: { type: 'boolean' },
   executors: { type: 'string' },
+  save: { type: 'string' },
   type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' }, executor: { type: 'string' },
   'include-legacy': { type: 'boolean' },
   write: { type: 'boolean' },
@@ -910,7 +915,7 @@ async function installOptionalExecutor(name, dir = executorsDir()) {
   }
   process.stdout.write(`✔ ${entry.title} instalado en ${dir}\n`);
   if (entry.connect) process.stdout.write(`Conéctalo con: ${entry.connect}\n`);
-  process.stdout.write(`Para usarlo: ejecuta "agentrelay set --local executor ${name}" o edita agentrelay.config.json\n`);
+  process.stdout.write(`Para usarlo: agentrelay use ${name}\n`);
   return 0;
 }
 
@@ -981,7 +986,7 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
@@ -1379,6 +1384,7 @@ export async function main(argv, runtime = {}) {
       case 'doctor': return await cmdDoctor(values);
       case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
+      case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
       case 'models': return await cmdModels(values);

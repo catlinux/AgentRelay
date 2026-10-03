@@ -11,6 +11,9 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] `agentrelay models --all`: inventario de modelos en un solo sitio (dónde corre cada uno, gratis o de pago, probado o no); ver `docs/MODELOS.md`.
 - [ ] Pulir: sangría de las opciones que activa `set`.
 - [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.
+- [x] `agentrelay use`: cambiar de IA (ejecutor, modelo y esfuerzo) con un solo comando, interactivo sin argumentos, con perfiles (`use --save <nombre>`, `use <nombre>`) y `/ar:usar` en el chat (acordado el 2026-10-03).
+- [ ] Simplificar (acordado el 2026-10-03; borrar archivos necesita el permiso explícito del usuario): quitar triaje, `pricing`, `usage` y niveles 1-5; fundir `set`, `unset`, `models`, `executors` y `/ar:ejecutor`, `/ar:modelo`, `/ar:esfuerzo` en `use`; retirar `config refresh` y el bloque de modelos; acortar `AGENTS.md`.
+- [ ] Documentación clara (acordado el 2026-10-03): manual de uso sencillo con ejemplos (`docs/MANUAL.md`), README más corto y plan paso a paso de cada punto pendiente para que lo ejecute un modelo más pequeño.
 - [ ] Aviso de `start`/`init` dentro de la copia instalada: no se distingue de forma fiable de la copia de desarrollo (ambas son «la raíz del paquete»); decidir con el usuario cómo detectarla.
 
 ## 0.0.x — Prototipo

@@ -6,7 +6,13 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Añadido
+
+- `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. En el chat de Claude Code: `/ar:usar`.
+
 ### Corregido
+
+- `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.
 
 - `agentrelay update` ya no devuelve error cuando `doctor` avisa de algo (por ejemplo, que no hay sesión iniciada): la actualización se considera hecha y `doctor` solo informa.
 - Los tests no dependen de la identidad global de git (`start` hacía un primer commit y fallaba en los runners de Windows y Linux de GitHub Actions, que no la tienen) y son robustos frente a `safe.directory` y a los finales de línea. Confirmado con una ejecución real de CI en Windows, Linux y macOS.
