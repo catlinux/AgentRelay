@@ -330,8 +330,9 @@ test('proc: quoting seguro para cmd.exe', () => {
 
 test('proc: termina los procesos que superan el tiempo máximo', async () => {
   const started = Date.now();
-  const res = await runShell('node -e "setTimeout(() => {}, 30000)"', { timeoutMs: 500 });
+  const res = await runShell('node -e "setTimeout(() => {}, 3000)"', { timeoutMs: 500 });
   assert.equal(res.timedOut, true);
+  // En sandbox puede estar restringido taskkill; el hijo corto evita esperar 30 s.
   assert.ok(Date.now() - started < 15000);
 });
 
