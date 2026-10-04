@@ -22,7 +22,7 @@ Orquestador multiplataforma de agentes de IA para desarrollo de software. Un mod
 
 Así gastas menos del modelo caro sin perder supervisión.
 
-> **Estado:** versión 0.1.0 (MVP). La interfaz puede cambiar antes de la 1.0.0.
+> **Estado:** versión 0.2.0. La interfaz puede cambiar antes de la 1.0.0.
 
 ## Cómo funciona
 

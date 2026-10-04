@@ -22,7 +22,7 @@ Cross-platform orchestrator of AI agents for software development. A powerful mo
 
 You spend less of the expensive model without losing supervision.
 
-> **Status:** version 0.1.0 (MVP). The interface may change before 1.0.0.
+> **Status:** version 0.2.0. The interface may change before 1.0.0.
 
 ## How it works
 
