@@ -10,7 +10,7 @@ import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
-import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
+import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, listCommands, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
@@ -801,7 +801,7 @@ async function cmdSetup(values) {
       else process.stdout.write(`Hook de Claude Code: recordará delegar al editar código (en ${hookFile}).\n`);
     }
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado y /ar:usar, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: ${listCommands().map(({ name }) => `/ar:${name.replace(/\.md$/, '')}`).join(', ')}, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
       if (result.retired.length && !values.quiet) process.stdout.write(`Comandos retirados (ahora es /ar:usar): ${result.retired.join(', ')}\n`);
       const legacy = removeLegacyCommands(values['claude-dir']);
