@@ -219,6 +219,10 @@ async function cmdRun(positionals, values) {
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
+  const lastAttempt = state.attempts[state.attempts.length - 1];
+  if (!values.json && lastAttempt && !lastAttempt.report) {
+    process.stderr.write('[aviso] El ejecutor no devolvió el informe estructurado; revisa el diff y las validaciones.\n');
+  }
   if (values.verbose) printAttemptDetails(state, root, config);
   if (values.verbose) {
     const { sources } = loadConfig({ cwd: root, configPath: values.config });

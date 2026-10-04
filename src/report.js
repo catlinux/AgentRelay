@@ -44,10 +44,13 @@ function validationsSection(check) {
     .join('\n');
 }
 
-function agentReportSection(attempt) {
+function agentReportSection(attempt, id) {
   if (!attempt) return '_(sin intentos)_';
   const r = attempt.report;
-  if (!r) return `_El ejecutor no ha devuelto un informe estructurado._\n\n${attempt.finalText ? `> ${attempt.finalText.replace(/\n/g, '\n> ')}` : ''}`;
+  if (!r) {
+    const warning = `**AVISO: el ejecutor no devolvió el informe estructurado (estado, archivos, incidencias). No te fíes del resumen: revisa el diff y las validaciones. Si falta información, pide una corrección con \`agentrelay review ${id ?? '<id>'} --decision fix --feedback "Termina con el bloque JSON del informe final"\`.**`;
+    return `${warning}\n\n_El ejecutor no ha devuelto un informe estructurado._\n\n${attempt.finalText ? `> ${attempt.finalText.replace(/\n/g, '\n> ')}` : ''}`;
+  }
   return [
     `- Estado declarado: **${r.status}**${r.needsEscalation ? ' · pide escalado' : ''}`,
     `- Resumen: ${r.summary || '-'}`,
@@ -111,7 +114,7 @@ Total: ${state.usage.inputTokens} tokens de entrada, ${state.usage.outputTokens}
 
 ## Informe del ejecutor (último intento)
 
-${agentReportSection(lastAttempt)}
+${agentReportSection(lastAttempt, state.id)}
 
 ## Archivos modificados
 

@@ -191,7 +191,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Arreglar la prueba de timeout de procesos (`proc:`) y revisar el resto de pruebas para que pasen también dentro del sandbox de Codex y en todos los sistemas del CI. (Parcial: la de `proc` ya no depende de `taskkill`; el resto de pruebas siguen sin poder ejecutarse dentro del sandbox de Codex, que falla con `spawn EPERM`, así que el orquestador las ejecuta.)
 - [ ] Reanudar la sesión del ejecutor en la self-review y en las correcciones (si Cline expone el identificador de sesión de forma fiable), para aprovechar su contexto y su caché.
 - [x] Recuperación de ejecuciones interrumpidas (estado `running` huérfano).
-- [ ] Mejorar el aviso cuando el ejecutor no devuelve el informe estructurado. (Parcial: `src/report.js` lo indica en `report.md` y conserva el texto final; falta mejorar el aviso en la salida de ejecución.)
+- [x] Aviso destacado cuando el ejecutor no devuelve el informe estructurado (2026-10-04): en el informe de la ejecución y en la salida de `run`.
 
 ## 0.1.0 — MVP
 
