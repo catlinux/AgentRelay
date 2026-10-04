@@ -28,13 +28,11 @@ import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { cmdUse } from './use.js';
 import { canOpenBrowser } from './platform.js';
-import { aggregateUsage, renderUsage } from './usage.js';
 import { createOutput } from './output.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
 import { appendEvent } from './events.js';
 import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
-import { PRICES_SOURCE, loadPrices, localWindows, nextChange, tariffAt } from './pricing.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
@@ -52,8 +50,6 @@ Uso:
   agentrelay status [--write] [--json] Resume el estado del proyecto
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
-  agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
-  agentrelay pricing [--json]      Muestra precios y tarifa DeepSeek
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
@@ -106,10 +102,6 @@ Opciones de login:
   --device                Usa el código de dispositivo
   --browser               Fuerza el inicio de sesión con navegador
 
-Opciones de usage:
-  --since <fecha>         Incluye ejecuciones desde esta fecha
-  --executor <tipo>       Filtra por ejecutor
-
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
   --with-config           Crea además ${CONFIG_FILE}
@@ -125,7 +117,6 @@ Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
 const OPTIONS = {
   cwd: { type: 'string' },
   config: { type: 'string' },
-  since: { type: 'string' },
   json: { type: 'boolean' },
   level: { type: 'string' },
   'self-review': { type: 'string' },
@@ -151,7 +142,6 @@ const OPTIONS = {
   login: { type: 'boolean' },
   executors: { type: 'string' },
   save: { type: 'string' },
-  model: { type: 'string' }, executor: { type: 'string' },
   write: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
@@ -209,7 +199,7 @@ function eventPrinter(values, root) {
   };
 }
 
-async function cmdRun(positionals, values, runtime) {
+async function cmdRun(positionals, values) {
   const source = positionals[0];
   if (!source) throw new Error('Indica la tarea: agentrelay run <tarea.json | ->');
   const task = loadTask(source === '-' ? '-' : path.resolve(source));
@@ -221,7 +211,6 @@ async function cmdRun(positionals, values, runtime) {
   const overrides = values.level ? { level: values.level } : undefined;
   const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config, overrides });
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
-  showDeepSeekNotice(config.executor.model, values, runtime);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
   if (values.verbose) printAttemptDetails(state, root, config);
@@ -238,20 +227,13 @@ async function cmdShow(positionals, values) {
   return printResult(state, root, values.json, values);
 }
 
-async function cmdReview(positionals, values, runtime) {
+async function cmdReview(positionals, values) {
   const root = await resolveRoot(values);
   if (!positionals[0]) throw new Error('Indica el id de la ejecución: agentrelay review <id> --decision ...');
   if (!values.decision) throw new Error(`Indica --decision ${DECISIONS.join(' | ')}`);
   let feedback = values.feedback || '';
   if (values['feedback-file']) feedback = readFileSync(path.resolve(values['feedback-file']), 'utf8');
   const onEvent = eventPrinter(values, root);
-  if (values.decision === 'fix') {
-    const before = loadState(root, positionals[0]);
-    const canAttempt = before.status !== 'running' && !['accepted', 'rejected', 'escalated'].includes(before.status)
-      && (values.force || before.retriesUsed < before.policy.maxRetries) && Boolean(feedback.trim());
-    const model = before.config?.executor?.model || before.attempts?.at(-1)?.model?.id;
-    if (canAttempt) showDeepSeekNotice(model, values, runtime);
-  }
   const state = await applyReview({
     root, id: positionals[0], decision: values.decision, feedback, force: values.force, onEvent,
   });
@@ -545,59 +527,6 @@ function printAttemptDetails(state, root, config) {
     const base = `attempt-${attempt.n}-${attempt.kind}`;
     process.stdout.write(`Archivos del intento ${attempt.n}: ${path.join(dir, `${base}.prompt.md`)} · ${path.join(dir, `${base}.ndjson`)} · ${path.join(dir, `${base}.stderr.log`)} · ${path.join(dir, 'report.md')}\n`);
   }
-}
-
-async function cmdUsage(values) {
-  const root = await resolveRoot(values);
-  const result = aggregateUsage(root, { since: values.since, executor: values.executor });
-  if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else process.stdout.write(renderUsage(result));
-  return 0;
-}
-
-export function showDeepSeekNotice(model, values, runtime = {}) {
-  const prices = loadPrices();
-  if (!prices[model] || prices[model].schedule !== 'deepseek') return;
-  const now = runtime.clock ? runtime.clock() : new Date();
-  const zone = runtime.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const period = tariffAt(now).period;
-  const until = new Intl.DateTimeFormat('es-ES', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(nextChange(now));
-  const label = period === 'peak' ? 'punta' : 'valle (precio al 50 %)';
-  (runtime.output || createOutput({ quiet: values.quiet, verbose: values.verbose })).info(`Tarifa DeepSeek ahora: ${label} hasta las ${until} (hora local); punta de ${localWindows(now, zone)} en días laborables; no se tienen en cuenta los festivos chinos.`);
-}
-
-async function cmdPricing(values, runtime = {}) {
-  const prices = loadPrices();
-  const now = runtime.clock ? runtime.clock() : new Date(), zone = runtime.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const period = tariffAt(now).period;
-  const file = path.join(agentrelayHome(), 'pricing.json');
-  if (values.json) {
-    process.stdout.write(`${JSON.stringify({ prices, current: { period, changesAt: nextChange(now).toISOString(), localChangesAt: describeTariffChange(now, nextChange(now), zone), windows: localWindows(now, zone), timeZone: zone }, source: PRICES_SOURCE, overrideFile: file, overrideExists: existsSync(file), note: 'No se tienen en cuenta los festivos chinos. Codex y otros modelos no están en la tabla.' }, null, 2)}\n`);
-    return 0;
-  }
-  const rows = Object.entries(prices).map(([id, p]) => [id, `${priceCell(p.input_hit.offpeak, 3)} / ${priceCell(p.input_hit.peak, 3)}`, `${priceCell(p.input_miss.offpeak, 2)} / ${priceCell(p.input_miss.peak, 2)}`, `${priceCell(p.output.offpeak, 2)} / ${priceCell(p.output.peak, 2)}`]);
-  const headings = ['Modelo', 'Entrada caché (valle / punta)', 'Entrada sin caché (valle / punta)', 'Salida (valle / punta)'];
-  const widths = headings.map((heading, i) => Math.max(heading.length, ...rows.map((row) => row[i].length)));
-  process.stdout.write('USD por millón de tokens\n');
-  process.stdout.write([headings, ...rows].map((row) => row.map((cell, i) => i ? cell.padStart(widths[i]) : cell.padEnd(widths[i])).join('  ').trimEnd()).join('\n') + '\n');
-  process.stdout.write(`Tarifa ahora: ${period === 'peak' ? 'punta' : 'valle (50 % de descuento)'}; cambia ${describeTariffChange(now, nextChange(now), zone)}.\n`);
-  process.stdout.write(`Punta en días laborables: ${localWindows(now, zone)} (${zone}).\nFuente: ${PRICES_SOURCE.url} (consultado ${PRICES_SOURCE.checkedAt}).\nArchivo de precios opcional: ${file} (${existsSync(file) ? 'existe' : 'no existe'}).\nNo se tienen en cuenta los festivos chinos. Codex y otros modelos no están en la tabla.\n`);
-  return 0;
-}
-
-function priceCell(value, digits) { return value.toFixed(digits).replace('.', ','); }
-function localDateKey(date, zone) {
-  const parts = new Intl.DateTimeFormat('es-ES', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
-  return `${parts.find((p) => p.type === 'year').value}-${parts.find((p) => p.type === 'month').value}-${parts.find((p) => p.type === 'day').value}`;
-}
-function describeTariffChange(now, change, zone) {
-  const clock = new Intl.DateTimeFormat('es-ES', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(change);
-  const today = localDateKey(now, zone), target = localDateKey(change, zone);
-  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
-  if (target === today) return `hoy a las ${clock}`;
-  if (target === tomorrow) return `mañana a las ${clock}`;
-  const date = new Intl.DateTimeFormat('es-ES', { timeZone: zone, day: 'numeric', month: 'long' }).format(change);
-  return `el ${date} a las ${clock} (hora local)`;
 }
 
 const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
@@ -1220,15 +1149,13 @@ export async function main(argv, runtime = {}) {
 
   try {
     switch (command) {
-      case 'run': return await cmdRun(rest, values, runtime);
+      case 'run': return await cmdRun(rest, values);
       case 'show': return await cmdShow(rest, values);
-      case 'review': return await cmdReview(rest, values, runtime);
+      case 'review': return await cmdReview(rest, values);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
       case 'status': return await cmdStatus(values);
       case 'recover': return await cmdRecover(rest, values);
-      case 'usage': return await cmdUsage(values);
-      case 'pricing': return await cmdPricing(values, runtime);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
       case 'update': return await cmdUpdate(values);

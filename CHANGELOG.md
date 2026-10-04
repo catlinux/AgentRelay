@@ -22,6 +22,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 - Triaje adaptativo: `agentrelay triage record|advise|stats`, su historial `triage.jsonl` y `/ar:triaje`. Se mantiene la recomendación de modelo y esfuerzo para el orquestador en las instrucciones globales; solo se quita la parte que aprendía de los resultados.
 
+- `agentrelay usage` y `agentrelay pricing` (resumen de consumo y tabla de precios y tarifas de DeepSeek), y el aviso de tarifa al lanzar una tarea. El informe de cada ejecución sigue mostrando los tokens de cada intento.
+
 ### Corregido
 
 - `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.
