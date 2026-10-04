@@ -1,6 +1,6 @@
 # AgentRelay — Contexto de diseño
 
-Contexto de fondo del proyecto (propósito, objetivo económico, niveles, configuración, compatibilidad, fases, versionado). Las reglas de actuación del orquestador están en `AGENTS.md`. La numeración es la original.
+Contexto de fondo del proyecto (propósito, objetivo económico, política de orquestación, configuración, compatibilidad, fases, versionado). Las reglas de actuación del orquestador están en `AGENTS.md`. La numeración es la original.
 
 ## 1. Propósito
 
@@ -16,21 +16,20 @@ La prioridad estratégica es ahorrar consumo del modelo premium del orquestador.
 
 Por defecto, AgentRelay favorece la delegación al ejecutor siempre que sea razonablemente segura. El orquestador interviene cuando aporta valor real: planificación, decisiones complejas, supervisión, resolución de bloqueos y validación final. El sistema permite configurar cuánto se sacrifica en consumo para obtener más supervisión.
 
-## 4. Niveles de orquestación
+## 4. Política de orquestación
 
-Hay 5 niveles configurables, desde mínima dependencia del orquestador hasta máxima supervisión:
+Hasta la 0.1.0 había 5 niveles configurables (de «máximo ahorro» a «máxima supervisión»). Se sustituyeron el 2026-10-03 por **una sola política** más sencilla de entender, que se puede ajustar con la sección `policy` de la configuración:
 
-- **Nivel 1 — Máximo ahorro:** el ejecutor hace casi todo; el orquestador solo interviene ante bloqueos o fallos graves.
-- **Nivel 2 — Ahorro:** el ejecutor es el habitual; el orquestador planifica y revisa solo lo necesario.
-- **Nivel 3 — Equilibrado:** el orquestador planifica y supervisa; el ejecutor ejecuta y puede corregir; escalado al alcanzar el límite.
-- **Nivel 4 — Calidad:** el orquestador participa más y tolera menos errores.
-- **Nivel 5 — Máxima supervisión:** el orquestador planifica y revisa prácticamente cada tarea.
+- el orquestador revisa siempre (`review: "always"`; también `selective` o `on-failure`);
+- hasta 2 correcciones automáticas del ejecutor antes de escalar (`maxRetries`, `autoFix`);
+- autorrevisión del ejecutor según la complejidad de la tarea: ninguna (trivial), en el propio prompt (normal) o en una segunda pasada (compleja) (`selfReview`);
+- `requireValidation` exige que la tarea tenga validaciones objetivas.
 
-Los nombres y valores son una propuesta, no una especificación inmutable.
+Para más ahorro o más supervisión se ajustan esos valores, no un número de nivel. El código está en `src/policy.js`.
 
 ## 5. Configuración
 
-Debe ser fácil cambiar sin modificar el motor: proveedor, modelo, agente/CLI, nivel de orquestación, máximo de reintentos, condiciones de escalado, nivel de revisión, timeouts, comandos de validación y opciones específicas de proveedor. La configuración está separada del código. El motor no debe quedar acoplado permanentemente a Claude, Cline, Codex o DeepSeek.
+Debe ser fácil cambiar sin modificar el motor: proveedor, modelo, agente/CLI, política de orquestación, máximo de reintentos, condiciones de escalado, nivel de revisión, timeouts, comandos de validación y opciones específicas de proveedor. La configuración está separada del código. El motor no debe quedar acoplado permanentemente a Claude, Cline, Codex o DeepSeek.
 
 ## 6. Compatibilidad futura
 

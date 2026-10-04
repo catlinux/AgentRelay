@@ -335,43 +335,45 @@ test('proc: termina los procesos que superan el tiempo máximo', async () => {
   assert.ok(Date.now() - started < 15000);
 });
 
-test('policy: self-review según nivel y complejidad', () => {
+test('policy: self-review según complejidad', () => {
   const task = (complexity, selfReview = null) => ({ complexity, selfReview });
-  assert.equal(decideSelfReview(resolvePolicy({ level: 1 }), task('normal')), 'none');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 1 }), task('complex')), 'inline');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 3 }), task('trivial')), 'none');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 3 }), task('normal')), 'inline');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 3 }), task('complex')), 'pass');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 5 }), task('normal')), 'pass');
-  assert.equal(decideSelfReview(resolvePolicy({ level: 5 }), task('normal', 'none')), 'none');
-  const custom = resolvePolicy({ level: 3, policy: { maxRetries: 5, selfReview: { normal: 'pass' } } });
+  const base = resolvePolicy({});
+  assert.equal(decideSelfReview(base, task('trivial')), 'none');
+  assert.equal(decideSelfReview(base, task('normal')), 'inline');
+  assert.equal(decideSelfReview(base, task('complex')), 'pass');
+  assert.equal(decideSelfReview(base, task('normal', 'none')), 'none');
+  const custom = resolvePolicy({ policy: { maxRetries: 5, selfReview: { normal: 'pass' } } });
   assert.equal(custom.maxRetries, 5);
   assert.equal(decideSelfReview(custom, task('normal')), 'pass');
   assert.equal(decideSelfReview(custom, task('complex')), 'pass');
+  assert.equal(decideSelfReview(custom, task('trivial')), 'none');
 });
 
 test('policy: pasada separada de self-review', () => {
-  const l3 = resolvePolicy({ level: 3 });
-  const l4 = resolvePolicy({ level: 4 });
+  const base = resolvePolicy({});
+  const strict = resolvePolicy({ policy: { skipPassMaxFiles: 0 } });
   const small = { changedFiles: 1, validationCount: 1, checkPassed: true };
-  assert.equal(shouldRunSelfReviewPass(l3, 'inline', small).run, false);
-  assert.equal(shouldRunSelfReviewPass(l3, 'pass', small).run, false);
-  assert.equal(shouldRunSelfReviewPass(l4, 'pass', small).run, true);
-  assert.equal(shouldRunSelfReviewPass(l3, 'pass', { ...small, validationCount: 0 }).run, true);
-  assert.equal(shouldRunSelfReviewPass(l4, 'pass', { ...small, changedFiles: 0 }).run, false);
+  assert.equal(shouldRunSelfReviewPass(base, 'inline', small).run, false);
+  assert.equal(shouldRunSelfReviewPass(base, 'pass', small).run, false);
+  assert.equal(shouldRunSelfReviewPass(strict, 'pass', small).run, true);
+  assert.equal(shouldRunSelfReviewPass(base, 'pass', { ...small, validationCount: 0 }).run, true);
+  assert.equal(shouldRunSelfReviewPass(strict, 'pass', { ...small, changedFiles: 0 }).run, false);
 });
 
 test('policy: cuándo revisa el orquestador', () => {
   const task = { complexity: 'normal' };
   const clean = { headMoved: false, agentReport: { issues: [], questions: [] }, validationCount: 1, changedFiles: 1 };
-  assert.equal(decideReview(resolvePolicy({ level: 1 }), task, clean).required, false);
-  assert.equal(decideReview(resolvePolicy({ level: 2 }), task, clean).required, false);
-  assert.equal(decideReview(resolvePolicy({ level: 3 }), task, clean).required, true);
-  assert.equal(decideReview(resolvePolicy({ level: 2 }), task, { ...clean, validationCount: 0 }).required, true);
-  assert.equal(decideReview(resolvePolicy({ level: 2 }), { complexity: 'complex' }, clean).required, true);
-  assert.equal(decideReview(resolvePolicy({ level: 1 }), task, { ...clean, validationCount: 0 }).required, false);
-  assert.equal(decideReview(resolvePolicy({ level: 1 }), task, { ...clean, headMoved: true }).required, true);
-  assert.equal(decideReview(resolvePolicy({ level: 1 }), task, { ...clean, changedFiles: 0 }).required, true);
+  const onFailure = resolvePolicy({ policy: { review: 'on-failure' } });
+  const selective = resolvePolicy({ policy: { review: 'selective' } });
+  assert.equal(decideReview(resolvePolicy({}), task, clean).required, true);
+  assert.equal(decideReview(onFailure, task, clean).required, false);
+  assert.equal(decideReview(selective, task, clean).required, false);
+  assert.equal(decideReview(selective, task, { ...clean, validationCount: 0 }).required, true);
+  assert.equal(decideReview(selective, { complexity: 'complex' }, clean).required, true);
+  assert.equal(decideReview(onFailure, task, { ...clean, validationCount: 0 }).required, false);
+  assert.equal(decideReview(onFailure, task, { ...clean, headMoved: true }).required, true);
+  assert.equal(decideReview(onFailure, task, { ...clean, changedFiles: 0 }).required, true);
+  assert.equal(decideReview(resolvePolicy({ policy: { review: 'on-failure', requireValidation: true } }), task, { ...clean, validationCount: 0 }).required, true);
 });
 
 test('config: valores por defecto, archivo, archivo local y opciones', () => {
@@ -379,15 +381,15 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
   try {
     const home = path.join(dir, 'home');
     assert.equal(loadConfig({ cwd: dir, home }).config.executor.model, 'gpt-6-luna');
-    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ level: 2, validation: { commands: ['npm test'] } }));
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ validation: { commands: ['npm test'] } }));
     writeFileSync(path.join(dir, 'agentrelay.config.local.json'), JSON.stringify({ executor: { command: ['node', 'cline.js'] } }));
-    const { config, sources } = loadConfig({ cwd: dir, home, overrides: { level: '4' } });
+    const { config, sources } = loadConfig({ cwd: dir, home, overrides: { executor: { timeoutSeconds: 77 } } });
     assert.equal(sources.length, 2);
-    assert.equal(config.level, 4);
+    assert.equal(config.executor.timeoutSeconds, 77);
     assert.deepEqual(config.validation.commands, ['npm test']);
     assert.deepEqual(config.executor.command, ['node', 'cline.js']);
     assert.equal(config.executor.provider, null);
-    assert.throws(() => loadConfig({ cwd: dir, home, overrides: { level: 9 } }), /1-5/);
+    assert.throws(() => loadConfig({ cwd: dir, home, overrides: { executor: { timeoutSeconds: 0 } } }), /número positivo/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -418,7 +420,6 @@ test('config: los valores por defecto de executor dependen del tipo', () => {
     assert.equal(codex.executor.command, 'codex');
     assert.equal(codex.executor.provider, null);
     assert.equal(codex.executor.model, 'gpt-6-luna');
-    assert.equal(codex.level, 3);
 
     // Un valor explícito del usuario siempre gana.
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex', model: 'gpt-6-luna' } }));
@@ -446,9 +447,9 @@ test('config y tarea: aceptan archivos JSON con BOM', () => {
   try {
     const configFile = path.join(dir, 'c.json');
     const taskFile = path.join(dir, 't.json');
-    writeFileSync(configFile, '﻿{"level":2}');
+    writeFileSync(configFile, '﻿{"executor":{"timeoutSeconds":2}}');
     writeFileSync(taskFile, '﻿{"objective":"x"}');
-    assert.equal(loadConfig({ cwd: dir, configPath: configFile, home: path.join(dir, 'home') }).config.level, 2);
+    assert.equal(loadConfig({ cwd: dir, configPath: configFile, home: path.join(dir, 'home') }).config.executor.timeoutSeconds, 2);
     assert.equal(loadTask(taskFile).objective, 'x');
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -544,7 +545,7 @@ test('events: resume órdenes y formatea eventos con hora local', () => {
   assert.equal(describeCommand('"C://WINDOWS//System32//WindowsPowerShell//v1.0//powershell.exe" -Command \'git diff -- suma.js; git status --short\''), 'revisa el estado de git');
   assert.equal(describeCommand('bash -lc "rg foo src"'), 'busca en el código');
   assert.equal(describeCommand('unknown-command --arg'), null);
-  assert.equal(formatEvent({ type: 'run_start', ts, runId: 'r1', title: 'T', level: 3, levelName: 'equilibrado' }, t0), `${prefix}▶ Ejecución r1 · nivel 3 (equilibrado)\n  T`);
+  assert.equal(formatEvent({ type: 'run_start', ts, runId: 'r1', title: 'T' }, t0), `${prefix}▶ Ejecución r1\n  T`);
   assert.equal(formatEvent({ type: 'attempt_start', ts, attempt: 1, kind: 'implement', model: 'm' }, t0), `\n${prefix}▶ Intento 1 (implementación) · m`);
   assert.equal(formatEvent({ type: 'activity', kind: 'iteration', n: 1, ts }, t0), null);
   assert.equal(formatEvent({ type: 'activity', kind: 'thinking', text: 'pensando', ts }, t0), `${prefix}  · piensa: pensando`);

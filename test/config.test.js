@@ -31,14 +31,15 @@ test('capas y orígenes aplican usuario, proyecto, local y opciones', () => {
   try {
     const user = path.join(home, 'config.json');
     mkdirSync(home, { recursive: true });
-    writeFileSync(user, '{"executor":{"model":"user"},"level":1}');
-    writeFileSync(path.join(dir, 'agentrelay.config.json'), '{"executor":{"model":"project"},"level":2}');
-    writeFileSync(path.join(dir, 'agentrelay.config.local.json'), '{"level":4}');
-    const result = loadConfig({ cwd: dir, home, overrides: { level: 5 } });
+    writeFileSync(user, '{"executor":{"model":"user","timeoutSeconds":100}}');
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), '{"executor":{"model":"project","timeoutSeconds":200}}');
+    writeFileSync(path.join(dir, 'agentrelay.config.local.json'), '{"validation":{"timeoutSeconds":300}}');
+    const result = loadConfig({ cwd: dir, home, overrides: { executor: { timeoutSeconds: 500 } } });
     assert.equal(result.config.executor.model, 'project');
-    assert.equal(result.config.level, 5);
+    assert.equal(result.config.executor.timeoutSeconds, 500);
+    assert.equal(result.config.validation.timeoutSeconds, 300);
     assert.equal(result.origins['executor.model'], path.join(dir, 'agentrelay.config.json'));
-    assert.equal(result.origins.level, 'línea de comandos');
+    assert.equal(result.origins['executor.timeoutSeconds'], 'línea de comandos');
     assert.equal(result.sources.length, 3);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -47,10 +48,23 @@ test('valida valores con el origen y avisa de claves desconocidas con sugerencia
   const dir = temp();
   try {
     const file = path.join(dir, 'agentrelay.config.json');
-    writeFileSync(file, '{"level":9,"executor":{"modle":"x"}}');
-    assert.throws(() => loadConfig({ cwd: dir }), new RegExp(`${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: level`));
+    writeFileSync(file, '{"executor":{"timeoutSeconds":-1,"modle":"x"}}');
+    assert.throws(() => loadConfig({ cwd: dir }), new RegExp(`${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: executor.timeoutSeconds`));
     writeFileSync(file, '{"executor":{"modle":"x"}}');
     assert.match(loadConfig({ cwd: dir }).warnings.join(' '), /modle.*quizá quisiste decir model/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('la opción level de versiones anteriores se ignora con un aviso', () => {
+  const dir = temp();
+  try {
+    const file = path.join(dir, 'agentrelay.config.json');
+    writeFileSync(file, '{"level":4,"executor":{"model":"x"}}');
+    const result = loadConfig({ cwd: dir, home: path.join(dir, 'home') });
+    assert.equal(result.config.level, undefined);
+    assert.equal(result.config.executor.model, 'x');
+    assert.ok(result.warnings.some((warning) => warning.includes('La opción level ya no existe') && warning.includes(file)));
+    assert.ok(!result.warnings.some((warning) => warning.includes('Clave desconocida level')));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

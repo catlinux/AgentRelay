@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from './config.js';
-import { LEVELS } from './policy.js';
+import { POLICY } from './policy.js';
 
 const value = (item) => JSON.stringify(item);
 
@@ -56,19 +56,15 @@ export function configTemplate({ scope } = {}) {
     lines.push('  // },');
   }
 
-  lines.push('', '  // ── Nivel y política ──');
-  lines.push(...option('level', DEFAULT_CONFIG.level, 'Nivel de orquestación que controla revisión y reintentos.', 'entero de 1 a 5', 'empieza por el nivel equilibrado.', '  '));
-  lines.push('', '  // Niveles de orquestación (cuánto interviene el orquestador, de menos a más):');
-  for (const [number, level] of Object.entries(LEVELS)) lines.push(`  //   ${number} = ${level.name}`);
-
+  lines.push('', '  // ── Política ──');
   if (!user) {
-    const defaults = LEVELS[DEFAULT_CONFIG.level];
-    lines.push('  // Política específica del proyecto; cada valor sustituye el correspondiente del nivel.');
+    const defaults = POLICY;
+    lines.push('  // Política específica del proyecto; cada valor sustituye el de la política por defecto.');
     lines.push('  // "policy": {');
     lines.push(...option('review', defaults.review, 'Cuándo debe intervenir el orquestador.', 'on-failure, selective o always', 'usa selective para revisar ante señales de riesgo.', '  '));
     lines.push(...option('maxRetries', defaults.maxRetries, 'Número máximo de reintentos automáticos.', 'entero mayor o igual que 0', 'reduce el valor si quieres limitar ejecuciones.', '  '));
     lines.push(...option('autoFix', defaults.autoFix, 'Indica si AgentRelay corrige automáticamente fallos de validación.', 'booleano', 'desactívalo si prefieres revisar cada fallo manualmente.', '  '));
-    lines.push(...option('requireValidation', defaults.requireValidation, 'Indica si el nivel debe exigir validaciones objetivas.', 'booleano', 'actívalo en proyectos con pruebas automatizadas.', '  '));
+    lines.push(...option('requireValidation', defaults.requireValidation, 'Indica si se deben exigir validaciones objetivas.', 'booleano', 'actívalo en proyectos con pruebas automatizadas.', '  '));
     lines.push('  // Self-review usa claves trivial, normal y complex, con valores none, inline o pass.');
     lines.push('  // "selfReview": {');
     for (const complexity of ['trivial', 'normal', 'complex']) lines.push(...option(complexity, defaults.selfReview[complexity], `Modo de self-review para tareas ${complexity}.`, 'none, inline o pass', 'usa pass cuando quieras una segunda pasada de revisión.', '    '));

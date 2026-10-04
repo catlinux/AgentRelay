@@ -17,7 +17,6 @@ export function agentrelayHome() {
 }
 
 export const DEFAULT_CONFIG = Object.freeze({
-  level: 3,
   executor: {
     type: 'codex',
     // Programa a ejecutar. Puede ser un array: ["node", "ruta/a/cline"].
@@ -34,7 +33,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     commands: [],
     timeoutSeconds: 600,
   },
-  // Ajustes que sustituyen a los del nivel elegido (ver src/policy.js).
+  // Ajustes que sustituyen a la política por defecto (ver src/policy.js).
   policy: {},
   report: { maxDiffChars: 60000, maxOutputChars: 4000 },
 });
@@ -130,7 +129,7 @@ function readConfig(file) {
   }
 }
 const KNOWN = {
-  '': ['level', 'executor', 'validation', 'policy', 'report', 'profiles'],
+  '': ['executor', 'validation', 'policy', 'report', 'profiles'],
   executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs'],
   validation: ['commands', 'timeoutSeconds'],
   policy: ['review', 'maxRetries', 'autoFix', 'requireValidation', 'selfReview', 'skipPassMaxFiles'],
@@ -186,10 +185,15 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
       }
     };
     updateOrigins(layer.data);
+    if (isObject(layer.data) && Object.hasOwn(layer.data, 'level')) {
+      warnings.push(`La opción level ya no existe y se ignora (${layer.origin}).`);
+      delete config.level;
+    }
     const checkKeys = (obj, prefix = '') => {
       if (!isObject(obj)) return;
       for (const [key, value] of Object.entries(obj)) {
         const parent = prefix;
+        if (parent === '' && key === 'level') continue;
         if (!(KNOWN[parent] || []).includes(key)) {
           const candidate = Object.keys(KNOWN[parent] || {}).length ? KNOWN[parent].find((k) => distance(key, k) <= 2) : null;
           warnings.push(`Clave desconocida ${prefix ? `${prefix}.` : ''}${key} en ${layer.origin}${candidate ? `; quizá quisiste decir ${candidate}` : ''}.`);
@@ -198,10 +202,8 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
     };
     checkKeys(layer.data);
   }
-  if (origins.level === 'línea de comandos' && typeof config.level === 'string' && /^\d+$/.test(config.level)) config.level = Number(config.level);
   const originError = (key) => origins[key] || 'defecto';
   const invalid = (key, explanation) => { throw new Error(`Configuración no válida en ${originError(key)}: ${key} ${explanation}`); };
-  if (!Number.isInteger(config.level) || config.level < 1 || config.level > 5) invalid('level', 'debe ser un entero entre 1-5');
   for (const key of ['executor', 'validation', 'policy', 'report']) if (!isObject(config[key])) invalid(key, 'debe ser un objeto');
   if (!Object.hasOwn(EXECUTOR_DEFAULTS, config.executor.type)) throw new Error(`Ejecutor no soportado: ${config.executor.type} (disponibles: ${Object.keys(EXECUTOR_DEFAULTS).join(', ')})`);
   if (!(config.executor.thinking === null || ['none', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.executor.thinking))) invalid('executor.thinking', 'debe ser null, none, low, medium, high, xhigh o max');
