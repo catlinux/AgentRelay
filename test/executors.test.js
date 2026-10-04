@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { executorsDir, installExecutor, isInstalled } from '../src/executors/catalog.js';
 import { findBundledCline } from '../src/executors/cline.js';
+import { commandParts as opencodeCommandParts } from '../src/executors/opencode.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
@@ -55,6 +56,40 @@ test('installExecutor crea el package.json aislado e invoca npm sin red en la pr
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('OpenCode se instala con npm y queda detectable en la carpeta gestionada', async () => {
+  const dir = temporary('agentrelay-opencode-');
+  try {
+    let call;
+    await installExecutor('opencode', {
+      dir,
+      run: async (...args) => {
+        call = args;
+        return { code: 0, stdout: '', stderr: '' };
+      },
+    });
+    assert.equal(call[0], 'npm');
+    assert.deepEqual(call[1], ['install', '--prefix', dir, '--no-audit', '--no-fund', 'opencode-ai@1']);
+    const link = path.join(dir, 'node_modules', '.bin', `opencode${process.platform === 'win32' ? '.cmd' : ''}`);
+    assert.equal(await isInstalled('opencode', { dir, env: { PATH: '' }, exists: (file) => file === link }), true);
+    assert.equal(await isInstalled('opencode', { dir, env: { PATH: '' }, exists: () => false }), false);
+    assert.equal(await isInstalled('opencode', {
+      dir,
+      env: { PATH: path.join(dir, 'bin') },
+      exists: (file) => file === path.join(dir, 'bin', process.platform === 'win32' ? 'opencode.exe' : 'opencode'),
+    }), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('OpenCode commandParts prioriza el enlace gestionado y conserva los comandos explícitos', () => {
+  const dir = path.join('user', 'executors');
+  const link = path.join(dir, 'node_modules', '.bin', process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
+  assert.deepEqual(opencodeCommandParts('opencode', { executorsDir: dir, exists: (file) => file === link }), [link]);
+  assert.deepEqual(opencodeCommandParts('opencode', { executorsDir: dir, exists: () => false }), ['opencode']);
+  assert.deepEqual(opencodeCommandParts('/custom/opencode', { executorsDir: dir, exists: () => true }), ['/custom/opencode']);
 });
 
 test('findBundledCline prioriza AgentRelay y encuentra la carpeta de ejecutores', () => {

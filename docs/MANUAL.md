@@ -141,7 +141,7 @@ agentrelay use bueno              # y vuelve a «bueno»
 | Ejecutor | Qué necesita | Cómo se conecta |
 |---|---|---|
 | `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita). Viene incluido. | `agentrelay login` |
-| `opencode` | Modelos gratuitos de OpenCode. Se instala aparte ([opencode.ai](https://opencode.ai)). | `opencode auth login` |
+| `opencode` | Modelos gratuitos de OpenCode. Se instala con `agentrelay executors add opencode` (o desde `agentrelay use opencode`); si ya lo tienes en el PATH, se usa ese. | `opencode auth login` |
 | `cline` | Una clave de API (por ejemplo, DeepSeek). `agentrelay use` ofrece instalarlo. | `npx cline auth …` (el comando exacto aparece al instalarlo) |
 
 ## 3. Ver qué hace el ejecutor

@@ -7,13 +7,16 @@
 // instrucción corta de una línea que le indica leerlo. El agente termina con el
 // informe JSON estructurado que extractAgentReport parsea de su texto final.
 
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { runProcess } from '../proc.js';
+import { executorsDir as defaultExecutorsDir } from './catalog.js';
 import { clip, extractAgentReport, instructionFor, makeLineHandler, relativize, tail } from './common.js';
 
 export const name = 'opencode';
 
 // Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
-export const installHint = 'Instala OpenCode CLI siguiendo las instrucciones de https://opencode.ai.';
+export const installHint = 'Instálalo con: agentrelay executors add opencode';
 export const loginHint = 'Ejecuta "opencode auth login" para conectar tu cuenta.';
 
 /**
@@ -36,8 +39,12 @@ export async function listModels(executor, { run = runProcess } = {}) {
   }
 }
 
-/** "opencode" (valor por defecto) está en el PATH; cualquier otro valor se usa tal cual. */
-export function commandParts(command) {
+/** "opencode" prioriza la instalación gestionada y, si falta, usa el PATH. */
+export function commandParts(command, { executorsDir = defaultExecutorsDir(), exists = existsSync, platform = process.platform } = {}) {
+  if (command === 'opencode') {
+    const link = path.join(executorsDir, 'node_modules', '.bin', `opencode${platform === 'win32' ? '.cmd' : ''}`);
+    if (exists(link)) return [link];
+  }
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
   if (!parts.length || !parts[0]) throw new Error('executor.command está vacío');
   return parts;
