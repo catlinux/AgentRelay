@@ -113,6 +113,8 @@ agentrelay setup
 
 Done. Go to [Getting started](#getting-started).
 
+**Alternative: graphical installer (in preparation).** `installer/debian/` contains `install.sh` (does the steps above for you; `--dry-run` shows what it would do without installing anything, `--install-deps` allows installing Git and Node.js with sudo, `--executors cline,opencode`, `--login`), `install-gui.sh` (a Zenity wizard that calls it) and `build-deb.sh` (builds the `agentrelay-installer_<version>_all.deb` package, which installs the wizard and an "Instalar AgentRelay" launcher; AgentRelay is then installed in your home folder as a git clone, so `agentrelay update` keeps working). Not yet tested on a real Debian machine: for now use the steps above.
+
 ---
 
 ## macOS

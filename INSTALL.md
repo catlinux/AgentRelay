@@ -113,6 +113,8 @@ agentrelay setup
 
 Listo. Pasa a [Cómo empezar a usarlo](#cómo-empezar-a-usarlo).
 
+**Alternativa: instalador con asistente gráfico (en preparación).** En `installer/debian/` hay `install.sh` (hace los pasos anteriores por ti; `--dry-run` muestra lo que haría sin instalar nada, `--install-deps` permite instalar Git y Node.js con sudo, `--executors cline,opencode`, `--login`), `install-gui.sh` (asistente con ventanas de Zenity que lo llama) y `build-deb.sh` (genera el paquete `agentrelay-installer_<versión>_all.deb`, que instala el asistente y un acceso directo «Instalar AgentRelay»; AgentRelay se instala luego en tu carpeta personal como clon de git, así que `agentrelay update` sigue funcionando). Aún sin probar en un equipo Debian real: por ahora usa los pasos de arriba.
+
 ---
 
 ## macOS
