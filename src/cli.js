@@ -33,6 +33,7 @@ import { appendEvent } from './events.js';
 import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
+import { hookDecision, projectUsesAgentRelay } from './hook.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -212,6 +213,30 @@ async function cmdRun(positionals, values) {
     process.stdout.write(`Archivos de configuración leídos: ${sources.length ? sources.join(', ') : 'ninguno'}\n`);
   }
   return printResult(state, root, values.json, values);
+}
+
+async function cmdHook() {
+  try {
+    if (process.stdin.isTTY) return 0;
+    const chunks = [];
+    for await (const chunk of process.stdin) chunks.push(chunk);
+    const input = Buffer.concat(chunks).toString('utf8');
+    if (!input.trim()) return 0;
+    const decision = hookDecision({
+      input,
+      now: Date.now(),
+      usesAgentRelay: projectUsesAgentRelay,
+      readMarker: (sessionId) => {
+        try { return readFileSync(path.join(os.tmpdir(), `agentrelay-hook-${sessionId}.txt`), 'utf8'); }
+        catch { return null; }
+      },
+      writeMarker: (sessionId, now) => writeFileSync(path.join(os.tmpdir(), `agentrelay-hook-${sessionId}.txt`), String(now)),
+    });
+    if (decision) process.stdout.write(`${JSON.stringify(decision)}\n`);
+  } catch {
+    // Un hook no debe interrumpir la herramienta que lo invocó.
+  }
+  return 0;
 }
 
 async function cmdShow(positionals, values) {
@@ -1084,9 +1109,10 @@ export async function main(argv, runtime = {}) {
     return 1;
   }
   const { values, positionals } = parsed;
+  const [command, ...rest] = positionals;
+  if (command === 'hook') return cmdHook();
   try { createOutput({ quiet: values.quiet, verbose: values.verbose }); }
   catch (error) { process.stderr.write(`${error.message}\n`); return 1; }
-  const [command, ...rest] = positionals;
 
   if (values.version) {
     process.stdout.write(`${VERSION}\n`);
