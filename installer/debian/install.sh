@@ -9,6 +9,8 @@ LOGIN=false
 INSTALL_DEPS=false
 DRY_RUN=false
 NODE_SETUP_FILE=""
+SUDO=(sudo)
+if [[ -n "${SUDO_ASKPASS:-}" ]]; then SUDO=(sudo -A); fi
 
 usage() {
   cat <<'EOF'
@@ -161,13 +163,13 @@ if [[ "$HAS_GIT" != true || "$HAS_NODE" != true ]]; then
   fi
   [[ "$HAS_APT" == true ]] || fail 'no se pueden instalar las dependencias: apt-get no está disponible.'
   if [[ "$HAS_GIT" != true ]]; then
-    run sudo apt-get install -y git curl ca-certificates
+    run "${SUDO[@]}" apt-get install -y git curl ca-certificates
   fi
   if [[ "$HAS_NODE" != true ]]; then
-    run sudo apt-get install -y curl ca-certificates
+    run "${SUDO[@]}" apt-get install -y curl ca-certificates
     if [[ "$DRY_RUN" == true ]]; then
       print_command curl -fsSL https://deb.nodesource.com/setup_22.x -o '<archivo-temporal>'
-      print_command sudo -E bash '<archivo-temporal>'
+      print_command "${SUDO[@]}" -E bash '<archivo-temporal>'
     else
       if NODE_SETUP_FILE="$(mktemp)"; then
         :
@@ -175,9 +177,9 @@ if [[ "$HAS_GIT" != true || "$HAS_NODE" != true ]]; then
         fail 'no se pudo crear un archivo temporal para configurar Node.js.'
       fi
       run curl -fsSL https://deb.nodesource.com/setup_22.x -o "$NODE_SETUP_FILE"
-      run sudo -E bash "$NODE_SETUP_FILE"
+      run "${SUDO[@]}" -E bash "$NODE_SETUP_FILE"
     fi
-    run sudo apt-get install -y nodejs
+    run "${SUDO[@]}" apt-get install -y nodejs
   fi
   if [[ "$DRY_RUN" != true ]]; then
     command -v git >/dev/null 2>&1 || fail 'Git sigue sin estar disponible tras la instalación.'
