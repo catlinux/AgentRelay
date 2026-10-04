@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Instalador de Windows en `installer/windows/`: `install.ps1` (instala Node.js y Git con winget si faltan, clona o actualiza el repositorio, `npm ci`, `npm link`, `agentrelay setup` con los ejecutores elegidos y `doctor`; admite `-DryRun`) y `agentrelay.iss`, el asistente de Inno Setup que lo presenta con ventanas. El `.exe` no se publica en el repositorio y aún no está compilado ni probado en un equipo real.
 - Cuando una ejecución falla por cuota o saldo del ejecutor, el informe propone alternativas con el comando exacto (Codex, modelos gratuitos de OpenCode ya aprobados, DeepSeek Flash) y las instrucciones del orquestador le piden preguntar al usuario cuál prefiere. Nunca se cambia de ejecutor solo.
 
 ### Cambiado

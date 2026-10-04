@@ -55,6 +55,8 @@ agentrelay setup
 
 Done. Go to [Getting started](#getting-started).
 
+**Alternative: installer wizard (in preparation).** `installer/windows/` contains a script that does steps 1 to 3 for you and an Inno Setup wizard that presents it with windows. Not compiled yet and not tested on a real machine: for now use the steps above. To try the script on its own, `powershell -ExecutionPolicy Bypass -File installerwindowsinstall.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install for real (options: `-InstallDir`, `-Executors cline,opencode`, `-Login`). To build the `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installerwindowsagentrelay.iss` (output goes to `.agentrelayinstaller`). To uninstall: run `agentrelay setup --uninstall`, `npm unlink -g agentrelay` and delete the folder.
+
 ---
 
 ## Linux
