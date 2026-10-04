@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- `agentrelay init` y `agentrelay start` avisan y piden confirmación si se ejecutan dentro de la propia carpeta de AgentRelay (por ejemplo, la copia instalada, donde un commit impediría `agentrelay update`). Con `--yes` no preguntan.
+
 - `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. `use --list` muestra todos los ejecutores y sus modelos (con el esfuerzo que admite cada uno, si están instalados y su coste). En el chat de Claude Code: `/ar:usar`.
 
 - Manual de uso con ejemplos, organizado por tareas («quiero hacer X»): `docs/MANUAL.md`.

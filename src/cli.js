@@ -870,7 +870,26 @@ function projectInstructionStatus(dir) {
   return 'missing';
 }
 
+function isAgentRelayFolder(root) {
+  const resolvedRoot = path.resolve(root);
+  const packageRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+  return process.platform === 'win32'
+    ? resolvedRoot.toLowerCase() === packageRoot.toLowerCase()
+    : resolvedRoot === packageRoot;
+}
+
+async function confirmNotAgentRelayFolder(values) {
+  const dir = path.resolve(values.cwd || process.cwd());
+  if (!isAgentRelayFolder(dir) || values.yes) return true;
+  process.stdout.write('Estás en la carpeta de AgentRelay. Si es tu copia instalada, no ejecutes init aquí: impedirá agentrelay update.\n');
+  const answer = await confirm('¿Continuar?', { yes: values.yes });
+  if (answer === true) return true;
+  process.stdout.write('Cancelado.\n');
+  return false;
+}
+
 async function cmdInit(values) {
+  if (!values.folderChecked && !await confirmNotAgentRelayFolder(values)) return 1;
   const dir = path.resolve(values.cwd || process.cwd());
   const root = await repoRoot(dir);
 
@@ -965,9 +984,10 @@ async function cmdInit(values) {
 }
 
 async function cmdStart(values) {
+  if (!await confirmNotAgentRelayFolder(values)) return 1;
   const dir = path.resolve(values.cwd || process.cwd());
   process.stdout.write('1/4 Preparar el proyecto\n');
-  const initStatus = await cmdInit(values);
+  const initStatus = await cmdInit({ ...values, folderChecked: true });
   const root = await repoRoot(dir);
   if (initStatus !== 0 || !root) return 1;
 

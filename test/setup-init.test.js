@@ -347,3 +347,13 @@ test('init --with-config crea agentrelay.config.json', () => {
     repo.cleanup();
   }
 });
+
+test('init en la carpeta de AgentRelay sin TTY cancela sin modificarla', () => {
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const before = git(root, 'status', '--porcelain', '--untracked-files=all');
+  const result = run(['init', '--cwd', root], root);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Estás en la carpeta de AgentRelay\./);
+  assert.match(result.stdout, /Cancelado\./);
+  assert.equal(git(root, 'status', '--porcelain', '--untracked-files=all'), before);
+});
