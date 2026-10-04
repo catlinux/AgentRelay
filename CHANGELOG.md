@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Cambiado
+
+- El informe diario `.agentrelay/EJECUTORES.md` es ahora un resumen del estado de las IA: saldos, ejecutor en uso, una línea por ejecutor y solo los modelos gratuitos de OpenCode con su marca (sin listas largas de modelos).
+
 ## [0.2.0] - 2026-10-04
 
 Simplificación (menos comandos, una sola política de revisión), `agentrelay use`, comandos `/ar:` completos en Claude Code, ayuda por comando, `doctor --fix`, hook de delegación, OpenCode instalable y revisión diaria de modelos gratuitos. **Cambio incompatible:** se eliminan los niveles de orquestación 1-5, el triaje que aprende, `usage`, `pricing` y `models` (ver «Eliminado»).

@@ -26,7 +26,7 @@ test('fetchDeepSeekBalance no consulta sin clave, formatea monedas y oculta erro
   }
 });
 
-test('renderReport ordena saldos primero y presenta modelos y revisiones diarias', async () => {
+test('renderReport resume saldos, uso, estado y modelos gratuitos de OpenCode', async () => {
   const checks = { lastRun: '2026-10-04', models: {
     'a-free': { status: 'approved', checkedAt: '2026-10-04T10:00:00Z', seconds: 12 },
     'b-free': { status: 'failed', checkedAt: '2026-10-04T11:00:00Z', seconds: 3, reason: 'falló' },
@@ -34,17 +34,34 @@ test('renderReport ordena saldos primero y presenta modelos y revisiones diarias
   } };
   const data = await collectReport({ current: { type: 'codex', model: 'demo', thinking: 'high' }, now,
     isInstalled: async () => true, authStatuses: { codex: { ok: true, message: 'conectado' } }, checks,
-    listModels: async (type) => { if (type === 'cline') throw new Error('lista rota'); return type === 'opencode' ? ['a-free', 'b-free', 'c-free'].map((id) => ({ id })) : [{ id: 'demo', efforts: ['low', 'high'] }]; },
+    listModels: async (type) => { if (type === 'cline') throw new Error('lista rota'); return type === 'opencode' ? ['a-free', 'b-free', 'c-free', 'paid-model'].map((id) => ({ id })) : [{ id: 'demo', efforts: ['low', 'high'] }]; },
     balances: { deepseek: { ok: true, text: '10 USD' } } });
   const text = renderReport(data);
-  assert.ok(text.indexOf('## Saldos') < text.indexOf('## Ejecutor en uso'));
+  assert.ok(text.indexOf('## Saldos') < text.indexOf('## En uso'));
+  assert.ok(text.indexOf('## En uso') < text.indexOf('## Estado'));
+  assert.ok(text.indexOf('## Estado') < text.indexOf('## OpenCode: modelos gratuitos'));
   assert.match(text, /OpenAI: no consultable por API;.*https:\/\/platform\.openai\.com/);
+  assert.match(text, /- Codex \(OpenAI\): instalado, sesión conectada ·/);
+  assert.match(text, /- Cline: instalado, no se pudo leer la lista: lista rota ·/);
   assert.match(text, /✔ probado \(2026-10-04, 12 s\)/);
   assert.match(text, /✘ no pasó la prueba: falló/);
   assert.match(text, /c-free — ✔ probado \(2026-10-03, 4 s\)/);
-  assert.doesNotMatch(text.split('### Probados hoy')[1], /c-free/);
-  assert.match(text, /Probados hoy[\s\S]*a-free[\s\S]*b-free/);
-  assert.match(text, /no se pudo leer la lista: lista rota/);
+  assert.match(text, /Otros modelos de OpenCode \(de pago o sin marca\): 1/);
+  assert.match(text, /codex · demo · esfuerzo high/);
+  assert.doesNotMatch(text, /- demo|paid-model|esfuerzos|Probados hoy/);
+});
+
+test('renderReport muestra disponibilidad y omite OpenCode si no está instalado', () => {
+  const base = { current: { type: 'codex' }, now, date: '2026-10-04', balances: {}, checks: { models: {} }, entries: [
+    { name: 'codex', title: 'Codex', cost: 'incluido', installed: true, models: [], auth: { ok: false } },
+    { name: 'opencode', title: 'OpenCode', cost: 'variable', installed: true, models: [{ id: 'paid' }] },
+  ] };
+  let text = renderReport(base);
+  assert.match(text, /OpenCode: instalado · variable/);
+  assert.match(text, /Sin modelos gratuitos disponibles/);
+  assert.match(text, /Otros modelos de OpenCode \(de pago o sin marca\): 1/);
+  text = renderReport({ ...base, entries: [{ ...base.entries[1], installed: false }] });
+  assert.doesNotMatch(text, /## OpenCode: modelos gratuitos/);
 });
 
 test('writeReport crea el destino y reemplaza el informe completo', async () => {
