@@ -68,6 +68,24 @@ test('use --save guarda un perfil y use <perfil> lo aplica', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('use --list muestra los modelos de Codex con su esfuerzo y marca el que está en uso', () => {
+  const dir = temp();
+  try {
+    mkdirSync(path.join(dir, 'codex'), { recursive: true });
+    writeFileSync(path.join(dir, 'codex', 'models_cache.json'), JSON.stringify({ models: [
+      { slug: 'gpt-6-luna', visibility: 'list', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }], default_reasoning_level: 'low' },
+      { slug: 'gpt-5.5', visibility: 'list', supported_reasoning_levels: [{ effort: 'medium' }], default_reasoning_level: 'medium' },
+    ] }));
+    const result = run(['use', '--list'], dir);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Codex \(OpenAI\) \(codex\) · instalado · cuenta de ChatGPT · en uso/);
+    assert.match(result.stdout, /● gpt-6-luna {2}bajo\* alto/);
+    assert.match(result.stdout, / {3}gpt-5\.5 {2}medio\*/);
+    assert.match(result.stdout, /Cline \(cline\) · no instalado · clave de API/);
+    assert.match(result.stdout, /agentrelay use <ejecutor> <modelo>/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('use sin argumentos y sin terminal muestra el estado sin cambiar nada', () => {
   const dir = temp();
   try {

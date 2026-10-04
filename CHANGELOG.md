@@ -8,7 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
-- `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. En el chat de Claude Code: `/ar:usar`.
+- `agentrelay use`: cambia de IA con un solo comando. Sin argumentos y en un terminal es interactivo (elige ejecutor, modelo y esfuerzo con números, ofrece instalar el ejecutor y guardar la elección como perfil); con argumentos va directo en cualquier orden (`use opencode`, `use codex gpt-5.5 alto`, `use bajo`). `use --save <nombre>` guarda lo actual como perfil y `use <nombre>` lo aplica. `use --list` muestra todos los ejecutores y sus modelos (con el esfuerzo que admite cada uno, si están instalados y su coste). En el chat de Claude Code: `/ar:usar`.
 
 - Manual de uso con ejemplos, organizado por tareas («quiero hacer X»): `docs/MANUAL.md`.
 - Plan de trabajo paso a paso para cada punto pendiente, pensado para que lo siga un orquestador con un modelo pequeño: `docs/PLAN.md`.
@@ -25,6 +25,9 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `agentrelay usage` y `agentrelay pricing` (resumen de consumo y tabla de precios y tarifas de DeepSeek), y el aviso de tarifa al lanzar una tarea. El informe de cada ejecución sigue mostrando los tokens de cada intento.
 
 - Niveles de orquestación 1-5: `--level`, `set level`, `/ar:nivel` y la opción `level`. Se sustituyen por una sola política (revisión siempre, 2 reintentos, autorrevisión según la complejidad) que se ajusta con la sección `policy`. Una opción `level` antigua en la configuración se ignora con un aviso. Cambio incompatible: la próxima versión debería ser la 0.2.0 (a acordar).
+
+- `agentrelay models`, el listado de `agentrelay executors` (queda `executors add <nombre>`), `config refresh` y la lista de modelos dentro del archivo de configuración; los sustituyen `agentrelay use` y `agentrelay use --list`.
+- Comandos de chat `/ar:modelo`, `/ar:esfuerzo`, `/ar:ejecutor` y `/ar:nivel`; los sustituye `/ar:usar`. `agentrelay setup` los borra del equipo si llevan la marca de AgentRelay (los que sean tuyos se respetan).
 
 ### Corregido
 

@@ -21,6 +21,7 @@ export const CATALOG = [
     title: 'Codex (OpenAI)',
     description: 'Por defecto. Usa tu cuenta de ChatGPT, sin clave de API; GPT-6 Luna está incluido en el plan gratuito.',
     bundled: true,
+    cost: 'cuenta de ChatGPT',
     npmPackage: null,
     connect: 'agentrelay login',
   },
@@ -29,6 +30,7 @@ export const CATALOG = [
     title: 'Cline',
     description: 'Con cualquier proveedor que Cline soporte (p. ej. DeepSeek con clave de API).',
     bundled: false,
+    cost: 'clave de API',
     // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).
     npmPackage: 'cline@3',
     connect: 'npx --prefix <executorsDir> cline auth --provider deepseek --apikey TU_CLAVE --modelid deepseek-v4-pro',
@@ -38,6 +40,7 @@ export const CATALOG = [
     title: 'OpenCode',
     description: 'Con los modelos gratuitos de OpenCode (p. ej. opencode/nemotron-3-ultra-free).',
     bundled: false,
+    cost: 'gratis',
     // No se instala con npm: se instala aparte en el PATH (npmPackage: null).
     npmPackage: null,
     connect: 'opencode auth login',

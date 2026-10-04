@@ -99,6 +99,24 @@ agentrelay use codex defecto               # vuelve al esfuerzo por defecto
 
 Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o en inglés: `low`, `medium`, `high`, `xhigh`, `max`). Usa el más bajo que funcione: gasta menos.
 
+**Ver todos los modelos** de todos los ejecutores, con el esfuerzo que admite cada uno:
+
+```sh
+agentrelay use --list
+```
+
+```
+Codex (OpenAI) (codex) · instalado · cuenta de ChatGPT · en uso
+  ● gpt-6-luna  bajo* medio alto extremo máximo
+    gpt-5.5     medio* alto
+OpenCode (opencode) · no instalado · gratis
+    (instálalo con: opencode auth login)
+Cline (cline) · no instalado · clave de API
+    (instálalo con: agentrelay executors add cline)
+```
+
+`●` marca el modelo en uso y `*`, el esfuerzo por defecto. En el chat: `/ar:usar --list`.
+
 **Perfiles** (guarda tus combinaciones favoritas con un nombre):
 
 ```sh
@@ -113,6 +131,8 @@ agentrelay use bueno              # y vuelve a «bueno»
 ```
 
 **Ver qué está en uso:** `agentrelay use` fuera de un terminal interactivo (o `/ar:usar` en el chat) muestra el ejecutor, el modelo, el esfuerzo y tus perfiles.
+
+**Ajustes sueltos** (poco frecuentes): `agentrelay set timeout 1800` y `agentrelay unset timeout`.
 
 **Solo para este proyecto:** añade `--local` (`agentrelay use --local opencode`). Se guarda en `agentrelay.config.json` del proyecto y tiene prioridad sobre tu ajuste general.
 

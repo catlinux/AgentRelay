@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 export const MANAGED_MARK = '<!-- agentrelay:managed -->';
 
+// Comandos de versiones anteriores que ya no existen (los sustituye /ar:usar).
+// Se retiran del equipo del usuario, pero solo si llevan la marca de AgentRelay.
+export const RETIRED_COMMANDS = ['modelo.md', 'esfuerzo.md', 'ejecutor.md', 'nivel.md', 'triaje.md'];
+
 export function commandsSourceDir() {
   return fileURLToPath(new URL('../assets/claude-commands/ar/', import.meta.url));
 }
@@ -28,6 +32,11 @@ export function listCommands(sourceDir = commandsSourceDir()) {
 
 const normalize = (text) => text.replace(/\r\n/g, '\n');
 
+// Nombres que AgentRelay puede haber instalado: los actuales y los retirados.
+function knownNames(sourceDir) {
+  return [...new Set([...listCommands(sourceDir).map(({ name }) => name), ...RETIRED_COMMANDS])];
+}
+
 export function commandsStatus(claudeDir, sourceDir = commandsSourceDir()) {
   const targetDir = commandsTargetDir(claudeDir);
   const details = listCommands(sourceDir).map(({ name, content }) => {
@@ -45,7 +54,7 @@ export function commandsStatus(claudeDir, sourceDir = commandsSourceDir()) {
 
 export function installCommands(claudeDir, sourceDir = commandsSourceDir()) {
   const targetDir = commandsTargetDir(claudeDir);
-  const result = { created: [], updated: [], unchanged: [], skipped: [] };
+  const result = { created: [], updated: [], unchanged: [], skipped: [], retired: [] };
   mkdirSync(targetDir, { recursive: true });
   for (const { name, content } of listCommands(sourceDir)) {
     const target = path.join(targetDir, name);
@@ -65,6 +74,13 @@ export function installCommands(claudeDir, sourceDir = commandsSourceDir()) {
     }
     result[existed ? 'updated' : 'created'].push(name);
   }
+  const current = listCommands(sourceDir).map(({ name }) => name);
+  for (const name of RETIRED_COMMANDS.filter((item) => !current.includes(item))) {
+    const target = path.join(targetDir, name);
+    if (!existsSync(target) || !readFileSync(target, 'utf8').includes(MANAGED_MARK)) continue;
+    rmSync(target);
+    result.retired.push(name);
+  }
   return result;
 }
 
@@ -72,7 +88,7 @@ export function removeCommands(claudeDir, sourceDir = commandsSourceDir()) {
   const targetDir = commandsTargetDir(claudeDir);
   const result = { removed: [], kept: [] };
   if (!existsSync(targetDir)) return result;
-  for (const { name } of listCommands(sourceDir)) {
+  for (const name of knownNames(sourceDir)) {
     const target = path.join(targetDir, name);
     if (!existsSync(target)) continue;
     if (readFileSync(target, 'utf8').includes(MANAGED_MARK)) {
@@ -88,7 +104,7 @@ export function removeLegacyCommands(claudeDir, sourceDir = commandsSourceDir())
   const targetDir = legacyCommandsDir(claudeDir);
   const result = { removed: [] };
   if (!existsSync(targetDir)) return result;
-  for (const { name } of listCommands(sourceDir)) {
+  for (const name of knownNames(sourceDir)) {
     const target = path.join(targetDir, name);
     if (!existsSync(target) || !readFileSync(target, 'utf8').includes(MANAGED_MARK)) continue;
     rmSync(target);
@@ -101,10 +117,8 @@ export function removeLegacyCommands(claudeDir, sourceDir = commandsSourceDir())
 export function legacyCommandsStatus(claudeDir, sourceDir = commandsSourceDir()) {
   const targetDir = legacyCommandsDir(claudeDir);
   if (!existsSync(targetDir)) return [];
-  return listCommands(sourceDir)
-    .filter(({ name }) => {
-      const target = path.join(targetDir, name);
-      return existsSync(target) && readFileSync(target, 'utf8').includes(MANAGED_MARK);
-    })
-    .map(({ name }) => name);
+  return knownNames(sourceDir).filter((name) => {
+    const target = path.join(targetDir, name);
+    return existsSync(target) && readFileSync(target, 'utf8').includes(MANAGED_MARK);
+  });
 }
