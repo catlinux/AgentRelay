@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,11 +9,11 @@ import { blockStatus, GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
-function doctor(cwd, claudeDir) {
-  return spawnSync(process.execPath, [BIN, '--cwd', cwd, 'doctor', '--claude-dir', claudeDir], {
+function doctor(cwd, claudeDir, flags = []) {
+  return spawnSync(process.execPath, [BIN, '--cwd', cwd, 'doctor', '--claude-dir', claudeDir, ...flags], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, AGENTRELAY_HOME: path.join(cwd, 'home') },
+    env: { ...process.env, AGENTRELAY_HOME: path.join(cwd, 'home'), AGENTRELAY_EXECUTORS_DIR: path.join(cwd, 'executors') },
   });
 }
 
@@ -30,6 +30,40 @@ test('blockStatus distingue archivo inexistente, sin bloque, desactualizado y al
     assert.equal(blockStatus(file, GLOBAL_BLOCK), 'outdated');
     // No modifica el archivo.
     assert.ok(readFileSync(file, 'utf8').includes('(antiguo)'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('doctor --fix actualiza las instrucciones desactualizadas y vuelve a diagnosticar', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-doctor-fix-'));
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    const claudeDir = path.join(dir, 'claude');
+    writeFileSync(path.join(dir, 'AGENTS.md'), `${PROJECT_BLOCK.replace('## Delegación con AgentRelay', '## Delegación (versión anterior)')}\n`);
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-q', '-m', 'base'], { cwd: dir });
+    const result = doctor(dir, claudeDir, ['--fix', '--yes']);
+    assert.match(result.stdout, /al día/);
+    assert.doesNotMatch(result.stdout, /Puedes arreglar/);
+    assert.equal(blockStatus(path.join(dir, 'AGENTS.md'), PROJECT_BLOCK), 'current');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('doctor sin --fix avisa del arreglo disponible sin modificar archivos', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-doctor-no-fix-'));
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    const claudeDir = path.join(dir, 'claude');
+    const agentsFile = path.join(dir, 'AGENTS.md');
+    const original = `${PROJECT_BLOCK.replace('## Delegación con AgentRelay', '## Delegación (versión anterior)')}\n`;
+    writeFileSync(agentsFile, original);
+    const result = doctor(dir, claudeDir);
+    assert.match(result.stdout, /Puedes arreglar \d+ problema\(s\) con: agentrelay doctor --fix/);
+    assert.equal(readFileSync(agentsFile, 'utf8'), original);
+    assert.equal(existsSync(path.join(dir, '.gitignore')), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -207,7 +207,7 @@ Estos comandos son para el chat. En el terminal se escribe `agentrelay use …`.
 agentrelay doctor
 ```
 
-Comprueba Node, git, el ejecutor, la sesión y las instrucciones, y dice qué comando arregla cada cosa.
+Comprueba Node, git, el ejecutor, la sesión y las instrucciones, y dice qué comando arregla cada cosa. Si hay arreglos seguros disponibles, `agentrelay doctor --fix` los aplica preguntando antes de cada uno (con `--yes`, sin preguntar).
 
 | Problema | Solución |
 |---|---|
