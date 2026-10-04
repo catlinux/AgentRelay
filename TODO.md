@@ -6,8 +6,8 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 
 - [x] Publicar la 0.1.0: versión, etiqueta y CHANGELOG fechado (hay hito: configuración en un solo archivo, ejecutor OpenCode, `start`, `status` y `update`).
 - [x] Publicar la 0.2.0 (2026-10-04): versión, CHANGELOG fechado y etiqueta local `v0.2.0`; falta subir la etiqueta con `git push origin v0.2.0` (hay que pedir permiso).
-- [ ] Estabilizar la 0.1.x (acordado el 2026-10-03): (a) [x] errores de credenciales/cuota del ejecutor sin reintentos y con mensaje claro; (b) [x] prueba `proc:` que no dependa de `taskkill`; (c) probar `start` en Taller; (d) recolocar la etiqueta `v0.1.0` (no está subida) en el commit estable, con permiso; (e) actualizar la copia de producción con `agentrelay update`. Estado 2026-10-04: (a) y (b) hechos; quedan (c), (d) y (e).
-- [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
+- [x] Estabilizar la 0.1.x (obsoleto: la 0.2.0 ya está publicada y subida el 2026-10-04; la etiqueta v0.1.0 ya no hace falta recolocarla).
+- [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle. (Pendiente solo cuando el usuario esté en casa; no bloquea nada.)
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [x] `doctor --fix`: arregla solo lo seguro (instrucciones globales y del proyecto, ejecuciones interrumpidas, `.gitignore`), preguntando antes de cada arreglo. El sandbox de Windows queda fuera hasta definir qué falla exactamente.
 - [x] Inventario de modelos en un solo sitio: `agentrelay use --list` (instalado, coste y esfuerzos por modelo).
