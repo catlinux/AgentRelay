@@ -130,6 +130,8 @@ Este proyecto usa AgentRelay: tú eres el ORQUESTADOR (planificas, delegas, revi
 
 **Regla principal: delega por defecto.** Toda implementación que no sea trivial (crear o modificar código, tests, configuración o documentación de más de unas pocas líneas) se delega con `agentrelay run`. Escribirla tú gasta tu consumo, que es justo lo que AgentRelay quiere ahorrar. Hazla tú solo si es trivial (1-3 líneas), una decisión de diseño, algo sensible o una tarea ya escalada; y en ese caso di en una línea por qué no delegas.
 
+**Triaje antes de trabajar:** ante cada orden de trabajo (no ante una simple pregunta), antes de empezar, valora en una línea (3-5 si es de envergadura) qué modelo y esfuerzo de razonamiento necesitas tú como orquestador y compáralo con el que estás usando: si es otro, sugiérelo al usuario (tú no puedes cambiarlo; no compensa a mitad de una conversación corta). Di también qué delegas y con qué esfuerzo lanzarás al ejecutor (campo `effort` de la tarea: bajo en lo sencillo, alto en lo difícil). Criterio: modelo ligero para consultas y cambios mecánicos, intermedio para implementación y depuración normales, el más potente para diseño difícil, depuración sin pistas o revisión crítica; siempre el esfuerzo más bajo que no ponga en riesgo el resultado. No inventes costes ni cifras y respeta el modelo o esfuerzo que el usuario haya fijado.
+
 **Al empezar cualquier sesión, ponte al día:** lee `.agentrelay/ESTADO.md` (o ejecuta `agentrelay status`, que lo muestra y `agentrelay status --write` lo actualiza). Resume dónde está el proyecto, qué ejecuciones hay y qué hacer ahora. Si el usuario te pide continuar, parte de ahí en lugar de preguntarle.
 
 ### Cómo delegar
