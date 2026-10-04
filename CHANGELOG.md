@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Hook de delegación para Claude Code: `agentrelay setup` añade a `settings.json` un hook PreToolUse que, al ir a editar código en un proyecto con AgentRelay, recuerda al orquestador delegar con `agentrelay run` (como mucho una vez cada 15 minutos por sesión). Respeta el resto de tu configuración, se omite con `--no-hook`, se retira con `setup --uninstall` y `doctor` comprueba su estado. Si `settings.json` no es JSON válido, no lo toca.
+
 - OpenCode se instala desde AgentRelay como Cline (`agentrelay executors add opencode`, o al elegirlo con `agentrelay use opencode`): paquete npm oficial `opencode-ai` en `~/.agentrelay/executors`. Si ya lo tienes en el PATH, se sigue usando.
 
 - La tarea JSON admite los campos opcionales `effort` y `model`, que sustituyen al esfuerzo y al modelo de la configuración solo en esa ejecución (el orquestador los elige según la dificultad).

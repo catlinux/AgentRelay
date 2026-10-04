@@ -228,7 +228,8 @@ export function setupExplanation(file, removing = false) {
     `Se instalará en ${file}: si el archivo no existe se creará, y si ya tiene el bloque se actualizará.`,
     'No se modifica nada fuera de las marcas.',
     'También se instalarán los comandos de Claude Code; solo se modifican archivos con la marca <!-- agentrelay:managed -->.',
-    'Para retirar el bloque y los comandos de Claude Code, ejecuta "agentrelay setup --uninstall".',
+    'También se añadirá el hook de delegación de Claude Code, que recuerda delegar al editar código.',
+    'Para retirar el bloque, los comandos y el hook de Claude Code, ejecuta "agentrelay setup --uninstall".',
   ];
 }
 

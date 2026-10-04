@@ -34,6 +34,7 @@ import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
+import { hookStatus, installHook, removeHook } from './claude-hook.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -86,6 +87,7 @@ Opciones de review:
 Opciones de setup:
   --uninstall             Retira el bloque y los comandos de Claude Code
   --no-commands            No instala los comandos de Claude Code
+  --no-hook                No instala el hook de delegación de Claude Code
   --yes                   Aplica sin pedir confirmación
   --login                 Conecta la cuenta de ChatGPT sin preguntar
   --executors <lista>     Instala ejecutores opcionales separados por comas
@@ -128,6 +130,7 @@ const OPTIONS = {
   check: { type: 'boolean' },
   uninstall: { type: 'boolean' },
   'no-commands': { type: 'boolean' },
+  'no-hook': { type: 'boolean' },
   'claude-dir': { type: 'string' },
   'with-config': { type: 'boolean' },
   project: { type: 'boolean' },
@@ -421,6 +424,14 @@ async function cmdDoctor(values, rerun = false) {
   else warn('Los comandos de Claude Code (/ar:…) no están instalados. Ejecuta "agentrelay setup".');
   if (!fixes.length && (legacyCommands.length || commandStatus.status !== 'current') && globalStatus === 'current') {
     fixes.push({ text: 'Actualizar las instrucciones globales y los comandos de Claude Code.', apply: () => cmdSetup({ ...values, yes: true }) });
+  }
+  const delegationHookStatus = hookStatus(values['claude-dir'] || path.join(os.homedir(), '.claude'));
+  if (delegationHookStatus === 'current') line(true, 'Hook de delegación de Claude Code: al día');
+  else {
+    warn(`Hook de delegación de Claude Code ${delegationHookStatus === 'outdated' ? 'desactualizado' : delegationHookStatus === 'invalid' ? 'inválido' : 'no instalado'}. Ejecuta "agentrelay setup".`);
+    if (delegationHookStatus === 'missing' || delegationHookStatus === 'outdated') {
+      fixes.push({ text: 'Instalar o actualizar el hook de delegación de Claude Code.', apply: () => cmdSetup({ ...values, yes: true }) });
+    }
   }
   if (root) {
     const interrupted = listRunIds(root).filter((id) => { const state = loadState(root, id); return state.status === 'interrupted' || isOrphaned(state, { lastEventMs: lastActivityMs(root, id) }); });
@@ -732,12 +743,20 @@ async function cmdSetup(values) {
     process.stdout.write(`Comandos de Claude Code eliminados: ${commands.removed.length + legacy.removed.length ? [...commands.removed, ...legacy.removed].join(', ') : 'ninguno'}\n`);
     if (commands.kept.length) process.stdout.write(`Conservados (archivo tuyo): ${commands.kept.join(', ')}\n`);
     process.stdout.write(`${action === 'removed' ? 'eliminado' : 'no había bloque'} ${file}\n`);
+    const hook = removeHook(values['claude-dir'] || path.join(os.homedir(), '.claude'));
+    process.stdout.write(`Hook de Claude Code ${hook.removed ? 'eliminado' : 'no instalado'} (${path.join(values['claude-dir'] || path.join(os.homedir(), '.claude'), 'settings.json')})\n`);
   } else {
     const { action } = applyBlockToFile(file, GLOBAL_BLOCK);
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
     process.stdout.write(`${label} ${file}\n`);
   }
   if (!removing) {
+    if (!values['no-hook']) {
+      const hookFile = path.join(values['claude-dir'] || path.join(os.homedir(), '.claude'), 'settings.json');
+      const hook = installHook(values['claude-dir'] || path.join(os.homedir(), '.claude'));
+      if (hook.action === 'skipped') process.stderr.write(`Hook de Claude Code omitido: ${hook.reason}\n`);
+      else process.stdout.write(`Hook de Claude Code: recordará delegar al editar código (en ${hookFile}).\n`);
+    }
     if (!values['no-commands']) {
       if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado y /ar:usar, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
