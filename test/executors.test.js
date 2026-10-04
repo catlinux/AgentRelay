@@ -68,23 +68,23 @@ test('findBundledCline prioriza AgentRelay y encuentra la carpeta de ejecutores'
   assert.deepEqual(findBundledCline(root, (file) => file === managedLauncher, dir), [process.execPath, managedLauncher]);
 });
 
-test('executors lista el estado, la configuración activa y una instalación del directorio de usuario', async () => {
+test('use --list muestra el estado, el ejecutor activo y una instalación del directorio de usuario', async () => {
   const cwd = temporary('agentrelay-list-');
   const dir = path.join(cwd, 'user-executors');
   try {
     const env = { AGENTRELAY_EXECUTORS_DIR: dir };
-    let listed = cli(cwd, ['executors'], env);
+    let listed = cli(cwd, ['use', '--list'], env);
     assert.equal(listed.status, 0, listed.stderr);
-    assert.match(listed.stdout, /Codex \(OpenAI\) \(codex\) — incluido · en uso/);
-    assert.match(listed.stdout, /Cline \(cline\) — no instalado/);
-    assert.match(listed.stdout, /OpenCode \(opencode\) — (instalado|no instalado)/);
+    assert.match(listed.stdout, /Codex \(OpenAI\) \(codex\) · instalado · cuenta de ChatGPT · en uso/);
+    assert.match(listed.stdout, /Cline \(cline\) · no instalado · clave de API/);
+    assert.match(listed.stdout, /OpenCode \(opencode\) · (instalado|no instalado) · gratis/);
 
     const bin = path.join(dir, 'node_modules', '.bin');
     mkdirSync(bin, { recursive: true });
     writeFileSync(path.join(bin, process.platform === 'win32' ? 'cline.cmd' : 'cline'), '');
     assert.equal(await isInstalled('cline', { dir }), true);
-    listed = cli(cwd, ['executors'], env);
-    assert.match(listed.stdout, /Cline \(cline\) — instalado/);
+    listed = cli(cwd, ['use', '--list'], env);
+    assert.match(listed.stdout, /Cline \(cline\) · instalado · clave de API/);
 
     const codex = cli(cwd, ['executors', 'add', 'codex'], env);
     assert.equal(codex.status, 0, codex.stderr);
@@ -119,7 +119,7 @@ test('setup --executors cline usa un npm falso y escribe solo en la carpeta de e
     const setup = cli(cwd, ['setup', '--yes', '--claude-dir', cwd, '--executors', 'cline'], env);
     assert.equal(setup.status, 0, setup.stderr);
     assert.match(setup.stdout, /Cline instalado en/);
-    assert.match(setup.stdout, /agentrelay\.config\.json/);
+    assert.match(setup.stdout, /agentrelay use cline/);
     assert.ok(existsSync(path.join(dir, 'package.json')));
     assert.ok(readFileSync(log, 'utf8').includes('install'));
     assert.ok(readFileSync(path.join(cwd, 'CLAUDE.md'), 'utf8').includes('agentrelay:start'));

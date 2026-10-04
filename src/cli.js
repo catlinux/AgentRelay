@@ -5,11 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
-import { applyModelsBlock, renderModelsBlock } from './config-models.js';
 import { getExecutor } from './executors/index.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue } from './settings.js';
@@ -26,22 +25,22 @@ import { latestRunId, listRunIds, loadState, runDir } from './store.js';
 import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
-import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
+import { cmdUse } from './use.js';
 import { canOpenBrowser } from './platform.js';
-import { aggregateUsage, renderUsage } from './usage.js';
 import { createOutput } from './output.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
 import { appendEvent } from './events.js';
 import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
-import { PRICES_SOURCE, loadPrices, localWindows, nextChange, tariffAt } from './pricing.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
-
-const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
 Uso:
+  agentrelay use                    Cambia de IA (ejecutor, modelo y esfuerzo) de forma interactiva
+  agentrelay use <ejecutor> [modelo] [esfuerzo]   Cambia directamente (ej.: use opencode, use codex alto)
+  agentrelay use <perfil>           Aplica un perfil guardado; guarda el actual con: use --save <nombre>
+  agentrelay use --list             Lista todos los ejecutores y sus modelos
   agentrelay run <tarea.json | ->   Delega una tarea (JSON en archivo o por stdin)
   agentrelay show [id]              Muestra el informe de una ejecución (por defecto, la última)
   agentrelay review <id> --decision <accept|fix|escalate|reject> [--feedback <texto>]
@@ -51,8 +50,6 @@ Uso:
   agentrelay status [--write] [--json] Resume el estado del proyecto
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
-  agentrelay usage [--since <fecha>] [--executor <tipo>] [--json]  Resume el consumo
-  agentrelay pricing [--json]      Muestra precios y tarifa DeepSeek
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
@@ -61,21 +58,11 @@ Uso:
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
-  agentrelay config refresh [--only <ejecutor>] [--dry-run] Actualiza la lista de modelos
-  agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
+  agentrelay executors add <nombre> Instala un ejecutor opcional (Cline)
+
+Avanzado:
+  agentrelay set <clave> <valor> [--local] Cambia un ajuste suelto (ejemplo: set timeout 1800)
   agentrelay unset <clave> [--local]       Restablece un ajuste
-  agentrelay models                Lista los modelos del ejecutor actual
-
-Ajustes rápidos:
-  agentrelay set model gpt-5.5
-  agentrelay unset effort
-  agentrelay models
-
-  agentrelay executors              Lista los ejecutores disponibles e instalados
-  agentrelay executors add <nombre> Instala un ejecutor opcional
-  agentrelay triage record      Guarda el resultado de una elección
-  agentrelay triage advise      Recomienda modelo y esfuerzo
-  agentrelay triage stats       Resume el historial de triaje
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -87,7 +74,6 @@ Opciones comunes:
   -V, --version           Muestra la versión
 
 Opciones de run:
-  --level <1-5>           Nivel de orquestación (1 = máximo ahorro … 5 = máxima supervisión)
   --self-review <modo>    Fuerza el modo de self-review: ${SELF_REVIEW_MODES.join(' | ')}
   --allow-dirty           Permite delegar con cambios sin confirmar
 
@@ -108,13 +94,6 @@ Opciones de login:
   --device                Usa el código de dispositivo
   --browser               Fuerza el inicio de sesión con navegador
 
-Opciones de usage:
-  --since <fecha>         Incluye ejecuciones desde esta fecha
-  --executor <tipo>       Filtra por ejecutor
-
-Opciones de triage:
-  --type --size --kind --executor --model --effort --level --outcome --run --note --signals --include-legacy
-
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
   --with-config           Crea además ${CONFIG_FILE}
@@ -130,9 +109,7 @@ Códigos de salida: 0 correcto · 1 error · 2 tarea escalada al orquestador.
 const OPTIONS = {
   cwd: { type: 'string' },
   config: { type: 'string' },
-  since: { type: 'string' },
   json: { type: 'boolean' },
-  level: { type: 'string' },
   'self-review': { type: 'string' },
   'allow-dirty': { type: 'boolean' },
   quiet: { type: 'boolean', short: 'q' },
@@ -142,7 +119,6 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
-  only: { type: 'string' },
   yes: { type: 'boolean' },
   check: { type: 'boolean' },
   uninstall: { type: 'boolean' },
@@ -155,10 +131,9 @@ const OPTIONS = {
   browser: { type: 'boolean' },
   login: { type: 'boolean' },
   executors: { type: 'string' },
-  type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' }, executor: { type: 'string' },
-  'include-legacy': { type: 'boolean' },
+  save: { type: 'string' },
+  list: { type: 'boolean' },
   write: { type: 'boolean' },
-  effort: { type: 'string' }, outcome: { type: 'string' }, run: { type: 'string' }, note: { type: 'string' }, signals: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -184,7 +159,6 @@ function printResult(state, root, json, values = {}) {
       id: state.id,
       status: state.status,
       reasons: state.statusReasons,
-      level: state.policy.level,
       selfReview: state.selfReview,
       retriesUsed: state.retriesUsed,
       changedFiles: check?.files ?? [],
@@ -215,7 +189,7 @@ function eventPrinter(values, root) {
   };
 }
 
-async function cmdRun(positionals, values, runtime) {
+async function cmdRun(positionals, values) {
   const source = positionals[0];
   if (!source) throw new Error('Indica la tarea: agentrelay run <tarea.json | ->');
   const task = loadTask(source === '-' ? '-' : path.resolve(source));
@@ -224,10 +198,8 @@ async function cmdRun(positionals, values, runtime) {
     task.selfReview = values['self-review'];
   }
   const root = await resolveRoot(values);
-  const overrides = values.level ? { level: values.level } : undefined;
-  const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config, overrides });
+  const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config });
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
-  showDeepSeekNotice(config.executor.model, values, runtime);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
   if (values.verbose) printAttemptDetails(state, root, config);
@@ -244,20 +216,13 @@ async function cmdShow(positionals, values) {
   return printResult(state, root, values.json, values);
 }
 
-async function cmdReview(positionals, values, runtime) {
+async function cmdReview(positionals, values) {
   const root = await resolveRoot(values);
   if (!positionals[0]) throw new Error('Indica el id de la ejecución: agentrelay review <id> --decision ...');
   if (!values.decision) throw new Error(`Indica --decision ${DECISIONS.join(' | ')}`);
   let feedback = values.feedback || '';
   if (values['feedback-file']) feedback = readFileSync(path.resolve(values['feedback-file']), 'utf8');
   const onEvent = eventPrinter(values, root);
-  if (values.decision === 'fix') {
-    const before = loadState(root, positionals[0]);
-    const canAttempt = before.status !== 'running' && !['accepted', 'rejected', 'escalated'].includes(before.status)
-      && (values.force || before.retriesUsed < before.policy.maxRetries) && Boolean(feedback.trim());
-    const model = before.config?.executor?.model || before.attempts?.at(-1)?.model?.id;
-    if (canAttempt) showDeepSeekNotice(model, values, runtime);
-  }
   const state = await applyReview({
     root, id: positionals[0], decision: values.decision, feedback, force: values.force, onEvent,
   });
@@ -290,11 +255,11 @@ async function cmdList(values) {
   const runs = listRunIds(root).map((id) => {
     const s = loadState(root, id);
     const orphaned = isOrphaned(s, { lastEventMs: lastActivityMs(root, id) });
-    return { id, status: orphaned ? 'running (¿interrumpida?)' : s.status, level: s.policy.level, attempts: s.attempts.length, title: s.task.title };
+    return { id, status: orphaned ? 'running (¿interrumpida?)' : s.status, attempts: s.attempts.length, title: s.task.title };
   });
   if (values.json) process.stdout.write(`${JSON.stringify(runs, null, 2)}\n`);
   else if (!runs.length) process.stdout.write('No hay ejecuciones.\n');
-  else for (const r of runs) process.stdout.write(`${r.id}  ${r.status.padEnd(16)} nivel ${r.level}  intentos ${r.attempts}  ${r.title}\n`);
+  else for (const r of runs) process.stdout.write(`${r.id}  ${r.status.padEnd(16)} intentos ${r.attempts}  ${r.title}\n`);
   return 0;
 }
 
@@ -379,7 +344,7 @@ async function cmdDoctor(values) {
   try {
     const loaded = loadConfig({ cwd: root || cwd, configPath: values.config });
     config = loaded.config;
-    line(true, `Configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'valores por defecto'} · nivel ${config.level}`);
+    line(true, `Configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'valores por defecto'}`);
     for (const warning of loaded.warnings) warn(warning);
   } catch (error) {
     line(false, error.message);
@@ -442,39 +407,6 @@ function configLeaves(value, prefix = '', result = {}) {
   return result;
 }
 
-async function cmdConfigRefresh(values, cwd, userFile) {
-  const loaded = loadConfig({ cwd, configPath: values.config });
-  const only = values.only;
-  if (only && !Object.hasOwn(EXECUTOR_DEFAULTS, only)) throw new Error(`Ejecutor no soportado: ${only}`);
-  const types = only ? [only] : Object.keys(EXECUTOR_DEFAULTS);
-  const entries = await Promise.allSettled(types.map(async (type) => {
-    const executor = { ...EXECUTOR_DEFAULTS[type], ...(type === loaded.config.executor.type ? loaded.config.executor : {}) };
-    const adapter = getExecutor(type);
-    if (!adapter.listModels) return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: [] };
-    let timer;
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tiempo máximo de 20 s superado')), 20_000); });
-    let models;
-    try { models = await Promise.race([adapter.listModels(executor), timeout]); }
-    finally { clearTimeout(timer); }
-    return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: models || [] };
-  }));
-  const records = entries.map((result, index) => result.status === 'fulfilled'
-    ? result.value
-    : { executor: types[index], title: CATALOG.find((item) => item.name === types[index])?.title || types[index], current: types[index] === loaded.config.executor.type, models: [], error: result.reason?.message || String(result.reason) });
-  let text = existsSync(userFile) ? readFileSync(userFile, 'utf8') : configTemplate({ scope: 'user' });
-  const block = renderModelsBlock(records);
-  text = applyModelsBlock(text, block);
-  parseJsonc(text, userFile);
-  if (values['dry-run']) process.stdout.write(`${block}\n`);
-  else {
-    mkdirSync(path.dirname(userFile), { recursive: true });
-    writeFileSync(userFile, text, 'utf8');
-  }
-  for (const entry of records) process.stdout.write(`${entry.executor}: ${entry.error ? `no se pudo leer: ${entry.error}` : `${entry.models.length} modelos`}\n`);
-  process.stdout.write(`Archivo: ${userFile}\n`);
-  return 0;
-}
-
 async function cmdConfig(positionals, values, migrationResult) {
   const action = positionals[0] || 'show';
   const requestedCwd = path.resolve(values.cwd || process.cwd());
@@ -483,7 +415,6 @@ async function cmdConfig(positionals, values, migrationResult) {
   const cwd = root || requestedCwd;
   const userFile = path.join(configHome(), 'config.json');
   const projectFile = path.join(cwd, CONFIG_FILE);
-  if (action === 'refresh' && positionals.length === 1) return cmdConfigRefresh(values, cwd, userFile);
   if (action === 'migrate' && positionals.length === 1) {
     let result = migrationResult;
     if (!result) {
@@ -518,10 +449,6 @@ async function cmdConfig(positionals, values, migrationResult) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, configTemplate({ scope: values.project || values.local ? 'project' : 'user' }), 'utf8');
     process.stdout.write(`Creado ${target}\n`);
-    if (!values.project && !values.local) {
-      try { await cmdConfigRefresh(values, cwd, target); }
-      catch (error) { process.stderr.write(`[aviso] No se pudo añadir el bloque de modelos: ${error.message}\n`); }
-    }
     if (!values.quiet) process.stdout.write('Descomenta las opciones para cambiar sus valores.\n');
     return 0;
   }
@@ -551,59 +478,6 @@ function printAttemptDetails(state, root, config) {
     const base = `attempt-${attempt.n}-${attempt.kind}`;
     process.stdout.write(`Archivos del intento ${attempt.n}: ${path.join(dir, `${base}.prompt.md`)} · ${path.join(dir, `${base}.ndjson`)} · ${path.join(dir, `${base}.stderr.log`)} · ${path.join(dir, 'report.md')}\n`);
   }
-}
-
-async function cmdUsage(values) {
-  const root = await resolveRoot(values);
-  const result = aggregateUsage(root, { since: values.since, executor: values.executor });
-  if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  else process.stdout.write(renderUsage(result));
-  return 0;
-}
-
-export function showDeepSeekNotice(model, values, runtime = {}) {
-  const prices = loadPrices();
-  if (!prices[model] || prices[model].schedule !== 'deepseek') return;
-  const now = runtime.clock ? runtime.clock() : new Date();
-  const zone = runtime.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const period = tariffAt(now).period;
-  const until = new Intl.DateTimeFormat('es-ES', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(nextChange(now));
-  const label = period === 'peak' ? 'punta' : 'valle (precio al 50 %)';
-  (runtime.output || createOutput({ quiet: values.quiet, verbose: values.verbose })).info(`Tarifa DeepSeek ahora: ${label} hasta las ${until} (hora local); punta de ${localWindows(now, zone)} en días laborables; no se tienen en cuenta los festivos chinos.`);
-}
-
-async function cmdPricing(values, runtime = {}) {
-  const prices = loadPrices();
-  const now = runtime.clock ? runtime.clock() : new Date(), zone = runtime.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const period = tariffAt(now).period;
-  const file = path.join(agentrelayHome(), 'pricing.json');
-  if (values.json) {
-    process.stdout.write(`${JSON.stringify({ prices, current: { period, changesAt: nextChange(now).toISOString(), localChangesAt: describeTariffChange(now, nextChange(now), zone), windows: localWindows(now, zone), timeZone: zone }, source: PRICES_SOURCE, overrideFile: file, overrideExists: existsSync(file), note: 'No se tienen en cuenta los festivos chinos. Codex y otros modelos no están en la tabla.' }, null, 2)}\n`);
-    return 0;
-  }
-  const rows = Object.entries(prices).map(([id, p]) => [id, `${priceCell(p.input_hit.offpeak, 3)} / ${priceCell(p.input_hit.peak, 3)}`, `${priceCell(p.input_miss.offpeak, 2)} / ${priceCell(p.input_miss.peak, 2)}`, `${priceCell(p.output.offpeak, 2)} / ${priceCell(p.output.peak, 2)}`]);
-  const headings = ['Modelo', 'Entrada caché (valle / punta)', 'Entrada sin caché (valle / punta)', 'Salida (valle / punta)'];
-  const widths = headings.map((heading, i) => Math.max(heading.length, ...rows.map((row) => row[i].length)));
-  process.stdout.write('USD por millón de tokens\n');
-  process.stdout.write([headings, ...rows].map((row) => row.map((cell, i) => i ? cell.padStart(widths[i]) : cell.padEnd(widths[i])).join('  ').trimEnd()).join('\n') + '\n');
-  process.stdout.write(`Tarifa ahora: ${period === 'peak' ? 'punta' : 'valle (50 % de descuento)'}; cambia ${describeTariffChange(now, nextChange(now), zone)}.\n`);
-  process.stdout.write(`Punta en días laborables: ${localWindows(now, zone)} (${zone}).\nFuente: ${PRICES_SOURCE.url} (consultado ${PRICES_SOURCE.checkedAt}).\nArchivo de precios opcional: ${file} (${existsSync(file) ? 'existe' : 'no existe'}).\nNo se tienen en cuenta los festivos chinos. Codex y otros modelos no están en la tabla.\n`);
-  return 0;
-}
-
-function priceCell(value, digits) { return value.toFixed(digits).replace('.', ','); }
-function localDateKey(date, zone) {
-  const parts = new Intl.DateTimeFormat('es-ES', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
-  return `${parts.find((p) => p.type === 'year').value}-${parts.find((p) => p.type === 'month').value}-${parts.find((p) => p.type === 'day').value}`;
-}
-function describeTariffChange(now, change, zone) {
-  const clock = new Intl.DateTimeFormat('es-ES', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(change);
-  const today = localDateKey(now, zone), target = localDateKey(change, zone);
-  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
-  if (target === today) return `hoy a las ${clock}`;
-  if (target === tomorrow) return `mañana a las ${clock}`;
-  const date = new Intl.DateTimeFormat('es-ES', { timeZone: zone, day: 'numeric', month: 'long' }).format(change);
-  return `el ${date} a las ${clock} (hora local)`;
 }
 
 const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
@@ -699,44 +573,11 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
-async function cmdModels(values) {
-  const loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
-  const executor = loaded.config.executor;
-  const adapter = getExecutor(executor.type);
-  const models = await adapter.listModels?.(executor) || [];
-  if (!models.length) {
-    process.stdout.write('Este ejecutor no ofrece lista de modelos. Indica uno con: agentrelay set model <id>\n');
-    return 0;
-  }
-  for (const model of models) {
-    const efforts = model.efforts ? model.efforts.map((effort) => `${EFFORT_ES[effort] || effort}${effort === model.defaultEffort ? '*' : ''}`).join(' ') : '—';
-    process.stdout.write(`${model.id === executor.model ? '●' : ' '} ${model.id}  ${efforts}\n`);
-  }
-  process.stdout.write(`Esfuerzo actual: ${executor.thinking ? (EFFORT_ES[executor.thinking] || executor.thinking) : 'por defecto'}\n`);
-  process.stdout.write('Cambia el modelo con: agentrelay set model <id>\nCambia el esfuerzo con: agentrelay set effort <bajo|medio|alto|extremo|máximo>\n');
-  return 0;
-}
-
 async function cmdExecutors(positionals, values) {
   const action = positionals[0];
   const dir = executorsDir();
   if (!action) {
-    let configured = null;
-    try {
-      const cwd = path.resolve(values.cwd || process.cwd());
-      const root = await repoRoot(cwd);
-      configured = loadConfig({ cwd: root || cwd, configPath: values.config }).config.executor.type;
-    } catch {
-      // Listing remains useful when the project config cannot be loaded.
-    }
-    for (const entry of CATALOG) {
-      const installed = await isInstalled(entry.name, { dir });
-      const state = entry.bundled ? 'incluido' : installed ? 'instalado' : 'no instalado';
-      const mark = entry.bundled || installed ? '✔' : '·';
-      process.stdout.write(`${mark} ${entry.title} (${entry.name}) — ${state}${configured === entry.name ? ' · en uso' : ''}\n`);
-      process.stdout.write(`  ${entry.description}\n`);
-    }
-    process.stdout.write('Añade uno con: agentrelay executors add <nombre>\n');
+    process.stdout.write('Para ver y cambiar de ejecutor usa: agentrelay use (o agentrelay use --list). Para instalar uno: agentrelay executors add <nombre>\n');
     return 0;
   }
   if (action !== 'add' || positionals.length !== 2) {
@@ -760,146 +601,6 @@ async function cmdExecutors(positionals, values) {
   return installOptionalExecutor(name, dir);
 }
 
-function requiredTriage(values, field) {
-  if (values[field] === undefined) throw new Error(`Indica --${field}.`);
-  return validateLabel(field, values[field]);
-}
-
-async function cmdTriage(positionals, values) {
-  const action = positionals[0];
-  const file = triageFile();
-  const records = readRecords(file);
-  const kind = values.kind === undefined ? 'orchestrator' : validateLabel('kind', values.kind);
-  if (action === 'record') {
-    const record = { kind, type: null, size: null, effort: null, outcome: null, signals: [] };
-    let config;
-    const currentConfig = () => config ||= loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config }).config;
-    let runState;
-    if (values.run && kind === 'executor') {
-      const root = await resolveRoot(values);
-      runState = loadState(root, values.run);
-      record.executor = runState.config?.executor?.type;
-      record.model = runState.attempts?.[0]?.model?.id;
-      const task = runState.task || {};
-      record.type = ({ feature: 'implementation', refactor: 'implementation', fix: 'debugging', docs: 'docs', test: 'implementation' })[task.type] || 'implementation';
-      record.size = ({ trivial: 'small', normal: 'normal', complex: 'large' })[task.complexity] || 'normal';
-      record.effort = normalizeLabel('effort', runState.config?.executor?.thinking || 'medium');
-      if (!['low', 'medium', 'high', 'xhigh'].includes(record.effort)) record.effort = 'medium';
-      record.level = Number(runState.policy?.level) || 3;
-      const attempts = runState.attempts || [];
-      record.signals.push(`intentos:${attempts.length}`, `reintentos:${runState.retriesUsed || 0}`);
-      const escalated = runState.status === 'escalated';
-      if (escalated) record.signals.push('escalado');
-      if (attempts.some((a) => a.kind === 'fix' || a.check?.passed === false || a.validationPassed === false)
-        || runState.lastCheck?.validations?.some((v) => !v.passed)) record.signals.push('validación-fallida');
-      record.outcome = runState.status === 'accepted' && attempts.length === 1 && !runState.retriesUsed && !escalated ? 'ok' : 'under';
-    }
-    if (kind === 'executor') {
-      record.executor = values.executor ?? record.executor ?? currentConfig().executor.type;
-      record.model = values.model ?? record.model ?? currentConfig().executor.model ?? 'default';
-      record.executor = String(record.executor).trim();
-      record.model = String(record.model).trim();
-      if (!record.executor || !record.model) throw new Error('El registro del ejecutor requiere --executor y --model o una configuraciÃ³n actual.');
-    }
-    if (values.type !== undefined) record.type = validateLabel('type', values.type);
-    if (values.size !== undefined) record.size = validateLabel('size', values.size);
-    if (values.effort !== undefined) record.effort = validateLabel('effort', values.effort);
-    if (values.outcome !== undefined) record.outcome = validateLabel('outcome', values.outcome);
-    if (values.signals !== undefined) record.signals = values.signals.split(',').map((x) => x.trim().slice(0, 60)).filter(Boolean);
-    record.type ||= requiredTriage(values, 'type');
-    record.size ||= requiredTriage(values, 'size');
-    record.outcome ||= requiredTriage(values, 'outcome');
-    if (kind === 'orchestrator') {
-      record.model = requiredTriage(values, 'model');
-      record.effort = record.effort || requiredTriage(values, 'effort');
-    } else {
-      if (values.level !== undefined) {
-        if (!/^[1-5]$/.test(values.level)) throw new Error('--level debe ser un entero entre 1 y 5.');
-        record.level = Number(values.level);
-      }
-      record.level ||= Number(config?.level) || 3;
-      record.effort ||= requiredTriage(values, 'effort');
-    }
-    if (values.run) record.run = values.run;
-    if (values.note !== undefined) record.note = String(values.note).slice(0, 200);
-    const saved = appendRecord(record, file);
-    const choice = kind === 'orchestrator' ? `${saved.model} · esfuerzo ${displayLabel('effort', saved.effort)}` : `${saved.executor} · ${saved.model} · nivel ${saved.level}/esfuerzo ${displayLabel('effort', saved.effort)}`;
-    process.stdout.write(`Anotado: ${kind === 'orchestrator' ? 'orquestador' : 'ejecutor'} · ${displayLabel('type', saved.type)} · ${displayLabel('size', saved.size)} · ${choice} · ${displayLabel('outcome', saved.outcome)}\n`);
-    return 0;
-  }
-  if (action === 'advise') {
-    const type = requiredTriage(values, 'type'), size = requiredTriage(values, 'size');
-    let config;
-    const currentConfig = () => config ||= loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config }).config;
-    const executor = kind === 'executor' ? String(values.executor ?? currentConfig().executor.type).trim() : undefined;
-    const model = kind === 'executor' ? String(values.model ?? currentConfig().executor.model ?? 'default').trim() : undefined;
-    const result = advise(records, { kind, type, size, executor, model, includeLegacy: values['include-legacy'] });
-    const compare = kind === 'orchestrator' && values.model !== undefined && values.effort !== undefined
-      ? comparison(result, validateLabel('model', values.model), validateLabel('effort', values.effort)) : null;
-    const output = { ...result, ...(kind === 'executor' ? { executor, model } : {}), comparison: compare };
-    if (values.json) process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
-    else {
-      const effortEs = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo' };
-      if (kind === 'orchestrator') process.stdout.write(`Recomendación (orquestador): ${result.step.model} · esfuerzo ${effortEs[result.step.effort]}\n`);
-      else process.stdout.write(`Ejecutor: ${executor} · ${model}\nRecomendación (ejecutor): esfuerzo ${effortEs[result.step.effort]} · nivel ${result.step.level}\n`);
-      process.stdout.write(`Motivo: ${result.reason}\nMuestras: ${result.samples} · confianza ${result.confidence}\n`);
-      if (compare) {
-        const current = `${values.model} · ${effortEs[normalizeLabel('effort', values.effort)]}`;
-        const recommended = `${result.step.model} · ${effortEs[result.step.effort]}`;
-        process.stdout.write(compare === 'keep' ? `Modelo actual: ${current} · el modelo actual es adecuado\n` : `Modelo actual: ${current} → conviene ${compare === 'down' ? 'bajar' : 'subir'} a ${recommended}\n`);
-      }
-    }
-    return 0;
-  }
-  if (action === 'stats') {
-    const selected = values.kind === undefined ? records : records.filter((r) => r.kind === kind);
-    if (values.json) {
-      const groups = new Map();
-      for (const r of selected) {
-        const key = JSON.stringify([r.kind, r.kind === 'executor' ? (r.executor && r.model ? executorKey(r.executor, r.model) : '') : '', r.type, r.size]);
-        groups.set(key, [...(groups.get(key) || []), r]);
-      }
-      const rows = [...groups].map(([key, group]) => {
-        const [groupKind, pair, type, size] = JSON.parse(key);
-        const [groupExecutor, groupModel] = pair ? pair.split('|') : ['', ''];
-        const counts = Object.fromEntries(['over', 'ok', 'under'].map((o) => [o, group.filter((r) => r.outcome === o).length]));
-        const steps = new Map();
-        for (const r of group) { const step = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(step, (steps.get(step) || 0) + 1); }
-        const mostUsedStep = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-        const rec = advise(records, { kind: groupKind, type, size, executor: groupExecutor, model: groupModel }).step;
-        return { kind: groupKind, ...(groupKind === 'executor' ? (groupExecutor && groupModel ? { executor: groupExecutor, model: groupModel } : { executor: 'sin ejecutor (antiguo)' }) : {}), type, size, records: group.length, counts, mostUsedStep, recommendation: groupKind === 'orchestrator' ? `${rec.model}-${rec.effort}` : `${rec.effort}/n${rec.level}` };
-      });
-      process.stdout.write(`${JSON.stringify({ file, total: selected.length, groups: rows }, null, 2)}\n`);
-    }
-    else if (!selected.length) process.stdout.write(`Sin datos todavía\nArchivo: ${file}\nTotal: 0\n`);
-    else {
-      process.stdout.write(`Clase / ejecutor y modelo   Tipo             Tamaño     Registros  Sobró/Bien/Corto  Paso más usado  Recomendación\n`);
-      const groups = new Map();
-      for (const r of selected) {
-        const key = JSON.stringify([r.kind, r.kind === 'executor' ? (r.executor && r.model ? executorKey(r.executor, r.model) : '') : '', r.type, r.size]);
-        groups.set(key, [...(groups.get(key) || []), r]);
-      }
-      for (const [key, group] of groups) {
-        const [groupKind, pair, type, size] = JSON.parse(key);
-        const [groupExecutor, groupModel] = pair ? pair.split('|') : ['', ''];
-        const counts = TRIAGE_OUTCOMES.map((o) => group.filter((r) => r.outcome === o).length);
-        const steps = new Map(); for (const r of group) { const s = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(s, (steps.get(s) || 0) + 1); }
-        const popular = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-        const rec = advise(records, { kind: groupKind, type, size, executor: groupExecutor, model: groupModel }).step;
-        const recommendation = groupKind === 'orchestrator' ? `${rec.model}-${displayLabel('effort', rec.effort)}` : `${displayLabel('effort', rec.effort)}/n${rec.level}`;
-        const popularDisplay = groupKind === 'orchestrator'
-          ? popular.replace(/-(low|medium|high|xhigh)$/, (_, e) => `-${displayLabel('effort', e)}`)
-          : popular.replace(/^(low|medium|high|xhigh)/, (e) => displayLabel('effort', e));
-        const executorLabel = groupKind === 'executor' ? (groupExecutor && groupModel ? `${groupExecutor} · ${groupModel}` : 'sin ejecutor (antiguo)') : 'orquestador';
-        process.stdout.write(`${executorLabel.padEnd(28)} ${displayLabel('type', type).padEnd(15)} ${displayLabel('size', size).padEnd(10)} ${String(group.length).padEnd(10)} ${counts.join('/').padEnd(17)} ${popularDisplay.padEnd(15)} ${recommendation}\n`);
-      }
-      process.stdout.write(`Archivo: ${file}\nTotal: ${selected.length}\n`);
-    }
-    return 0;
-  }
-  throw new Error('Uso: agentrelay triage record|advise|stats');
-}
-
 async function installOptionalExecutor(name, dir = executorsDir()) {
   const entry = getCatalogEntry(name, dir);
   process.stdout.write(`Se instalará ${entry.title} en ${dir}.\n`);
@@ -910,7 +611,7 @@ async function installOptionalExecutor(name, dir = executorsDir()) {
   }
   process.stdout.write(`✔ ${entry.title} instalado en ${dir}\n`);
   if (entry.connect) process.stdout.write(`Conéctalo con: ${entry.connect}\n`);
-  process.stdout.write(`Para usarlo: ejecuta "agentrelay set --local executor ${name}" o edita agentrelay.config.json\n`);
+  process.stdout.write(`Para usarlo: agentrelay use ${name}\n`);
   return 0;
 }
 
@@ -981,8 +682,9 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado y /ar:usar, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
+      if (result.retired.length && !values.quiet) process.stdout.write(`Comandos retirados (ahora es /ar:usar): ${result.retired.join(', ')}\n`);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
       const counts = [];
@@ -1014,7 +716,7 @@ async function cmdSetup(values) {
       const answer = await confirm(`¿Instalar también ${entry.title}? ${entry.description}`, { yes: false });
       if (answer === null) {
         if (!noTtyNotice) {
-          if (!values.quiet) process.stdout.write('Ejecutores opcionales: agentrelay executors add <nombre> (ver agentrelay executors)\n');
+          if (!values.quiet) process.stdout.write('Ejecutores opcionales: agentrelay use (o agentrelay executors add <nombre>)\n');
           noTtyNotice = true;
         }
       } else if (answer && await installOptionalExecutor(entry.name, dir) !== 0) {
@@ -1366,24 +1068,21 @@ export async function main(argv, runtime = {}) {
 
   try {
     switch (command) {
-      case 'run': return await cmdRun(rest, values, runtime);
+      case 'run': return await cmdRun(rest, values);
       case 'show': return await cmdShow(rest, values);
-      case 'review': return await cmdReview(rest, values, runtime);
+      case 'review': return await cmdReview(rest, values);
       case 'check': return await cmdCheck(rest, values);
       case 'list': return await cmdList(values);
       case 'status': return await cmdStatus(values);
       case 'recover': return await cmdRecover(rest, values);
-      case 'usage': return await cmdUsage(values);
-      case 'pricing': return await cmdPricing(values, runtime);
       case 'watch': return await cmdWatch(rest, values);
       case 'doctor': return await cmdDoctor(values);
       case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
+      case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
-      case 'models': return await cmdModels(values);
       case 'executors': return await cmdExecutors(rest, values);
-      case 'triage': return await cmdTriage(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);

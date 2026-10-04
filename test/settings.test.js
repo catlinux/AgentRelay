@@ -18,19 +18,20 @@ test('aliases y valores españoles conservan su parsing', () => {
   assert.equal(canonicalSetting('effort'), 'executor.thinking');
   assert.equal(canonicalSetting('validation.timeoutSeconds'), 'validation.timeoutSeconds');
   for (const [input, expected] of [['bajo', 'low'], ['MEDIO', 'medium'], ['alto', 'high'], ['extremo', 'xhigh'], ['máximo', 'max'], ['ninguno', 'none']]) assert.deepEqual(parseSettingValue('effort', input), { value: expected });
-  assert.deepEqual(parseSettingValue('level', '4'), { value: 4 });
+  assert.deepEqual(parseSettingValue('timeout', '900'), { value: 900 });
   assert.deepEqual(parseSettingValue('model', 'default'), { unset: true });
-  assert.throws(() => parseSettingValue('level', '9'), /entero entre 1 y 5/);
+  assert.throws(() => parseSettingValue('timeout', '0'), /número positivo/);
+  assert.equal(canonicalSetting('level'), null);
 });
 
 test('set crea config.json desde la plantilla y conserva sus comentarios', () => {
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
   try {
-    const result = run(['set', 'level', '4'], dir, home, codexHome);
+    const result = run(['set', 'timeout', '900'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
     const text = readFileSync(path.join(home, 'config.json'), 'utf8');
     assert.match(text, /Configuración personal de AgentRelay/);
-    assert.match(text, /"level": 4,/);
+    assert.match(text, /"timeoutSeconds": 900,/);
     assert.ok(text.includes('// Para ajustes del proyecto, usa agentrelay.config.json'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -40,13 +41,13 @@ test('set conserva todos los comentarios existentes', () => {
   try {
     mkdirSync(home, { recursive: true });
     const file = path.join(home, 'config.json');
-    const original = '{\n  // comentario uno\n  "level": 2, // comentario en línea\n  // comentario dos\n  "report": {\n    // comentario anidado\n    "maxDiffChars": 1000\n  }\n}\n';
+    const original = '{\n  // comentario uno\n  "executor": {\n    "timeoutSeconds": 600, // comentario en línea\n    "thinking": "low"\n  },\n  // comentario dos\n  "report": {\n    // comentario anidado\n    "maxDiffChars": 1000\n  }\n}\n';
     writeFileSync(file, original);
-    const result = run(['set', 'level', '4'], dir, home, codexHome);
+    const result = run(['set', 'timeout', '900'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
     const updated = readFileSync(file, 'utf8');
     for (const comment of ['// comentario uno', '// comentario en línea', '// comentario dos', '// comentario anidado']) assert.ok(updated.includes(comment));
-    assert.match(updated, /"level": 4,/);
+    assert.match(updated, /"timeoutSeconds": 900,/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -54,9 +55,9 @@ test('set --project escribe agentrelay.config.json y --local es un alias', () =>
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex'), file = path.join(dir, 'agentrelay.config.json');
   try {
     initRepo(dir);
-    let result = run(['set', 'level', '4', '--project'], dir, home, codexHome);
+    let result = run(['set', 'timeout', '900', '--project'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(readFileSync(file, 'utf8'), /"level": 4,/);
+    assert.match(readFileSync(file, 'utf8'), /"timeoutSeconds": 900,/);
     assert.match(result.stdout, /solo en este proyecto: agentrelay\.config\.json/);
     result = run(['set', 'effort', 'alto', '--local'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
@@ -68,12 +69,12 @@ test('set --project escribe agentrelay.config.json y --local es un alias', () =>
 test('unset restaura la línea comentada de la plantilla', () => {
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
   try {
-    let result = run(['set', 'level', '4'], dir, home, codexHome);
+    let result = run(['set', 'timeout', '900'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
-    result = run(['unset', 'level'], dir, home, codexHome);
+    result = run(['unset', 'timeout'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
     const text = readFileSync(path.join(home, 'config.json'), 'utf8');
-    assert.match(text, /\/\/ "level": 3,/);
+    assert.match(text, /\/\/ "timeoutSeconds": 1200,/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -95,7 +96,7 @@ test('un valor inválido no se guarda y restaura exactamente el archivo', () => 
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex'), file = path.join(home, 'config.json');
   try {
     mkdirSync(home, { recursive: true });
-    const original = '{\n  // comentario que debe sobrevivir al rollback\n  "level": 4\n}\n';
+    const original = '{\n  // comentario que debe sobrevivir al rollback\n  "report": { "maxDiffChars": 1000 }\n}\n';
     writeFileSync(file, original);
     const result = run(['set', 'executor', 'no-existe'], dir, home, codexHome);
     assert.equal(result.status, 1);
@@ -107,9 +108,9 @@ test('unset también puede escribir la configuración del proyecto', () => {
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex'), file = path.join(dir, 'agentrelay.config.json');
   try {
     initRepo(dir);
-    writeFileSync(file, '{\n  "level": 4\n}\n');
-    const result = run(['unset', 'level', '--project'], dir, home, codexHome);
+    writeFileSync(file, '{\n  "executor": {\n    "timeoutSeconds": 600\n  }\n}\n');
+    const result = run(['unset', 'timeout', '--project'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
-    assert.match(readFileSync(file, 'utf8'), /\/\/ "level": 3,/);
+    assert.match(readFileSync(file, 'utf8'), /\/\/ "timeoutSeconds": 1200,/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

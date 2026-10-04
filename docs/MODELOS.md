@@ -44,7 +44,7 @@ Problemas conocidos en Windows: el sandbox protegido de Codex puede romperse («
 | deepseek-v4-pro | Probado, fiable. Más caro. |
 | deepseek-v4-flash | Más barato. Una vez se quedó esperando a la API; otra vez terminó una tarea en 3 minutos. |
 
-`agentrelay pricing` muestra las tarifas de DeepSeek y sus horas punta y valle.
+DeepSeek cobra la mitad en horas valle: la punta es de 01:00 a 04:00 y de 06:00 a 10:00 UTC, de lunes a viernes. AgentRelay ya no muestra las tarifas; consúltalas en https://api-docs.deepseek.com/quick_start/pricing.
 
 ## 5. Ejecutor `opencode`: 52 modelos en cuatro grupos
 
