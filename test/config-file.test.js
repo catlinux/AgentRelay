@@ -7,6 +7,11 @@ import { setConfigValue, unsetConfigValue } from '../src/config-file.js';
 const userText = () => configTemplate({ scope: 'user' });
 const projectText = () => configTemplate({ scope: 'project' });
 
+test('set inserts a missing option using the block indentation', () => {
+  const text = setConfigValue(userText(), 'executor.type', 'opencode');
+  assert.match(text, /^ {4}"type": "opencode",$/m);
+});
+
 // Diferencia de líneas mínima (LCS): devuelve las líneas retiradas y las
 // añadidas. El resto se conserva en el mismo orden.
 function diffLines(before, after) {
@@ -48,12 +53,12 @@ test('set descomenta una opción de la plantilla y su bloque, y parsea con el va
   const parsed = parseJsonc(after);
   assert.equal(parsed.executor.model, 'mi-modelo');
   assert.ok(after.includes('  "executor": {'));
-  assert.ok(after.includes('  "model": "mi-modelo",'));
+  assert.ok(after.includes('    "model": "mi-modelo",'));
   // Solo cambian la línea de la opción y las del bloque que la contiene.
   assertOnlyChanged(
     before, after,
-    ['  // "executor": {', '  // "model": "gpt-6-luna",', '  // },'],
-    ['  "executor": {', '  "model": "mi-modelo",', '  },'],
+    ['  // "executor": {', '    // "model": "gpt-6-luna",', '  // },'],
+    ['  "executor": {', '    "model": "mi-modelo",', '  },'],
   );
 });
 
@@ -62,7 +67,7 @@ test('set sobre una opción ya activa reemplaza solo su valor', () => {
   assert.equal(parseJsonc(first).executor.thinking, 'low');
   const second = setConfigValue(first, 'executor.thinking', 'high');
   assert.equal(parseJsonc(second).executor.thinking, 'high');
-  assertOnlyChanged(first, second, ['  "thinking": "low",'], ['  "thinking": "high",']);
+  assertOnlyChanged(first, second, ['    "thinking": "low",'], ['    "thinking": "high",']);
 });
 
 test('set de una clave de profundidad 3 descomenta policy y selfReview', () => {
@@ -72,8 +77,8 @@ test('set de una clave de profundidad 3 descomenta policy y selfReview', () => {
   assert.deepEqual(parsed.policy, { selfReview: { normal: 'pass' } });
   assert.ok(after.includes('  "policy": {'));
   assert.ok(after.includes('  "selfReview": {'));
-  assert.ok(after.includes('  // "trivial": "none",'));
-  assert.ok(after.includes('  // "complex": "pass",'));
+  assert.ok(after.includes('    // "trivial": "none",'));
+  assert.ok(after.includes('    // "complex": "pass",'));
 });
 
 test('set de una clave que no está en la plantilla la inserta en su bloque', () => {
@@ -83,12 +88,12 @@ test('set de una clave que no está en la plantilla la inserta en su bloque', ()
   assert.equal(parsed.executor.newOption, 'valor');
   // La nueva opción queda dentro del bloque executor.
   const lines = after.split('\n');
-  assert.ok(lines.includes('  "newOption": "valor",'));
-  assert.ok(lines.indexOf('  "newOption": "valor",') < lines.indexOf('  },'));
+  assert.ok(lines.includes('    "newOption": "valor",'));
+  assert.ok(lines.indexOf('    "newOption": "valor",') < lines.indexOf('  },'));
   assertOnlyChanged(
     before, after,
     ['  // "executor": {', '  // },'],
-    ['  "executor": {', '  "newOption": "valor",', '  },'],
+    ['  "executor": {', '    "newOption": "valor",', '  },'],
   );
 });
 
