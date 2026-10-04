@@ -81,7 +81,6 @@ Opciones comunes:
   -V, --version           Muestra la versión
 
 Opciones de run:
-  --level <1-5>           Nivel de orquestación (1 = máximo ahorro … 5 = máxima supervisión)
   --self-review <modo>    Fuerza el modo de self-review: ${SELF_REVIEW_MODES.join(' | ')}
   --allow-dirty           Permite delegar con cambios sin confirmar
 
@@ -118,7 +117,6 @@ const OPTIONS = {
   cwd: { type: 'string' },
   config: { type: 'string' },
   json: { type: 'boolean' },
-  level: { type: 'string' },
   'self-review': { type: 'string' },
   'allow-dirty': { type: 'boolean' },
   quiet: { type: 'boolean', short: 'q' },
@@ -168,7 +166,6 @@ function printResult(state, root, json, values = {}) {
       id: state.id,
       status: state.status,
       reasons: state.statusReasons,
-      level: state.policy.level,
       selfReview: state.selfReview,
       retriesUsed: state.retriesUsed,
       changedFiles: check?.files ?? [],
@@ -208,8 +205,7 @@ async function cmdRun(positionals, values) {
     task.selfReview = values['self-review'];
   }
   const root = await resolveRoot(values);
-  const overrides = values.level ? { level: values.level } : undefined;
-  const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config, overrides });
+  const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config });
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
@@ -266,11 +262,11 @@ async function cmdList(values) {
   const runs = listRunIds(root).map((id) => {
     const s = loadState(root, id);
     const orphaned = isOrphaned(s, { lastEventMs: lastActivityMs(root, id) });
-    return { id, status: orphaned ? 'running (¿interrumpida?)' : s.status, level: s.policy.level, attempts: s.attempts.length, title: s.task.title };
+    return { id, status: orphaned ? 'running (¿interrumpida?)' : s.status, attempts: s.attempts.length, title: s.task.title };
   });
   if (values.json) process.stdout.write(`${JSON.stringify(runs, null, 2)}\n`);
   else if (!runs.length) process.stdout.write('No hay ejecuciones.\n');
-  else for (const r of runs) process.stdout.write(`${r.id}  ${r.status.padEnd(16)} nivel ${r.level}  intentos ${r.attempts}  ${r.title}\n`);
+  else for (const r of runs) process.stdout.write(`${r.id}  ${r.status.padEnd(16)} intentos ${r.attempts}  ${r.title}\n`);
   return 0;
 }
 
@@ -355,7 +351,7 @@ async function cmdDoctor(values) {
   try {
     const loaded = loadConfig({ cwd: root || cwd, configPath: values.config });
     config = loaded.config;
-    line(true, `Configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'valores por defecto'} · nivel ${config.level}`);
+    line(true, `Configuración: ${loaded.sources.length ? loaded.sources.join(', ') : 'valores por defecto'}`);
     for (const warning of loaded.warnings) warn(warning);
   } catch (error) {
     line(false, error.message);
@@ -764,7 +760,7 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:ejecutor, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);

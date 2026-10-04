@@ -2,7 +2,7 @@
 // conservando todos los comentarios y el resto de las líneas byte a byte.
 // Son funciones puras: reciben texto y devuelven texto, sin tocar el disco.
 import { DEFAULT_CONFIG } from './config.js';
-import { LEVELS } from './policy.js';
+import { POLICY } from './policy.js';
 
 // --- Utilidades de líneas -------------------------------------------------
 
@@ -93,9 +93,9 @@ function uncommentAncestors(lines, blocks, parts) {
 // --- Valores por defecto conocidos ---------------------------------------
 
 // Objeto con los valores predeterminados que aparecen en la plantilla: los de
-// DEFAULT_CONFIG más los de la política del nivel por defecto.
+// DEFAULT_CONFIG más los de la política por defecto.
 function defaultValues() {
-  return { ...DEFAULT_CONFIG, policy: { ...LEVELS[DEFAULT_CONFIG.level], ...DEFAULT_CONFIG.policy } };
+  return { ...DEFAULT_CONFIG, policy: { ...POLICY, ...DEFAULT_CONFIG.policy } };
 }
 
 // Valor por defecto de una clave con puntos, o { known: false } si no es una

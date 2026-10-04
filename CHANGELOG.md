@@ -24,6 +24,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 - `agentrelay usage` y `agentrelay pricing` (resumen de consumo y tabla de precios y tarifas de DeepSeek), y el aviso de tarifa al lanzar una tarea. El informe de cada ejecución sigue mostrando los tokens de cada intento.
 
+- Niveles de orquestación 1-5: `--level`, `set level`, `/ar:nivel` y la opción `level`. Se sustituyen por una sola política (revisión siempre, 2 reintentos, autorrevisión según la complejidad) que se ajusta con la sección `policy`. Una opción `level` antigua en la configuración se ignora con un aviso. Cambio incompatible: la próxima versión debería ser la 0.2.0 (a acordar).
+
 ### Corregido
 
 - `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.

@@ -1,6 +1,6 @@
 export const SETTING_ALIASES = Object.freeze({
   model: 'executor.model', effort: 'executor.thinking', thinking: 'executor.thinking',
-  executor: 'executor.type', provider: 'executor.provider', level: 'level', timeout: 'executor.timeoutSeconds',
+  executor: 'executor.type', provider: 'executor.provider', timeout: 'executor.timeoutSeconds',
   'executor.type': 'executor.type', 'executor.model': 'executor.model', 'executor.provider': 'executor.provider',
   'executor.thinking': 'executor.thinking', 'executor.timeoutSeconds': 'executor.timeoutSeconds',
   'validation.timeoutSeconds': 'validation.timeoutSeconds',
@@ -18,12 +18,6 @@ export function parseSettingValue(key, value) {
   if (typeof value !== 'string') throw new Error('El valor debe ser texto.');
   if (/^(default|defecto)$/i.test(value.trim())) return { unset: true };
   const canonical = canonicalSetting(key) || key;
-  if (canonical === 'level') {
-    if (!/^\d+$/.test(value)) throw new Error('level debe ser un entero entre 1 y 5.');
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 1 || number > 5) throw new Error('level debe ser un entero entre 1 y 5.');
-    return { value: number };
-  }
   if (canonical === 'executor.timeoutSeconds' || canonical === 'validation.timeoutSeconds') {
     if (!/^\d+(?:\.\d+)?$/.test(value) || !(Number(value) > 0)) throw new Error(`${canonical} debe ser un número positivo.`);
     return { value: Number(value) };

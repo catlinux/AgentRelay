@@ -17,63 +17,25 @@ export const SELF_REVIEW_MODES = ['none', 'inline', 'pass'];
 export const COMPLEXITIES = ['trivial', 'normal', 'complex'];
 export const POLICY_REVIEWS = ['on-failure', 'selective', 'always'];
 
-export const LEVELS = Object.freeze({
-  1: {
-    name: 'máximo ahorro',
-    review: 'on-failure',
-    maxRetries: 3,
-    autoFix: true,
-    requireValidation: false,
-    selfReview: { trivial: 'none', normal: 'none', complex: 'inline' },
-    skipPassMaxFiles: 1,
-  },
-  2: {
-    name: 'ahorro',
-    review: 'selective',
-    maxRetries: 2,
-    autoFix: true,
-    requireValidation: false,
-    selfReview: { trivial: 'none', normal: 'inline', complex: 'pass' },
-    skipPassMaxFiles: 1,
-  },
-  3: {
-    name: 'equilibrado',
-    review: 'always',
-    maxRetries: 2,
-    autoFix: true,
-    requireValidation: false,
-    selfReview: { trivial: 'none', normal: 'inline', complex: 'pass' },
-    skipPassMaxFiles: 1,
-  },
-  4: {
-    name: 'calidad',
-    review: 'always',
-    maxRetries: 1,
-    autoFix: true,
-    requireValidation: true,
-    selfReview: { trivial: 'inline', normal: 'pass', complex: 'pass' },
-    skipPassMaxFiles: 0,
-  },
-  5: {
-    name: 'máxima supervisión',
-    review: 'always',
-    maxRetries: 1,
-    // Los fallos de validación llegan al orquestador en vez de reintentarse solos.
-    autoFix: false,
-    requireValidation: true,
-    selfReview: { trivial: 'inline', normal: 'pass', complex: 'pass' },
-    skipPassMaxFiles: 0,
-  },
+// Política única de orquestación. Cada valor se puede sustituir con la sección
+// "policy" de la configuración.
+export const POLICY = Object.freeze({
+  name: 'estándar',
+  review: 'always',
+  maxRetries: 2,
+  autoFix: true,
+  requireValidation: false,
+  selfReview: { trivial: 'none', normal: 'inline', complex: 'pass' },
+  skipPassMaxFiles: 1,
 });
 
 // Número de archivos modificados a partir del cual la revisión selectiva se activa.
 const SELECTIVE_REVIEW_FILES = 5;
 
 export function resolvePolicy(config) {
-  const base = LEVELS[config.level];
   const overrides = config.policy || {};
-  const policy = { level: config.level, ...base, ...overrides };
-  policy.selfReview = { ...base.selfReview, ...(overrides.selfReview || {}) };
+  const policy = { ...POLICY, ...overrides };
+  policy.selfReview = { ...POLICY.selfReview, ...(overrides.selfReview || {}) };
   return policy;
 }
 
@@ -122,6 +84,6 @@ export function decideReview(policy, task, outcome) {
   else if (policy.review === 'selective') required = reasons.length > 0;
   else required = serious.length > 0;
 
-  if (policy.review === 'always') reasons.unshift(`el nivel ${policy.level} revisa siempre`);
+  if (policy.review === 'always') reasons.unshift('la política revisa siempre');
   return { required, reasons };
 }
