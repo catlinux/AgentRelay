@@ -35,7 +35,8 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
-import { runChecks, startDailyCheck } from './model-check.js';
+import { isDue, loadChecks, markDay, runChecks, startDailyCheck } from './model-check.js';
+import { reportPath, writeReport } from './executors-report.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -212,7 +213,7 @@ async function cmdRun(positionals, values) {
   const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config });
   const checkExecutor = config.executor.type === 'opencode'
     ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-  void startDailyCheck({ executor: checkExecutor, isInstalled, authStatus: (executor) => getExecutor('opencode').authStatus(executor) }).catch(() => {});
+  void startDailyCheck({ executor: checkExecutor }).catch(() => {});
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
@@ -659,21 +660,32 @@ async function cmdExecutors(positionals, values) {
     const executor = config.executor.type === 'opencode'
       ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
     const adapter = getExecutor('opencode');
-    if (!await isInstalled('opencode', { dir })) {
-      if (!values.background) process.stderr.write('OpenCode no está instalado. Instálalo con: agentrelay executors add opencode\n');
+    const home = agentrelayHome();
+    if (!values.force && !isDue(loadChecks(home))) {
+      if (!values.background) process.stdout.write(`Ya se hizo hoy (usa --force para repetirlo). Informe: ${reportPath(process.env.AGENTRELAY_REPORT_ROOT || undefined)}\n`);
+      return 0;
+    }
+    markDay(home);
+    if (await isInstalled('opencode', { dir })) {
+      const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
+      if (auth.ok) {
+        const result = await runChecks({ executor, adapter, force: true });
+        if (!values.background) {
+          if (!result.checked.length) process.stdout.write('Nada nuevo que probar.\n');
+          for (const item of result.checked) process.stdout.write(item.status === 'approved'
+            ? `✔ ${item.id} aprobado (${item.seconds ?? 0} s)\n`
+            : `✘ ${item.id} fallido: ${item.reason}\n`);
+        }
+      } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (opencode auth login); se omite la prueba de modelos.\n');
+    } else if (!values.background) process.stdout.write('OpenCode no está instalado (agentrelay executors add opencode); se omite la prueba de modelos.\n');
+    let written;
+    try { written = await writeReport({ current: config.executor, home, root: process.env.AGENTRELAY_REPORT_ROOT || undefined }); }
+    catch (error) {
+      if (!values.background) process.stderr.write(`No se pudo escribir el informe diario: ${error.message}\n`);
       return values.background ? 0 : 1;
     }
-    const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
-    if (!auth.ok) {
-      if (!values.background) process.stderr.write(`OpenCode no tiene una sesión. Conéctalo con: opencode auth login${auth.message ? ` (${auth.message})` : ''}\n`);
-      return values.background ? 0 : 1;
-    }
-    const result = await runChecks({ executor, adapter, force: values.force });
     if (!values.background) {
-      if (!result.checked.length) process.stdout.write('Nada nuevo que probar.\n');
-      for (const item of result.checked) process.stdout.write(item.status === 'approved'
-        ? `✔ ${item.id} aprobado (${item.seconds ?? 0} s)\n`
-        : `✘ ${item.id} fallido: ${item.reason}\n`);
+      process.stdout.write(`Informe: ${written.path}\n`);
     }
     return 0;
   }
@@ -1149,7 +1161,7 @@ async function cmdStart(values) {
     const { config } = loadConfig({ cwd: root, configPath: values.config });
     const executor = config.executor.type === 'opencode'
       ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-    void startDailyCheck({ executor, isInstalled, authStatus: (value) => getExecutor('opencode').authStatus(value) }).catch(() => {});
+    void startDailyCheck({ executor }).catch(() => {});
   } catch { /* La revisión diaria nunca altera start. */ }
   return doctorStatus === 0 && treeClean ? 0 : 1;
 }
