@@ -47,14 +47,10 @@ Estas instrucciones definen objetivos y restricciones, no una implementación ce
 
 El desarrollo de este proyecto sigue el flujo de AgentRelay: el orquestador analiza, planifica, revisa y decide; el ejecutor implementa.
 
-- Delegar las tareas de implementación bien acotadas con `agentrelay run - <<'EOF' … EOF` (tarea JSON con `objective`, `context`, `files`, `constraints`, `acceptanceCriteria`, `validation` y `doNotModify`).
+- Cómo se delega, se revisa y se informa está en la sección 24 y en el bloque de AgentRelay del final de este archivo; aquí solo lo propio de este repositorio.
 - Usar siempre el comando `agentrelay` INSTALADO (una copia separada del código de desarrollo) y no `node bin/agentrelay.js` de esta carpeta: así, si una tarea delegada rompe el código de desarrollo, la herramienta con la que se orquesta sigue funcionando. Para probar cambios del código de desarrollo sí se usa `node bin/agentrelay.js`.
-- La copia instalada se actualiza con `git pull` y `npm ci` (no `npm install`) solo con lo que esté en `main`; después `agentrelay doctor` avisa si hay que repetir `setup` o `init`.
-- Antes de delegar, el árbol de trabajo debe estar limpio (commit previo) para que el diff sea solo de la tarea.
-- Leer el informe (diff, validaciones, informe del ejecutor) y decidir con `agentrelay review <id> --decision accept|fix|escalate|reject`. La autorrevisión del ejecutor no sustituye esta revisión. Ejecutar `npm test` uno mismo antes de aceptar.
-- El orquestador hace el trabajo directamente cuando delegar no compensa: cambios triviales, decisiones de diseño, documentación sensible, archivos internos o tareas escaladas. Si una tarea delegada rompe AgentRelay, el orquestador asume la corrección.
-- Informar al usuario en el chat de qué se delega, por qué y qué se decide al revisar. El usuario puede seguir la ejecución con `agentrelay watch`.
-- Informar con fidelidad: no decir que una ejecución está aceptada si `agentrelay list` no lo indica.
+- La copia instalada se actualiza con `agentrelay update` (o `git pull` y `npm ci`, no `npm install`) solo con lo que esté en `main`; después `agentrelay doctor` avisa si hay que repetir `setup` o `init`.
+- El orquestador programa él mismo solo si el ejecutor no puede: tarea escalada tras fallar, decisión de diseño, documentación sensible, un cambio de 1-3 líneas o un entorno sin `agentrelay` instalado. En esos casos lo dice en una línea con el motivo. Si una tarea delegada rompe AgentRelay, el orquestador asume la corrección.
 
 ## 23. Mantener TODO.md al día
 
@@ -102,7 +98,7 @@ Sigue estos pasos en orden, sin saltarte ninguno. Si un paso falla o no estás s
 
 ### Reglas de comunicación con el usuario
 - Respuestas cortas y en español.
-- Los comandos del chat de Claude Code (`/ar:esfuerzo alto`) y los de terminal (`agentrelay set effort alto`) nunca se mezclan en un mismo texto.
+- Los comandos del chat de Claude Code (`/ar:usar alto`) y los de terminal (`agentrelay use alto`) nunca se mezclan en un mismo texto.
 - No inventes costes, versiones ni resultados. Si no lo sabes, dilo.
 
 ### Problemas conocidos del ejecutor (Codex con GPT-6 Luna en Windows)
