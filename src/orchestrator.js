@@ -20,7 +20,6 @@ import {
 } from './store.js';
 import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
-import { classifyExecutorError, maskSecrets } from './executors/common.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -94,7 +93,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     finishReason: result.finishReason,
     exitCode: result.exitCode,
     timedOut: result.timedOut,
-    error: result.error ? maskSecrets(result.error) : result.error,
+    error: result.error,
     model: result.model,
     iterations: result.iterations,
     toolCalls: result.toolCalls,
@@ -112,7 +111,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     ok: result.ok,
     durationMs: result.durationMs,
     agentStatus: result.report?.status,
-    error: result.error ? maskSecrets(result.error) : result.error,
+    error: result.error,
   });
   return result;
 }
@@ -170,16 +169,6 @@ async function continueCycle(ctx, result) {
     const check = await evaluate(ctx);
     if (isBlocked(result)) return finalize(ctx, result, check);
 
-    if (!result.ok) {
-      const errorKind = classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`);
-      if (errorKind) {
-        const reason = errorKind === 'credentials'
-          ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
-          : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor, o cambia de ejecutor o modelo con `agentrelay set`';
-        return finalize(ctx, result, check, { status: 'failed', reasons: [reason] });
-      }
-    }
-
     if (!result.ok || !check.passed) {
       if (policy.autoFix && state.retriesUsed < policy.maxRetries) {
         state.retriesUsed += 1;
@@ -206,15 +195,12 @@ async function continueCycle(ctx, result) {
   }
 }
 
-function finalize(ctx, result, check, forced = null) {
+function finalize(ctx, result, check) {
   const { state, policy, task, root } = ctx;
   let status;
   let reasons = [];
 
-  if (forced) {
-    status = forced.status;
-    reasons = forced.reasons;
-  } else if (isBlocked(result)) {
+  if (isBlocked(result)) {
     status = 'escalated';
     reasons = ['el ejecutor informa de que está bloqueado o pide escalado'];
   } else if (!result.ok || !check.passed) {
