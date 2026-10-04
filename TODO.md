@@ -25,7 +25,7 @@ Decisiones del 2026-10-04 (el usuario autoriza borrar los archivos de la simplif
 - [ ] Cadena de ejecutores: Luna (Codex, cuota gratuita por cuenta de correo) primero. Al agotarse NO se cambia solo: la ejecución para y ofrece elegir (seguir con Luna más tarde, un gratuito de OpenCode o DeepSeek Flash de pago); el orquestador pregunta al usuario. Se vuelve a probar Luna cada 24 h (o a la hora de reinicio si el error la da). Falta el texto real del error de cuota de Codex y OpenCode.
 - [ ] OpenCode desde el instalador: existe el paquete npm oficial `opencode-ai` (binarios por plataforma, como Codex); instalarlo como Cline en `~/.agentrelay/executors`.
 - [ ] Revisión diaria de modelos gratuitos: en el primer uso de cada día, listar los `-free` de OpenCode y probar solo los nuevos con una prueba fija; aprobar los que superen un mínimo (p. ej. ≥ 24/26 casos, informe estructurado válido, < 300 s, sin errores de API). Sin bloquear la primera tarea. Avisar de que las ofertas gratuitas pueden guardar el código enviado.
-- [ ] Aviso de `start`/`init` dentro de la copia instalada: no se distingue de forma fiable de la copia de desarrollo (ambas son «la raíz del paquete»); decidir con el usuario cómo detectarla.
+- [x] Aviso de `start`/`init` dentro de la carpeta de AgentRelay (opción A): avisa y pide confirmación; con `--yes` sigue sin preguntar.
 
 ## 0.0.x — Prototipo
 
