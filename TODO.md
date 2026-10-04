@@ -12,7 +12,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Pulir: sangría de las opciones que activa `set`.
 - [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.
 - [x] `agentrelay use`: cambiar de IA (ejecutor, modelo y esfuerzo) con un solo comando, interactivo sin argumentos, con perfiles (`use --save <nombre>`, `use <nombre>`) y `/ar:usar` en el chat (acordado el 2026-10-03).
-- [ ] Simplificar (acordado el 2026-10-03). Hecho: triaje que aprende, `pricing`, `usage`, niveles 1-5, `models`, listado de `executors`, `/ar:modelo|esfuerzo|ejecutor|nivel`, `config refresh` y bloque de modelos. Falta acortar `AGENTS.md` (sección 22 y bloque gestionado) y revisar el README de nuevo.
+- [ ] Simplificar (acordado el 2026-10-03). Hecho: triaje que aprende, `pricing`, `usage`, niveles 1-5, `models`, listado de `executors`, `/ar:modelo|esfuerzo|ejecutor|nivel`, `config refresh` y bloque de modelos. `AGENTS.md`: sección 22 sin duplicados (el grueso del texto es el bloque gestionado, que sale de `PROJECT_BLOCK` y sirve a todos los proyectos; acortarlo es decisión aparte).
 - [x] Documentación clara (acordado el 2026-10-03): manual de uso sencillo con ejemplos (`docs/MANUAL.md`), README más corto y plan paso a paso de cada punto pendiente para que lo ejecute un modelo más pequeño (`docs/PLAN.md`).
 
 > **Cómo hacer cada punto de esta sección, paso a paso: [`docs/PLAN.md`](docs/PLAN.md).**
