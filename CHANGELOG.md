@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Revisión diaria de los modelos gratuitos de OpenCode: el primer uso de cada día (`run` o `start`), en segundo plano y sin bloquear nada, AgentRelay prueba con una tarea sintética mínima los modelos `-free` que aún no conoce (nunca se envía código del usuario). El resultado se guarda en `~/.agentrelay/model-checks.json` y `agentrelay use --list` y el menú de `use` marcan cada modelo como `✔ probado`, `✘ no pasó la prueba` o `· sin probar`. Un modelo fallido se vuelve a probar a los 7 días. Nunca se cambia solo de modelo. Comando manual: `agentrelay executors check [--force]`; se desactiva con `AGENTRELAY_NO_MODEL_CHECK=1`.
+
 - Hook de delegación para Claude Code: `agentrelay setup` añade a `settings.json` un hook PreToolUse que, al ir a editar código en un proyecto con AgentRelay, recuerda al orquestador delegar con `agentrelay run` (como mucho una vez cada 15 minutos por sesión). Respeta el resto de tu configuración, se omite con `--no-hook`, se retira con `setup --uninstall` y `doctor` comprueba su estado. Si `settings.json` no es JSON válido, no lo toca.
 
 - OpenCode se instala desde AgentRelay como Cline (`agentrelay executors add opencode`, o al elegirlo con `agentrelay use opencode`): paquete npm oficial `opencode-ai` en `~/.agentrelay/executors`. Si ya lo tienes en el PATH, se sigue usando.

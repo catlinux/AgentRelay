@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +10,25 @@ import { choiceEdits, parseUseArgs } from '../src/use.js';
 import { main } from '../src/cli.js';
 
 const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
+const fakeOpenCode = fileURLToPath(new URL('./fixtures/fake-opencode.mjs', import.meta.url));
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-use-'));
 function env(dir) {
   return { ...process.env, AGENTRELAY_HOME: path.join(dir, 'home'), CODEX_HOME: path.join(dir, 'codex'), AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex'), AGENTRELAY_NO_MIGRATE: '1', AGENTRELAY_NO_STATE: '1' };
 }
 function run(args, dir) {
   return spawnSync(process.execPath, [bin, ...args], { cwd: dir, encoding: 'utf8', env: env(dir) });
+}
+function installFakeOpenCode(dir) {
+  const fakeBin = path.join(dir, 'fake-bin');
+  mkdirSync(fakeBin, { recursive: true });
+  const executable = path.join(fakeBin, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
+  if (process.platform === 'win32') {
+    writeFileSync(executable, `@echo off\r\n"${process.execPath}" "${fakeOpenCode}" %*\r\n`);
+  } else {
+    writeFileSync(executable, `#!/bin/sh\nexec "${process.execPath}" "${fakeOpenCode}" "$@"\n`);
+    chmodSync(executable, 0o755);
+  }
+  return { ...env(dir), PATH: `${fakeBin}${path.delimiter}${process.env.PATH || process.env.Path || ''}` };
 }
 const userConfig = (dir) => parseJsonc(readFileSync(path.join(dir, 'home', 'config.json'), 'utf8'));
 
@@ -86,6 +99,32 @@ test('use --list muestra los modelos de Codex con su esfuerzo y marca el que est
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('use --list marca modelos gratuitos de OpenCode según la revisión diaria', () => {
+  const dir = temp();
+  try {
+    const testEnv = installFakeOpenCode(dir);
+    mkdirSync(testEnv.AGENTRELAY_HOME, { recursive: true });
+    writeFileSync(path.join(dir, 'home', 'model-checks.json'), JSON.stringify({
+      lastRun: '2026-10-04',
+      models: {
+        'opencode/nemotron-3-ultra-free': { status: 'approved', checkedAt: '2026-10-04T10:00:00.000Z' },
+        'opencode/gpt-oss-120b-free': { status: 'failed', checkedAt: '2026-10-04T10:00:00.000Z' },
+      },
+    }));
+    const listed = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: testEnv });
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.match(listed.stdout, /opencode\/nemotron-3-ultra-free  ✔ probado \(2026-10-04\)/);
+    assert.match(listed.stdout, /opencode\/gpt-oss-120b-free  ✘ no pasó la prueba/);
+    assert.doesNotMatch(listed.stdout, /Codex[\s\S]*?sin probar/);
+
+    writeFileSync(path.join(dir, 'home', 'model-checks.json'), JSON.stringify({ lastRun: null, models: {} }));
+    const untested = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: testEnv });
+    assert.equal(untested.status, 0, untested.stderr);
+    assert.match(untested.stdout, /opencode\/nemotron-3-ultra-free  · sin probar/);
+    assert.match(untested.stdout, /opencode\/gpt-oss-120b-free  · sin probar/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('use sin argumentos y sin terminal muestra el estado sin cambiar nada', () => {
   const dir = temp();
   try {
@@ -118,6 +157,39 @@ test('use interactivo elige ejecutor, modelo y esfuerzo con números', async () 
     assert.equal(config.executor.model, 'gpt-5.5');
     assert.equal(config.executor.thinking, 'high');
     assert.equal(config.profiles.bueno.model, 'gpt-5.5');
+  } finally {
+    process.stdout.write = write;
+    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+    Object.assign(process.env, saved);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('use interactivo muestra las marcas de prueba en los modelos de OpenCode', async () => {
+  const dir = temp();
+  const saved = { ...process.env };
+  const write = process.stdout.write;
+  const testEnv = installFakeOpenCode(dir);
+  Object.assign(process.env, testEnv);
+  mkdirSync(testEnv.AGENTRELAY_HOME, { recursive: true });
+  writeFileSync(path.join(dir, 'home', 'model-checks.json'), JSON.stringify({
+    lastRun: '2026-10-04',
+    models: {
+      'opencode/nemotron-3-ultra-free': { status: 'approved', checkedAt: '2026-10-04T10:00:00.000Z' },
+      'opencode/gpt-oss-120b-free': { status: 'failed', checkedAt: '2026-10-04T10:00:00.000Z' },
+    },
+  }));
+  let output = '';
+  process.stdout.write = (chunk) => { output += chunk; return true; };
+  const answers = ['3', '1', '1', ''];
+  try {
+    const code = await main(['use', '--cwd', dir], { ask: async (question) => {
+      output += question;
+      return answers.shift() ?? '';
+    } });
+    assert.equal(code, 0, output);
+    assert.match(output, /opencode\/nemotron-3-ultra-free(?:  ← en uso)?  ✔ probado \(2026-10-04\)/);
+    assert.match(output, /opencode\/gpt-oss-120b-free  ✘ no pasó la prueba/);
   } finally {
     process.stdout.write = write;
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];

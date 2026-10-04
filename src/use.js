@@ -18,10 +18,23 @@ import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
 import { CATALOG, executorsDir, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
+import { loadChecks } from './model-check.js';
 import { parseSettingValue } from './settings.js';
 
 export const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
 const effortLabel = (effort) => (effort ? EFFORT_ES[effort] || effort : 'por defecto');
+
+function modelMark(id, checks) {
+  if (!id.endsWith('-free')) return '';
+  const record = checks.models[id];
+  if (record?.status === 'approved') {
+    const date = new Date(record.checkedAt);
+    const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return `  ✔ probado (${localDate})`;
+  }
+  if (record?.status === 'failed') return '  ✘ no pasó la prueba';
+  return '  · sin probar';
+}
 
 /** Devuelve el esfuerzo normalizado si el texto es un esfuerzo (alto, high…), o null. */
 export function asEffort(text) {
@@ -116,9 +129,10 @@ async function interactive(current, ask, helpers) {
   const choice = { type: entry.name };
   const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
   const { models } = await modelsOf(entry.name, executor);
+  const checks = entry.name === 'opencode' ? loadChecks() : null;
   let model = null;
   if (models.length) {
-    const items = [...models.map((item) => `${item.id}${item.id === executor.model ? '  ← en uso' : ''}`), 'Otro (escribirlo)'];
+    const items = [...models.map((item) => `${item.id}${item.id === executor.model ? '  ← en uso' : ''}${checks ? modelMark(item.id, checks) : ''}`), 'Otro (escribirlo)'];
     const index = await pick(ask, '¿Qué modelo?', items, models.findIndex((item) => item.id === executor.model) >= 0 ? models.findIndex((item) => item.id === executor.model) : 0);
     if (index === models.length) choice.model = (await ask('Modelo: ')).trim() || undefined;
     else { model = models[index]; choice.model = model.id; }
@@ -153,11 +167,12 @@ async function listAll(current, out) {
     if (!installed) { out(`    (instálalo con: ${entry.npmPackage ? `agentrelay executors add ${entry.name}` : entry.connect})`); continue; }
     const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
     const { models, error } = await modelsOf(entry.name, executor);
+    const checks = entry.name === 'opencode' ? loadChecks() : null;
     if (error) out(`    (no se pudo leer la lista: ${error})`);
     else if (!models.length) out(`    modelo por defecto: ${EXECUTOR_DEFAULTS[entry.name].model || '—'} (este ejecutor no ofrece lista)`);
     for (const model of models) {
       const efforts = model.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
-      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}`);
+      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}${checks ? modelMark(model.id, checks) : ''}`);
     }
   }
   out('Cambia con: agentrelay use <ejecutor> <modelo> [esfuerzo]   (* = esfuerzo por defecto)');
