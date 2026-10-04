@@ -115,8 +115,7 @@ async function interactive(current, ask, helpers) {
   }
   const choice = { type: entry.name };
   const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
-  let models = [];
-  try { models = await getExecutor(entry.name).listModels?.(executor) || []; } catch { models = []; }
+  const { models } = await modelsOf(entry.name, executor);
   let model = null;
   if (models.length) {
     const items = [...models.map((item) => `${item.id}${item.id === executor.model ? '  ← en uso' : ''}`), 'Otro (escribirlo)'];
@@ -134,6 +133,36 @@ async function interactive(current, ask, helpers) {
   return choice;
 }
 
+/** Lista de modelos de un ejecutor con tiempo máximo; devuelve { models, error }. */
+async function modelsOf(type, executor, timeoutMs = 20_000) {
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`tiempo máximo de ${timeoutMs / 1000} s superado`)), timeoutMs); });
+  try {
+    const adapter = getExecutor(type);
+    return { models: adapter.listModels ? await Promise.race([adapter.listModels(executor), timeout]) || [] : [] };
+  } catch (error) { return { models: [], error: error.message }; }
+  finally { clearTimeout(timer); }
+}
+
+/** agentrelay use --list: todos los ejecutores y sus modelos en un solo sitio. */
+async function listAll(current, out) {
+  const dir = executorsDir();
+  for (const entry of CATALOG) {
+    const installed = entry.bundled || await isInstalled(entry.name, { dir });
+    out(`${entry.title} (${entry.name}) · ${installed ? 'instalado' : 'no instalado'} · ${entry.cost}${entry.name === current.type ? ' · en uso' : ''}`);
+    if (!installed) { out(`    (instálalo con: ${entry.npmPackage ? `agentrelay executors add ${entry.name}` : entry.connect})`); continue; }
+    const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
+    const { models, error } = await modelsOf(entry.name, executor);
+    if (error) out(`    (no se pudo leer la lista: ${error})`);
+    else if (!models.length) out(`    modelo por defecto: ${EXECUTOR_DEFAULTS[entry.name].model || '—'} (este ejecutor no ofrece lista)`);
+    for (const model of models) {
+      const efforts = model.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
+      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}`);
+    }
+  }
+  out('Cambia con: agentrelay use <ejecutor> <modelo> [esfuerzo]   (* = esfuerzo por defecto)');
+}
+
 export async function cmdUse(positionals, values, helpers, runtime = {}) {
   const cwd = path.resolve(values.cwd || process.cwd());
   const root = values.local || values.project ? await helpers.resolveRoot(values) : cwd;
@@ -143,6 +172,8 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
   const current = loaded.config.executor;
   const profiles = loaded.config.profiles || {};
   const out = (text) => process.stdout.write(`${text}\n`);
+
+  if (values.list) { await listAll(current, out); return 0; }
 
   // Guardar el ajuste actual como perfil.
   if (values.save !== undefined) {

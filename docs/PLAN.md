@@ -32,11 +32,11 @@ Redactado el 2026-10-03 sobre el commit `2a9c81b`. Si el código ha cambiado muc
 
 | # | Punto | ¿Necesita al usuario? | Tamaño |
 |---|---|---|---|
-| 1 | Simplificar: quitar triaje, precios, consumo, niveles y comandos duplicados | 🛑 Sí: **permiso para borrar archivos** | Grande (6 tareas) |
+| 1 | Simplificar: quitar triaje, precios, consumo, niveles y comandos duplicados | Permiso concedido; falta 1f | Grande (6 tareas) |
 | 2 | Probar `agentrelay start` en Taller | 🛑 Sí: lo prueba él en su equipo | Pequeño |
 | 3 | Pulir la sangría de las opciones que activa `set`/`use` | No | Pequeño |
 | 4 | Aviso al ejecutar `start`/`init` dentro de la carpeta de AgentRelay | 🛑 Sí: elegir la opción | Pequeño |
-| 5 | Inventario de modelos (`agentrelay use --list`) | No | Mediano |
+| 5 | Inventario de modelos (`agentrelay use --list`) | Hecho (2026-10-04) | Mediano |
 | 6 | `doctor --fix` | 🛑 Sí: confirmar qué arregla | Mediano |
 | 7 | Cambio de ejecutor cuando se agota la cuota | Decidido (2026-10-04); falta el texto real del error | Mediano |
 
@@ -56,6 +56,8 @@ Nuevos puntos decididos el 2026-10-04 (esfuerzo por tarea, hook de delegación, 
 🛑 **PARA antes de empezar.** Borrar archivos necesita el permiso explícito del usuario (`AGENTS.md`, sección 24, «Prohibido sin permiso explícito»). Enséñale la lista de cada tarea («se borrarán: …») y espera su «sí». Sin permiso, no hagas este punto y pasa al 2.
 
 Haz las tareas 1a → 1f **en este orden**: cada una deja `npm test` en verde.
+
+**Estado (2026-10-04):** hechas 1a, 1b, 1c, 1d y 1e (el punto 5 se adelantó: `use --list` ya existe). Falta 1f (acortar `AGENTS.md`, que lo haces tú) y repasar el README y el manual al terminar. Los detalles de abajo se conservan como referencia de lo que se hizo.
 
 ### 1a. Quitar el triaje adaptativo
 

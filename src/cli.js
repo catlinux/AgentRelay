@@ -5,11 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
-import { applyModelsBlock, renderModelsBlock } from './config-models.js';
 import { getExecutor } from './executors/index.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue } from './settings.js';
@@ -41,6 +40,7 @@ Uso:
   agentrelay use                    Cambia de IA (ejecutor, modelo y esfuerzo) de forma interactiva
   agentrelay use <ejecutor> [modelo] [esfuerzo]   Cambia directamente (ej.: use opencode, use codex alto)
   agentrelay use <perfil>           Aplica un perfil guardado; guarda el actual con: use --save <nombre>
+  agentrelay use --list             Lista todos los ejecutores y sus modelos
   agentrelay run <tarea.json | ->   Delega una tarea (JSON en archivo o por stdin)
   agentrelay show [id]              Muestra el informe de una ejecución (por defecto, la última)
   agentrelay review <id> --decision <accept|fix|escalate|reject> [--feedback <texto>]
@@ -58,18 +58,11 @@ Uso:
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
-  agentrelay config refresh [--only <ejecutor>] [--dry-run] Actualiza la lista de modelos
-  agentrelay set <clave> <valor> [--local] Cambia un ajuste (ejemplo: set effort alto)
+  agentrelay executors add <nombre> Instala un ejecutor opcional (Cline)
+
+Avanzado:
+  agentrelay set <clave> <valor> [--local] Cambia un ajuste suelto (ejemplo: set timeout 1800)
   agentrelay unset <clave> [--local]       Restablece un ajuste
-  agentrelay models                Lista los modelos del ejecutor actual
-
-Ajustes rápidos:
-  agentrelay set model gpt-5.5
-  agentrelay unset effort
-  agentrelay models
-
-  agentrelay executors              Lista los ejecutores disponibles e instalados
-  agentrelay executors add <nombre> Instala un ejecutor opcional
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -126,7 +119,6 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
-  only: { type: 'string' },
   yes: { type: 'boolean' },
   check: { type: 'boolean' },
   uninstall: { type: 'boolean' },
@@ -140,6 +132,7 @@ const OPTIONS = {
   login: { type: 'boolean' },
   executors: { type: 'string' },
   save: { type: 'string' },
+  list: { type: 'boolean' },
   write: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
@@ -414,39 +407,6 @@ function configLeaves(value, prefix = '', result = {}) {
   return result;
 }
 
-async function cmdConfigRefresh(values, cwd, userFile) {
-  const loaded = loadConfig({ cwd, configPath: values.config });
-  const only = values.only;
-  if (only && !Object.hasOwn(EXECUTOR_DEFAULTS, only)) throw new Error(`Ejecutor no soportado: ${only}`);
-  const types = only ? [only] : Object.keys(EXECUTOR_DEFAULTS);
-  const entries = await Promise.allSettled(types.map(async (type) => {
-    const executor = { ...EXECUTOR_DEFAULTS[type], ...(type === loaded.config.executor.type ? loaded.config.executor : {}) };
-    const adapter = getExecutor(type);
-    if (!adapter.listModels) return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: [] };
-    let timer;
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('tiempo máximo de 20 s superado')), 20_000); });
-    let models;
-    try { models = await Promise.race([adapter.listModels(executor), timeout]); }
-    finally { clearTimeout(timer); }
-    return { executor: type, title: CATALOG.find((item) => item.name === type)?.title || type, current: type === loaded.config.executor.type, models: models || [] };
-  }));
-  const records = entries.map((result, index) => result.status === 'fulfilled'
-    ? result.value
-    : { executor: types[index], title: CATALOG.find((item) => item.name === types[index])?.title || types[index], current: types[index] === loaded.config.executor.type, models: [], error: result.reason?.message || String(result.reason) });
-  let text = existsSync(userFile) ? readFileSync(userFile, 'utf8') : configTemplate({ scope: 'user' });
-  const block = renderModelsBlock(records);
-  text = applyModelsBlock(text, block);
-  parseJsonc(text, userFile);
-  if (values['dry-run']) process.stdout.write(`${block}\n`);
-  else {
-    mkdirSync(path.dirname(userFile), { recursive: true });
-    writeFileSync(userFile, text, 'utf8');
-  }
-  for (const entry of records) process.stdout.write(`${entry.executor}: ${entry.error ? `no se pudo leer: ${entry.error}` : `${entry.models.length} modelos`}\n`);
-  process.stdout.write(`Archivo: ${userFile}\n`);
-  return 0;
-}
-
 async function cmdConfig(positionals, values, migrationResult) {
   const action = positionals[0] || 'show';
   const requestedCwd = path.resolve(values.cwd || process.cwd());
@@ -455,7 +415,6 @@ async function cmdConfig(positionals, values, migrationResult) {
   const cwd = root || requestedCwd;
   const userFile = path.join(configHome(), 'config.json');
   const projectFile = path.join(cwd, CONFIG_FILE);
-  if (action === 'refresh' && positionals.length === 1) return cmdConfigRefresh(values, cwd, userFile);
   if (action === 'migrate' && positionals.length === 1) {
     let result = migrationResult;
     if (!result) {
@@ -490,10 +449,6 @@ async function cmdConfig(positionals, values, migrationResult) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, configTemplate({ scope: values.project || values.local ? 'project' : 'user' }), 'utf8');
     process.stdout.write(`Creado ${target}\n`);
-    if (!values.project && !values.local) {
-      try { await cmdConfigRefresh(values, cwd, target); }
-      catch (error) { process.stderr.write(`[aviso] No se pudo añadir el bloque de modelos: ${error.message}\n`); }
-    }
     if (!values.quiet) process.stdout.write('Descomenta las opciones para cambiar sus valores.\n');
     return 0;
   }
@@ -618,44 +573,11 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
-async function cmdModels(values) {
-  const loaded = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
-  const executor = loaded.config.executor;
-  const adapter = getExecutor(executor.type);
-  const models = await adapter.listModels?.(executor) || [];
-  if (!models.length) {
-    process.stdout.write('Este ejecutor no ofrece lista de modelos. Indica uno con: agentrelay set model <id>\n');
-    return 0;
-  }
-  for (const model of models) {
-    const efforts = model.efforts ? model.efforts.map((effort) => `${EFFORT_ES[effort] || effort}${effort === model.defaultEffort ? '*' : ''}`).join(' ') : '—';
-    process.stdout.write(`${model.id === executor.model ? '●' : ' '} ${model.id}  ${efforts}\n`);
-  }
-  process.stdout.write(`Esfuerzo actual: ${executor.thinking ? (EFFORT_ES[executor.thinking] || executor.thinking) : 'por defecto'}\n`);
-  process.stdout.write('Cambia el modelo con: agentrelay set model <id>\nCambia el esfuerzo con: agentrelay set effort <bajo|medio|alto|extremo|máximo>\n');
-  return 0;
-}
-
 async function cmdExecutors(positionals, values) {
   const action = positionals[0];
   const dir = executorsDir();
   if (!action) {
-    let configured = null;
-    try {
-      const cwd = path.resolve(values.cwd || process.cwd());
-      const root = await repoRoot(cwd);
-      configured = loadConfig({ cwd: root || cwd, configPath: values.config }).config.executor.type;
-    } catch {
-      // Listing remains useful when the project config cannot be loaded.
-    }
-    for (const entry of CATALOG) {
-      const installed = await isInstalled(entry.name, { dir });
-      const state = entry.bundled ? 'incluido' : installed ? 'instalado' : 'no instalado';
-      const mark = entry.bundled || installed ? '✔' : '·';
-      process.stdout.write(`${mark} ${entry.title} (${entry.name}) — ${state}${configured === entry.name ? ' · en uso' : ''}\n`);
-      process.stdout.write(`  ${entry.description}\n`);
-    }
-    process.stdout.write('Añade uno con: agentrelay executors add <nombre>\n');
+    process.stdout.write('Para ver y cambiar de ejecutor usa: agentrelay use (o agentrelay use --list). Para instalar uno: agentrelay executors add <nombre>\n');
     return 0;
   }
   if (action !== 'add' || positionals.length !== 2) {
@@ -760,8 +682,9 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:ejecutor, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado y /ar:usar, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
+      if (result.retired.length && !values.quiet) process.stdout.write(`Comandos retirados (ahora es /ar:usar): ${result.retired.join(', ')}\n`);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
       const counts = [];
@@ -793,7 +716,7 @@ async function cmdSetup(values) {
       const answer = await confirm(`¿Instalar también ${entry.title}? ${entry.description}`, { yes: false });
       if (answer === null) {
         if (!noTtyNotice) {
-          if (!values.quiet) process.stdout.write('Ejecutores opcionales: agentrelay executors add <nombre> (ver agentrelay executors)\n');
+          if (!values.quiet) process.stdout.write('Ejecutores opcionales: agentrelay use (o agentrelay executors add <nombre>)\n');
           noTtyNotice = true;
         }
       } else if (answer && await installOptionalExecutor(entry.name, dir) !== 0) {
@@ -1159,7 +1082,6 @@ export async function main(argv, runtime = {}) {
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
-      case 'models': return await cmdModels(values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
