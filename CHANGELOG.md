@@ -29,6 +29,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- Triaje del orquestador en AgentRelay (no depende de las instrucciones personales de cada usuario): el bloque global que instala `setup` ahora también pide decir con qué esfuerzo se lanza al ejecutor (campo `effort` de la tarea), y el bloque de cada proyecto (`init`) incluye un apartado «Triaje antes de trabajar» con el modelo y esfuerzo del orquestador, para quien no haya ejecutado `setup`. Tras actualizar: `agentrelay setup` (global) y `agentrelay init` (proyecto).
+
 - README (es/en) reescrito y reducido de 494 a 119 líneas: qué es, ejecutores, instalación, empezar en 3 pasos y seguridad; la referencia de comandos pasa al manual. Estaba desfasado (decía 0.0.3 y no mencionaba OpenCode).
 - INSTALL (es/en): «Cómo empezar» usa `agentrelay start`, se menciona `agentrelay update` para actualizar y los enlaces a secciones retiradas del README apuntan al manual.
 
