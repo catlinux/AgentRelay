@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { CONFIG_FILE, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
@@ -35,6 +35,7 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
+import { runChecks, startDailyCheck } from './model-check.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -60,7 +61,8 @@ Uso:
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
-  agentrelay executors add <nombre> Instala un ejecutor opcional (Cline)
+  agentrelay executors [add <nombre> | check [--force]]
+                                    Instala un ejecutor o revisa modelos gratuitos nuevos
 
 Avanzado:
   agentrelay set <clave> <valor> [--local] Cambia un ajuste suelto (ejemplo: set timeout 1800)
@@ -124,6 +126,7 @@ const OPTIONS = {
   feedback: { type: 'string' },
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
+  background: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   fix: { type: 'boolean' },
   yes: { type: 'boolean' },
@@ -207,6 +210,9 @@ async function cmdRun(positionals, values) {
   }
   const root = await resolveRoot(values);
   const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config });
+  const checkExecutor = config.executor.type === 'opencode'
+    ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+  void startDailyCheck({ executor: checkExecutor, isInstalled, authStatus: (executor) => getExecutor('opencode').authStatus(executor) }).catch(() => {});
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
@@ -648,8 +654,31 @@ async function cmdExecutors(positionals, values) {
     process.stdout.write('Para ver y cambiar de ejecutor usa: agentrelay use (o agentrelay use --list). Para instalar uno: agentrelay executors add <nombre>\n');
     return 0;
   }
+  if (action === 'check' && positionals.length === 1) {
+    const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
+    const executor = config.executor.type === 'opencode'
+      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+    const adapter = getExecutor('opencode');
+    if (!await isInstalled('opencode', { dir })) {
+      if (!values.background) process.stderr.write('OpenCode no está instalado. Instálalo con: agentrelay executors add opencode\n');
+      return values.background ? 0 : 1;
+    }
+    const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
+    if (!auth.ok) {
+      if (!values.background) process.stderr.write(`OpenCode no tiene una sesión. Conéctalo con: opencode auth login${auth.message ? ` (${auth.message})` : ''}\n`);
+      return values.background ? 0 : 1;
+    }
+    const result = await runChecks({ executor, adapter, force: values.force });
+    if (!values.background) {
+      if (!result.checked.length) process.stdout.write('Nada nuevo que probar.\n');
+      for (const item of result.checked) process.stdout.write(item.status === 'approved'
+        ? `✔ ${item.id} aprobado (${item.seconds ?? 0} s)\n`
+        : `✘ ${item.id} fallido: ${item.reason}\n`);
+    }
+    return 0;
+  }
   if (action !== 'add' || positionals.length !== 2) {
-    process.stderr.write('Uso: agentrelay executors [add <nombre>]\n');
+    process.stderr.write('Uso: agentrelay executors [add <nombre> | check [--force]]\n');
     return 1;
   }
   const name = positionals[1];
@@ -1116,6 +1145,12 @@ async function cmdStart(values) {
   process.stdout.write('\nMensaje para tu orquestador (pégalo en su chat):\n');
   process.stdout.write('Lee AGENTS.md y .agentrelay/ESTADO.md, ejecuta git status --short y agentrelay list, y continúa con lo pendiente. Eres el orquestador: no escribas código tú, delégalo con agentrelay run (en Windows usa agentrelay.cmd), en tareas pequeñas, y revisa cada resultado. Si tienes dudas, pregúntame antes de empezar.\n');
   process.stdout.write('\nSigue lo que hace el ejecutor con: agentrelay watch (en otra terminal, en esta carpeta).\n');
+  try {
+    const { config } = loadConfig({ cwd: root, configPath: values.config });
+    const executor = config.executor.type === 'opencode'
+      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+    void startDailyCheck({ executor, isInstalled, authStatus: (value) => getExecutor('opencode').authStatus(value) }).catch(() => {});
+  } catch { /* La revisión diaria nunca altera start. */ }
   return doctorStatus === 0 && treeClean ? 0 : 1;
 }
 

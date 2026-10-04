@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   MAX_PER_DAY, MAX_SECONDS, buildProbe, checkModel, checksFile, evaluateProbe,
-  isDue, isFreeModel, loadChecks, pendingModels, runChecks, saveChecks,
+  isDue, isFreeModel, loadChecks, pendingModels, runChecks, saveChecks, startDailyCheck,
 } from '../src/model-check.js';
 
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-model-check-test-'));
@@ -31,6 +31,43 @@ test('isFreeModel, isDue y pendingModels filtran y limitan modelos', () => {
   assert.equal(isDue({ lastRun: '2026-10-04' }, today), false);
   assert.deepEqual(pendingModels(['paid', 'a-free', 'b-free', 'a-free', 'c-free'], { models: { 'b-free': {} } }, 2), ['a-free', 'a-free']);
   assert.equal(MAX_PER_DAY, 5);
+});
+
+test('pendingModels reintenta fallos de más de siete días, pero conserva aprobados y fallos recientes', () => {
+  const now = new Date('2026-10-04T12:00:00Z');
+  const checks = { models: {
+    'viejo-free': { status: 'failed', checkedAt: '2026-09-26T11:59:59Z' },
+    'reciente-free': { status: 'failed', checkedAt: '2026-09-27T12:00:01Z' },
+    'aprobado-free': { status: 'approved', checkedAt: '2026-09-01T00:00:00Z' },
+  } };
+  assert.deepEqual(pendingModels(['viejo-free', 'reciente-free', 'aprobado-free'], checks, MAX_PER_DAY, now), ['viejo-free']);
+});
+
+test('startDailyCheck respeta las condiciones de omisión y desacopla el lanzamiento', async () => {
+  const home = temp();
+  const now = new Date('2026-10-04T12:00:00Z');
+  const installed = async () => true;
+  const authStatus = async () => ({ ok: true });
+  const calls = [];
+  const spawnFn = (...args) => { calls.push(args); return { unref() { calls.push('unref'); } }; };
+  const options = { executor: {}, home, now, spawnFn, isInstalled: installed, authStatus, env: {} };
+  try {
+    assert.equal(await startDailyCheck({ ...options, env: { AGENTRELAY_NO_MODEL_CHECK: '1' } }), false);
+    assert.equal(await startDailyCheck({ ...options, env: { NODE_TEST_CONTEXT: 'child-v8' } }), false);
+    saveChecks({ lastRun: '2026-10-04', models: {} }, home);
+    assert.equal(await startDailyCheck(options), false);
+    saveChecks({ lastRun: null, models: {} }, home);
+    assert.equal(await startDailyCheck({ ...options, isInstalled: async () => false }), false);
+    assert.equal(await startDailyCheck({ ...options, authStatus: async () => ({ ok: false }) }), false);
+    const warnings = [];
+    assert.equal(await startDailyCheck({ ...options, log: (line) => warnings.push(line) }), true);
+    assert.deepEqual(calls[0][0], process.execPath);
+    assert.deepEqual(calls[0][1].slice(-3), ['executors', 'check', '--background']);
+    assert.deepEqual(calls[0][2], { detached: true, stdio: 'ignore', windowsHide: true });
+    assert.equal(calls[1], 'unref');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /Revisando en segundo plano/);
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
 test('buildProbe mantiene el chequeo en el padre y crea un work aislado', () => {
