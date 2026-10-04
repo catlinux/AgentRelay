@@ -76,22 +76,23 @@ export function renderReport(data) {
   const lines = [`# Ejecutores disponibles — ${data.date}`, `Generado: ${data.now.toLocaleString('es-ES')}`, '', '## Saldos',
     `DeepSeek: ${data.balances.deepseek?.text || 'saldo no consultado: define la variable DEEPSEEK_API_KEY'}`,
     'OpenAI: no consultable por API; míralo en https://platform.openai.com/settings/organization/billing/overview', '',
-    '## Ejecutor en uso', `${data.current.type} · ${data.current.model || 'modelo por defecto'} · esfuerzo ${data.current.thinking || 'por defecto'}`, ''];
+    '## En uso', `${data.current.type} · ${data.current.model || 'modelo por defecto'} · esfuerzo ${data.current.thinking || 'por defecto'}`, '', '## Estado'];
   for (const entry of data.entries) {
-    lines.push(`## ${entry.title} (${entry.name})`, `Instalado: ${entry.installed ? 'sí' : 'no'}`, `Coste: ${entry.cost}`);
-    if (entry.auth) lines.push(`Sesión: ${entry.auth.ok ? 'conectada' : (entry.auth.message || 'no conectada')}`);
-    if (entry.error) lines.push(`Modelos: no se pudo leer la lista: ${entry.error}`);
-    else if (!entry.installed) lines.push('Modelos: ejecutor no instalado');
-    else if (!entry.models.length) lines.push('Modelos: modelo por defecto (sin lista disponible)');
-    else for (const model of entry.models) {
-      const efforts = model.efforts?.length ? ` — esfuerzos: ${model.efforts.join(', ')}${model.defaultEffort ? ` (predeterminado: ${model.defaultEffort})` : ''}` : '';
-      lines.push(`- ${model.id}${efforts}${entry.name === 'opencode' ? mark(model, data.checks, data.date) : ''}`);
-    }
-    lines.push('');
-    if (entry.name === 'opencode') {
-      const today = Object.entries(data.checks?.models || {}).filter(([, record]) => record?.checkedAt && dateOf(new Date(record.checkedAt)) === data.date);
-      lines.push('### Probados hoy', ...(today.length ? today.map(([id, record]) => `- ${id}: ${record.status === 'approved' ? '✔ probado' : `✘ no pasó la prueba: ${record.reason || 'motivo no indicado'}`} (${record.seconds ?? 0} s)`) : ['- Ninguno']), '');
-    }
+    let status;
+    if (!entry.installed) status = 'no instalado';
+    else if (entry.error) status = `instalado, no se pudo leer la lista: ${entry.error}`;
+    else if (entry.auth) status = entry.auth.ok ? 'instalado, sesión conectada' : 'instalado, sin sesión';
+    else status = 'instalado';
+    lines.push(`- ${entry.title}: ${status} · ${entry.cost}`);
+  }
+  const opencode = data.entries.find((entry) => entry.name === 'opencode' && entry.installed);
+  if (opencode) {
+    lines.push('', '## OpenCode: modelos gratuitos');
+    const models = (opencode.models || []).filter((model) => model.id?.endsWith('-free'));
+    const others = (opencode.models || []).filter((model) => !model.id?.endsWith('-free')).length;
+    if (models.length) for (const model of models) lines.push(`- ${model.id}${mark(model, data.checks, data.date)}`);
+    else lines.push('Sin modelos gratuitos disponibles');
+    if (others) lines.push(`Otros modelos de OpenCode (de pago o sin marca): ${others}`);
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
