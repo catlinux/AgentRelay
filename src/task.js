@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { COMPLEXITIES, SELF_REVIEW_MODES } from './policy.js';
 
 const LIST_FIELDS = ['constraints', 'files', 'acceptanceCriteria', 'validation', 'doNotModify'];
+const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 function toList(value) {
   if (value === undefined || value === null || value === '') return [];
@@ -21,6 +22,8 @@ export function normalizeTask(raw) {
     type: String(raw.type ?? 'feature').trim(),
     complexity: String(raw.complexity ?? 'normal').trim(),
     selfReview: raw.selfReview ? String(raw.selfReview).trim() : null,
+    effort: raw.effort == null ? null : String(raw.effort).trim(),
+    model: raw.model == null ? null : typeof raw.model === 'string' ? raw.model.trim() : '',
   };
   for (const field of LIST_FIELDS) task[field] = toList(raw[field]);
 
@@ -32,6 +35,10 @@ export function normalizeTask(raw) {
   if (task.selfReview && !SELF_REVIEW_MODES.includes(task.selfReview)) {
     throw new Error(`"selfReview" debe ser ${SELF_REVIEW_MODES.join(' | ')}`);
   }
+  if (task.effort !== null && !EFFORTS.includes(task.effort)) {
+    throw new Error('"effort" debe ser none | low | medium | high | xhigh | max');
+  }
+  if (task.model !== null && !task.model) throw new Error('"model" debe ser un texto no vacío');
   return task;
 }
 

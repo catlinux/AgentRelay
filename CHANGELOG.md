@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- La tarea JSON admite los campos opcionales `effort` y `model`, que sustituyen al esfuerzo y al modelo de la configuración solo en esa ejecución (el orquestador los elige según la dificultad).
+
 - `agentrelay doctor --fix`: arregla lo que es seguro y reversible (instrucciones globales y comandos `/ar:` desactualizados, instrucciones del proyecto si el árbol está limpio, ejecuciones interrumpidas y entradas que faltan en `.gitignore`), preguntando antes de cada arreglo. Sin `--fix`, `doctor` avisa de cuántos arreglos hay. No arregla una sesión caducada: sigue indicando `agentrelay login`.
 
 - `agentrelay init` y `agentrelay start` avisan y piden confirmación si se ejecutan dentro de la propia carpeta de AgentRelay (por ejemplo, la copia instalada, donde un commit impediría `agentrelay update`). Con `--yes` no preguntan.

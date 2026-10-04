@@ -255,6 +255,8 @@ agentrelay run tarea.json
 | `validation` | Comandos que comprueban el resultado (`npm test`, `npm run lint`…). |
 | `doNotModify` | Archivos prohibidos; si acaba en `/`, una carpeta entera. |
 | `complexity` | `trivial`, `normal` (por defecto) o `complex`. |
+| `effort` | Opcional. Esfuerzo de razonamiento solo para esta tarea (`low`, `medium`, `high`, `xhigh`, `max`, `none`); sustituye al de la configuración. |
+| `model` | Opcional. Modelo solo para esta tarea; sustituye al de la configuración. |
 
 Prueba completa con el proyecto de ejemplo: [examples/demo](../examples/demo) y [examples/demo-task.json](../examples/demo-task.json).
 

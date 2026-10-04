@@ -74,12 +74,17 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
 
   const base = `attempt-${n}-${kind}`;
   writeRunFile(root, state.id, `${base}.prompt.md`, prompt);
-  const { provider, model } = config.executor;
+  const executor = {
+    ...config.executor,
+    thinking: task.effort ?? config.executor.thinking,
+    model: task.model ?? config.executor.model,
+  };
+  const { provider, model } = executor;
   ctx.emit({ type: 'attempt_start', attempt: n, kind, provider, model });
 
   const startedAt = new Date().toISOString();
   const result = await ctx.executor.run({
-    executor: config.executor, cwd: root, promptFile: relativeRunFile(state.id, `${base}.prompt.md`),
+    executor, cwd: root, promptFile: relativeRunFile(state.id, `${base}.prompt.md`),
     onActivity: (activity) => ctx.emit({ type: 'activity', attempt: n, ...activity }),
   });
   writeRunFile(root, state.id, `${base}.ndjson`, result.rawOutput);
@@ -95,7 +100,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     exitCode: result.exitCode,
     timedOut: result.timedOut,
     error: result.error ? maskSecrets(result.error) : result.error,
-    model: result.model,
+    model: result.model ?? (model ? { id: model, provider } : result.model),
     iterations: result.iterations,
     toolCalls: result.toolCalls,
     usage: result.usage,

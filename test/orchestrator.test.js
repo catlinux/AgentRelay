@@ -56,6 +56,33 @@ test('implementa, valida y queda pendiente de revisión', async () => {
   }
 });
 
+test('normaliza effort y model opcionales de la tarea', () => {
+  const defaults = normalizeTask(baseTask());
+  assert.equal(defaults.effort, null);
+  assert.equal(defaults.model, null);
+  const task = normalizeTask(baseTask({ effort: 'high', model: 'modelo-tarea' }));
+  assert.equal(task.effort, 'high');
+  assert.equal(task.model, 'modelo-tarea');
+  assert.throws(() => normalizeTask(baseTask({ effort: 'ultra' })), /"effort" debe ser none \| low \| medium \| high \| xhigh \| max/);
+});
+
+test('usa effort y model de la tarea solo para esa ejecución', async () => {
+  const repo = makeRepo();
+  try {
+    const config = testConfig({ executor: { thinking: 'low', model: 'modelo-config' } });
+    const state = await run(repo, {
+      task: { effort: 'high', model: 'modelo-tarea' }, config, plan: { implement: GOOD },
+    });
+    const [call] = repo.calls();
+    assert.ok(call.args.includes('modelo-tarea'));
+    assert.ok(call.args.includes('high'));
+    assert.equal(config.executor.model, 'modelo-config');
+    assert.equal(config.executor.thinking, 'low');
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('corrige automáticamente cuando fallan las validaciones', async () => {
   const repo = makeRepo();
   try {
