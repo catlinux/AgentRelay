@@ -18,6 +18,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - README (es/en) reescrito y reducido de 494 a 119 líneas: qué es, ejecutores, instalación, empezar en 3 pasos y seguridad; la referencia de comandos pasa al manual. Estaba desfasado (decía 0.0.3 y no mencionaba OpenCode).
 - INSTALL (es/en): «Cómo empezar» usa `agentrelay start`, se menciona `agentrelay update` para actualizar y los enlaces a secciones retiradas del README apuntan al manual.
 
+### Eliminado
+
+- Triaje adaptativo: `agentrelay triage record|advise|stats`, su historial `triage.jsonl` y `/ar:triaje`. Se mantiene la recomendación de modelo y esfuerzo para el orquestador en las instrucciones globales; solo se quita la parte que aprendía de los resultados.
+
 ### Corregido
 
 - `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.

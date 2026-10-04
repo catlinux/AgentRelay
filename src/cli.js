@@ -27,7 +27,6 @@ import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { cmdUse } from './use.js';
-import { advise, appendRecord, comparison, displayLabel, executorKey, normalizeLabel, readRecords, triageFile, validateLabel } from './triage.js';
 import { canOpenBrowser } from './platform.js';
 import { aggregateUsage, renderUsage } from './usage.js';
 import { createOutput } from './output.js';
@@ -37,8 +36,6 @@ import { renderReport } from './report.js';
 import { pendingChanges } from './git.js';
 import { PRICES_SOURCE, loadPrices, localWindows, nextChange, tariffAt } from './pricing.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
-
-const TRIAGE_OUTCOMES = ['over', 'ok', 'under'];
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -77,9 +74,6 @@ Ajustes rápidos:
 
   agentrelay executors              Lista los ejecutores disponibles e instalados
   agentrelay executors add <nombre> Instala un ejecutor opcional
-  agentrelay triage record      Guarda el resultado de una elección
-  agentrelay triage advise      Recomienda modelo y esfuerzo
-  agentrelay triage stats       Resume el historial de triaje
 
 Opciones comunes:
   --cwd <dir>             Repositorio de trabajo (por defecto, el directorio actual)
@@ -115,9 +109,6 @@ Opciones de login:
 Opciones de usage:
   --since <fecha>         Incluye ejecuciones desde esta fecha
   --executor <tipo>       Filtra por ejecutor
-
-Opciones de triage:
-  --type --size --kind --executor --model --effort --level --outcome --run --note --signals --include-legacy
 
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
@@ -160,10 +151,8 @@ const OPTIONS = {
   login: { type: 'boolean' },
   executors: { type: 'string' },
   save: { type: 'string' },
-  type: { type: 'string' }, size: { type: 'string' }, kind: { type: 'string' }, model: { type: 'string' }, executor: { type: 'string' },
-  'include-legacy': { type: 'boolean' },
+  model: { type: 'string' }, executor: { type: 'string' },
   write: { type: 'boolean' },
-  effort: { type: 'string' }, outcome: { type: 'string' }, run: { type: 'string' }, note: { type: 'string' }, signals: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
 };
@@ -765,146 +754,6 @@ async function cmdExecutors(positionals, values) {
   return installOptionalExecutor(name, dir);
 }
 
-function requiredTriage(values, field) {
-  if (values[field] === undefined) throw new Error(`Indica --${field}.`);
-  return validateLabel(field, values[field]);
-}
-
-async function cmdTriage(positionals, values) {
-  const action = positionals[0];
-  const file = triageFile();
-  const records = readRecords(file);
-  const kind = values.kind === undefined ? 'orchestrator' : validateLabel('kind', values.kind);
-  if (action === 'record') {
-    const record = { kind, type: null, size: null, effort: null, outcome: null, signals: [] };
-    let config;
-    const currentConfig = () => config ||= loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config }).config;
-    let runState;
-    if (values.run && kind === 'executor') {
-      const root = await resolveRoot(values);
-      runState = loadState(root, values.run);
-      record.executor = runState.config?.executor?.type;
-      record.model = runState.attempts?.[0]?.model?.id;
-      const task = runState.task || {};
-      record.type = ({ feature: 'implementation', refactor: 'implementation', fix: 'debugging', docs: 'docs', test: 'implementation' })[task.type] || 'implementation';
-      record.size = ({ trivial: 'small', normal: 'normal', complex: 'large' })[task.complexity] || 'normal';
-      record.effort = normalizeLabel('effort', runState.config?.executor?.thinking || 'medium');
-      if (!['low', 'medium', 'high', 'xhigh'].includes(record.effort)) record.effort = 'medium';
-      record.level = Number(runState.policy?.level) || 3;
-      const attempts = runState.attempts || [];
-      record.signals.push(`intentos:${attempts.length}`, `reintentos:${runState.retriesUsed || 0}`);
-      const escalated = runState.status === 'escalated';
-      if (escalated) record.signals.push('escalado');
-      if (attempts.some((a) => a.kind === 'fix' || a.check?.passed === false || a.validationPassed === false)
-        || runState.lastCheck?.validations?.some((v) => !v.passed)) record.signals.push('validación-fallida');
-      record.outcome = runState.status === 'accepted' && attempts.length === 1 && !runState.retriesUsed && !escalated ? 'ok' : 'under';
-    }
-    if (kind === 'executor') {
-      record.executor = values.executor ?? record.executor ?? currentConfig().executor.type;
-      record.model = values.model ?? record.model ?? currentConfig().executor.model ?? 'default';
-      record.executor = String(record.executor).trim();
-      record.model = String(record.model).trim();
-      if (!record.executor || !record.model) throw new Error('El registro del ejecutor requiere --executor y --model o una configuraciÃ³n actual.');
-    }
-    if (values.type !== undefined) record.type = validateLabel('type', values.type);
-    if (values.size !== undefined) record.size = validateLabel('size', values.size);
-    if (values.effort !== undefined) record.effort = validateLabel('effort', values.effort);
-    if (values.outcome !== undefined) record.outcome = validateLabel('outcome', values.outcome);
-    if (values.signals !== undefined) record.signals = values.signals.split(',').map((x) => x.trim().slice(0, 60)).filter(Boolean);
-    record.type ||= requiredTriage(values, 'type');
-    record.size ||= requiredTriage(values, 'size');
-    record.outcome ||= requiredTriage(values, 'outcome');
-    if (kind === 'orchestrator') {
-      record.model = requiredTriage(values, 'model');
-      record.effort = record.effort || requiredTriage(values, 'effort');
-    } else {
-      if (values.level !== undefined) {
-        if (!/^[1-5]$/.test(values.level)) throw new Error('--level debe ser un entero entre 1 y 5.');
-        record.level = Number(values.level);
-      }
-      record.level ||= Number(config?.level) || 3;
-      record.effort ||= requiredTriage(values, 'effort');
-    }
-    if (values.run) record.run = values.run;
-    if (values.note !== undefined) record.note = String(values.note).slice(0, 200);
-    const saved = appendRecord(record, file);
-    const choice = kind === 'orchestrator' ? `${saved.model} · esfuerzo ${displayLabel('effort', saved.effort)}` : `${saved.executor} · ${saved.model} · nivel ${saved.level}/esfuerzo ${displayLabel('effort', saved.effort)}`;
-    process.stdout.write(`Anotado: ${kind === 'orchestrator' ? 'orquestador' : 'ejecutor'} · ${displayLabel('type', saved.type)} · ${displayLabel('size', saved.size)} · ${choice} · ${displayLabel('outcome', saved.outcome)}\n`);
-    return 0;
-  }
-  if (action === 'advise') {
-    const type = requiredTriage(values, 'type'), size = requiredTriage(values, 'size');
-    let config;
-    const currentConfig = () => config ||= loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config }).config;
-    const executor = kind === 'executor' ? String(values.executor ?? currentConfig().executor.type).trim() : undefined;
-    const model = kind === 'executor' ? String(values.model ?? currentConfig().executor.model ?? 'default').trim() : undefined;
-    const result = advise(records, { kind, type, size, executor, model, includeLegacy: values['include-legacy'] });
-    const compare = kind === 'orchestrator' && values.model !== undefined && values.effort !== undefined
-      ? comparison(result, validateLabel('model', values.model), validateLabel('effort', values.effort)) : null;
-    const output = { ...result, ...(kind === 'executor' ? { executor, model } : {}), comparison: compare };
-    if (values.json) process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
-    else {
-      const effortEs = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo' };
-      if (kind === 'orchestrator') process.stdout.write(`Recomendación (orquestador): ${result.step.model} · esfuerzo ${effortEs[result.step.effort]}\n`);
-      else process.stdout.write(`Ejecutor: ${executor} · ${model}\nRecomendación (ejecutor): esfuerzo ${effortEs[result.step.effort]} · nivel ${result.step.level}\n`);
-      process.stdout.write(`Motivo: ${result.reason}\nMuestras: ${result.samples} · confianza ${result.confidence}\n`);
-      if (compare) {
-        const current = `${values.model} · ${effortEs[normalizeLabel('effort', values.effort)]}`;
-        const recommended = `${result.step.model} · ${effortEs[result.step.effort]}`;
-        process.stdout.write(compare === 'keep' ? `Modelo actual: ${current} · el modelo actual es adecuado\n` : `Modelo actual: ${current} → conviene ${compare === 'down' ? 'bajar' : 'subir'} a ${recommended}\n`);
-      }
-    }
-    return 0;
-  }
-  if (action === 'stats') {
-    const selected = values.kind === undefined ? records : records.filter((r) => r.kind === kind);
-    if (values.json) {
-      const groups = new Map();
-      for (const r of selected) {
-        const key = JSON.stringify([r.kind, r.kind === 'executor' ? (r.executor && r.model ? executorKey(r.executor, r.model) : '') : '', r.type, r.size]);
-        groups.set(key, [...(groups.get(key) || []), r]);
-      }
-      const rows = [...groups].map(([key, group]) => {
-        const [groupKind, pair, type, size] = JSON.parse(key);
-        const [groupExecutor, groupModel] = pair ? pair.split('|') : ['', ''];
-        const counts = Object.fromEntries(['over', 'ok', 'under'].map((o) => [o, group.filter((r) => r.outcome === o).length]));
-        const steps = new Map();
-        for (const r of group) { const step = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(step, (steps.get(step) || 0) + 1); }
-        const mostUsedStep = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-        const rec = advise(records, { kind: groupKind, type, size, executor: groupExecutor, model: groupModel }).step;
-        return { kind: groupKind, ...(groupKind === 'executor' ? (groupExecutor && groupModel ? { executor: groupExecutor, model: groupModel } : { executor: 'sin ejecutor (antiguo)' }) : {}), type, size, records: group.length, counts, mostUsedStep, recommendation: groupKind === 'orchestrator' ? `${rec.model}-${rec.effort}` : `${rec.effort}/n${rec.level}` };
-      });
-      process.stdout.write(`${JSON.stringify({ file, total: selected.length, groups: rows }, null, 2)}\n`);
-    }
-    else if (!selected.length) process.stdout.write(`Sin datos todavía\nArchivo: ${file}\nTotal: 0\n`);
-    else {
-      process.stdout.write(`Clase / ejecutor y modelo   Tipo             Tamaño     Registros  Sobró/Bien/Corto  Paso más usado  Recomendación\n`);
-      const groups = new Map();
-      for (const r of selected) {
-        const key = JSON.stringify([r.kind, r.kind === 'executor' ? (r.executor && r.model ? executorKey(r.executor, r.model) : '') : '', r.type, r.size]);
-        groups.set(key, [...(groups.get(key) || []), r]);
-      }
-      for (const [key, group] of groups) {
-        const [groupKind, pair, type, size] = JSON.parse(key);
-        const [groupExecutor, groupModel] = pair ? pair.split('|') : ['', ''];
-        const counts = TRIAGE_OUTCOMES.map((o) => group.filter((r) => r.outcome === o).length);
-        const steps = new Map(); for (const r of group) { const s = groupKind === 'orchestrator' ? `${r.model}-${r.effort}` : `${r.effort}/n${r.level}`; steps.set(s, (steps.get(s) || 0) + 1); }
-        const popular = [...steps].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-        const rec = advise(records, { kind: groupKind, type, size, executor: groupExecutor, model: groupModel }).step;
-        const recommendation = groupKind === 'orchestrator' ? `${rec.model}-${displayLabel('effort', rec.effort)}` : `${displayLabel('effort', rec.effort)}/n${rec.level}`;
-        const popularDisplay = groupKind === 'orchestrator'
-          ? popular.replace(/-(low|medium|high|xhigh)$/, (_, e) => `-${displayLabel('effort', e)}`)
-          : popular.replace(/^(low|medium|high|xhigh)/, (e) => displayLabel('effort', e));
-        const executorLabel = groupKind === 'executor' ? (groupExecutor && groupModel ? `${groupExecutor} · ${groupModel}` : 'sin ejecutor (antiguo)') : 'orquestador';
-        process.stdout.write(`${executorLabel.padEnd(28)} ${displayLabel('type', type).padEnd(15)} ${displayLabel('size', size).padEnd(10)} ${String(group.length).padEnd(10)} ${counts.join('/').padEnd(17)} ${popularDisplay.padEnd(15)} ${recommendation}\n`);
-      }
-      process.stdout.write(`Archivo: ${file}\nTotal: ${selected.length}\n`);
-    }
-    return 0;
-  }
-  throw new Error('Uso: agentrelay triage record|advise|stats');
-}
-
 async function installOptionalExecutor(name, dir = executorsDir()) {
   const entry = getCatalogEntry(name, dir);
   process.stdout.write(`Se instalará ${entry.title} en ${dir}.\n`);
@@ -986,7 +835,7 @@ async function cmdSetup(values) {
   }
   if (!removing) {
     if (!values['no-commands']) {
-      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor y /ar:triaje, en ${commandsTargetDir(values['claude-dir'])}\n`);
+      if (!values.quiet) process.stdout.write(`Comandos de Claude Code: /ar:estado, /ar:usar, /ar:modelo, /ar:esfuerzo, /ar:nivel, /ar:ejecutor, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
@@ -1389,7 +1238,6 @@ export async function main(argv, runtime = {}) {
       case 'unset': return await cmdUnset(rest, values);
       case 'models': return await cmdModels(values);
       case 'executors': return await cmdExecutors(rest, values);
-      case 'triage': return await cmdTriage(rest, values);
       case 'login': return await cmdLogin(values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
