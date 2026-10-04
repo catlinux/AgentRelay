@@ -223,6 +223,11 @@ async function cmdRun(positionals, values) {
   if (!values.json && lastAttempt && !lastAttempt.report) {
     process.stderr.write('[aviso] El ejecutor no devolvió el informe estructurado; revisa el diff y las validaciones.\n');
   }
+  if (!values.json && lastAttempt?.undeclaredFiles?.length) {
+    const files = lastAttempt.undeclaredFiles;
+    const names = files.slice(0, 5).join(', ');
+    process.stderr.write(`[aviso] Hay ${files.length} archivo(s) cambiado(s) que el ejecutor no declaró: ${names}${files.length > 5 ? ', …' : ''}; revisa el diff.\n`);
+  }
   if (values.verbose) printAttemptDetails(state, root, config);
   if (values.verbose) {
     const { sources } = loadConfig({ cwd: root, configPath: values.config });
