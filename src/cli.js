@@ -37,6 +37,7 @@ import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { isDue, loadChecks, markDay, runChecks, startDailyCheck } from './model-check.js';
 import { reportPath, writeReport } from './executors-report.js';
+import { commandNames, renderCommandHelp } from './help.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -56,6 +57,7 @@ Uso:
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
+  agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
@@ -1184,9 +1186,42 @@ export async function main(argv, runtime = {}) {
     process.stdout.write(`${VERSION}\n`);
     return 0;
   }
-  if (values.help || !command || command === 'help') {
+  if (values.help) {
+    if (!command) {
+      process.stdout.write(HELP);
+      return 0;
+    }
+    if (command === 'help' && !rest[0]) {
+      process.stdout.write(`${HELP}\nAyuda detallada de cada comando: agentrelay help <comando>\n`);
+      return 0;
+    }
+    const helpTarget = command === 'help' ? rest[0] : command;
+    const detail = helpTarget ? renderCommandHelp(helpTarget) : null;
+    if (detail) {
+      process.stdout.write(detail);
+      return 0;
+    }
+    const names = commandNames().join(', ');
+    process.stderr.write(`Comando desconocido: ${helpTarget || command}. Comandos: ${names}\n`);
+    return 1;
+  }
+  if (!command) {
     process.stdout.write(HELP);
     return 0;
+  }
+  if (command === 'help') {
+    if (!rest[0]) {
+      process.stdout.write(`${HELP}\nAyuda detallada de cada comando: agentrelay help <comando>\n`);
+      return 0;
+    }
+    const detail = renderCommandHelp(rest[0]);
+    if (detail) {
+      process.stdout.write(detail);
+      return 0;
+    }
+    const names = commandNames().join(', ');
+    process.stderr.write(`Comando desconocido: ${rest[0]}. Comandos: ${names}\n`);
+    return 1;
   }
 
   let migrationResult;
