@@ -1,12 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import {
   MAX_PER_DAY, MAX_SECONDS, buildProbe, checkModel, checksFile, evaluateProbe,
-  isDue, isFreeModel, loadChecks, pendingModels, runChecks, saveChecks, startDailyCheck,
+  isDue, isFreeModel, loadChecks, markDay, pendingModels, runChecks, saveChecks, startDailyCheck,
 } from '../src/model-check.js';
+import { reportPath } from '../src/executors-report.js';
+import { fileURLToPath } from 'node:url';
 
 const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-model-check-test-'));
 const report = { status: 'done', summary: 'Listo', filesChanged: ['sumar.js'], checks: [], issues: [], questions: [], needsEscalation: false };
@@ -43,22 +46,18 @@ test('pendingModels reintenta fallos de más de siete días, pero conserva aprob
   assert.deepEqual(pendingModels(['viejo-free', 'reciente-free', 'aprobado-free'], checks, MAX_PER_DAY, now), ['viejo-free']);
 });
 
-test('startDailyCheck respeta las condiciones de omisión y desacopla el lanzamiento', async () => {
+test('startDailyCheck respeta las condiciones restantes y lanza sin OpenCode', async () => {
   const home = temp();
   const now = new Date('2026-10-04T12:00:00Z');
-  const installed = async () => true;
-  const authStatus = async () => ({ ok: true });
   const calls = [];
   const spawnFn = (...args) => { calls.push(args); return { unref() { calls.push('unref'); } }; };
-  const options = { executor: {}, home, now, spawnFn, isInstalled: installed, authStatus, env: {} };
+  const options = { executor: {}, home, now, spawnFn, env: {} };
   try {
     assert.equal(await startDailyCheck({ ...options, env: { AGENTRELAY_NO_MODEL_CHECK: '1' } }), false);
     assert.equal(await startDailyCheck({ ...options, env: { NODE_TEST_CONTEXT: 'child-v8' } }), false);
     saveChecks({ lastRun: '2026-10-04', models: {} }, home);
     assert.equal(await startDailyCheck(options), false);
     saveChecks({ lastRun: null, models: {} }, home);
-    assert.equal(await startDailyCheck({ ...options, isInstalled: async () => false }), false);
-    assert.equal(await startDailyCheck({ ...options, authStatus: async () => ({ ok: false }) }), false);
     const warnings = [];
     assert.equal(await startDailyCheck({ ...options, log: (line) => warnings.push(line) }), true);
     assert.deepEqual(calls[0][0], process.execPath);
@@ -66,8 +65,44 @@ test('startDailyCheck respeta las condiciones de omisión y desacopla el lanzami
     assert.deepEqual(calls[0][2], { detached: true, stdio: 'ignore', windowsHide: true });
     assert.equal(calls[1], 'unref');
     assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /Revisando en segundo plano/);
+    assert.match(warnings[0], /Preparando en segundo plano el informe diario de ejecutores/);
   } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('markDay actualiza la fecha local y conserva los modelos', () => {
+  const home = temp();
+  const models = { 'x-free': { status: 'approved' } };
+  try {
+    saveChecks({ lastRun: '2026-10-03', models }, home);
+    markDay(home, new Date(2026, 9, 4, 12));
+    assert.deepEqual(loadChecks(home), { lastRun: '2026-10-04', models });
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('executors check genera informe sin OpenCode y no repite el informe el mismo día', () => {
+  const cwd = temp();
+  const home = path.join(cwd, 'home');
+  const executors = path.join(cwd, 'executors');
+  const reports = path.join(cwd, 'reports');
+  const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
+  mkdirSync(executors);
+  const env = { ...process.env, AGENTRELAY_HOME: home, AGENTRELAY_EXECUTORS_DIR: executors,
+    AGENTRELAY_REPORT_ROOT: reports, AGENTRELAY_NO_MIGRATE: '1', PATH: '', DEEPSEEK_API_KEY: undefined };
+  delete env.NODE_TEST_CONTEXT;
+  const run = (args = []) => spawnSync(process.execPath, [bin, '--cwd', cwd, 'executors', 'check', ...args], { cwd, encoding: 'utf8', env });
+  try {
+    const first = run();
+    assert.equal(first.status, 0, first.stderr);
+    assert.match(first.stdout, /OpenCode no está instalado .*se omite la prueba de modelos/);
+    assert.ok(existsSync(reportPath(reports)));
+    assert.match(first.stdout, new RegExp(`Informe: ${reportPath(reports).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    const second = run();
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /Ya se hizo hoy \(usa --force para repetirlo\)/);
+    const forced = run(['--force']);
+    assert.equal(forced.status, 0, forced.stderr);
+    assert.match(forced.stdout, /Informe:/);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
 });
 
 test('buildProbe mantiene el chequeo en el padre y crea un work aislado', () => {

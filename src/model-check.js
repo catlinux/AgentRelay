@@ -40,6 +40,12 @@ function localDate(now) {
 
 export function isDue(checks, now = new Date()) { return checks?.lastRun !== localDate(now); }
 
+export function markDay(home = agentrelayHome(), now = new Date()) {
+  const checks = loadChecks(home);
+  checks.lastRun = localDate(now);
+  saveChecks(checks, home);
+}
+
 export function pendingModels(listedIds, checks, max = MAX_PER_DAY, now = new Date()) {
   const models = checks?.models || {};
   const retryBefore = now.getTime() - 7 * 24 * 60 * 60 * 1000;
@@ -52,17 +58,15 @@ export function pendingModels(listedIds, checks, max = MAX_PER_DAY, now = new Da
     }).slice(0, Math.max(0, max));
 }
 
-export async function startDailyCheck({ executor, env = process.env, home, now = new Date(), spawnFn = spawn, isInstalled, authStatus, log = (line) => process.stderr.write(`${line}\n`) }) {
+export async function startDailyCheck({ executor, env = process.env, home, now = new Date(), spawnFn = spawn, log = (line) => process.stderr.write(`${line}\n`) }) {
   try {
-    if (env.AGENTRELAY_NO_MODEL_CHECK === '1' || env.NODE_TEST_CONTEXT !== undefined
-      || !isDue(loadChecks(home), now) || !isInstalled || !authStatus) return false;
-    if (!await isInstalled('opencode') || !(await authStatus(executor)).ok) return false;
+    if (env.AGENTRELAY_NO_MODEL_CHECK === '1' || env.NODE_TEST_CONTEXT !== undefined || !isDue(loadChecks(home), now)) return false;
     const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
     const child = spawnFn(process.execPath, [entry, 'executors', 'check', '--background'], {
       detached: true, stdio: 'ignore', windowsHide: true,
     });
     child.unref();
-    log('Revisando en segundo plano los modelos gratuitos nuevos de OpenCode (solo se les envía una tarea de prueba, nunca tu código).');
+    log('Preparando en segundo plano el informe diario de ejecutores (y probando los modelos gratuitos nuevos de OpenCode, solo con una tarea de ejemplo, nunca con tu código).');
     return true;
   } catch { return false; }
 }
