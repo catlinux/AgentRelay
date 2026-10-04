@@ -168,11 +168,11 @@ Done. Go to [Getting started](#getting-started).
 ## Getting started
 
 1. Open your project in VS Code with the **Claude Code** extension installed and signed in.
-2. In that project's terminal run `agentrelay init`. It prepares the project (and the git repository if it does not exist yet). Depending on the repository state, it may ask for confirmation to prepare it or create a commit; if there are already uncommitted changes, it adds the block and tells you to commit `CLAUDE.md` and clean the repository before delegating.
+2. In that project's terminal run `agentrelay start`. It prepares the project (and the git repository if it does not exist yet), leaves the repository clean and checks everything works; it asks for confirmation before changing anything.
 3. Open a second terminal and keep `agentrelay watch` running to see live what the agent does.
 4. Ask Claude for the work in the chat, in your own words. For example: *"Add a function that validates emails and delegate the implementation with AgentRelay."*
 
-Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes"](README.en.md#try-agentrelay-in-5-minutes) section of the README.
+Want to try it first on a demo project? Follow the ["Delegar a mano"](docs/MANUAL.md#8-delegar-a-mano-sin-orquestador) section of the user manual (in Spanish).
 
 ---
 
@@ -183,14 +183,14 @@ Want to try it first on a demo project? Follow the ["Try AgentRelay in 5 minutes
 | `agentrelay: command not found` | Repeat `npm link` in the AgentRelay folder, or open a new terminal. On Linux and macOS you can use the alias shown above. |
 | `agentrelay doctor` reports a failure for the executor | Run `npm install` again in the AgentRelay folder and repeat `doctor`. |
 | `EBADENGINE` warnings during `npm install` | They are warnings: some dependencies prefer Node 22. It works with Node 20. To avoid them, upgrade to Node 22. |
-| "Authentication Fails" when delegating (Cline only) | The provider key is not configured or is wrong: repeat the Cline setup described in the README. |
-| `doctor` says Cline is not available | Install it with `agentrelay executors add cline`. |
+| "Authentication Fails" when delegating (Cline only) | The provider key is not configured or is wrong: repeat the Cline setup command shown when it was installed (`npx cline auth …`). |
+| `doctor` says Cline or OpenCode is not available | Run `agentrelay use` and pick it: it tells you how to install it. |
 | `doctor` or `run` say there is no session | Run `agentrelay login` and sign in with your ChatGPT account. On a machine without a browser (for example over SSH), use `agentrelay login --device`. |
-| "no es un repositorio git" (not a git repository) | Run `agentrelay init` in the project folder. |
+| "no es un repositorio git" (not a git repository) | Run `agentrelay start` in the project folder. |
 
 ## Updating and uninstalling
 
-**Update:** inside the AgentRelay folder:
+**Update:** `agentrelay update` does everything (download, dependencies, `setup` and `doctor`). By hand, inside the AgentRelay folder:
 
 ```sh
 git pull

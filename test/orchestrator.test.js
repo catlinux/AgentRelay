@@ -23,7 +23,7 @@ function prompt(repo, state, n) {
   return readFileSync(path.join(runDir(repo.dir, state.id), `attempt-${n}-${attempt.kind}.prompt.md`), 'utf8');
 }
 
-test('nivel 3: implementa, valida y queda pendiente de revisión', async () => {
+test('implementa, valida y queda pendiente de revisión', async () => {
   const repo = makeRepo();
   try {
     const state = await run(repo, { plan: { implement: GOOD } });
@@ -76,17 +76,17 @@ test('escala al orquestador al agotar los reintentos', async () => {
   try {
     const state = await run(repo, { plan: { implement: BAD, fix: BAD } });
     assert.equal(state.status, 'escalated');
-    assert.equal(state.attempts.length, 3); // implementación + 2 correcciones (nivel 3)
+    assert.equal(state.attempts.length, 3); // implementación + 2 correcciones (política por defecto)
     assert.match(state.statusReasons[0], /validaciones/);
   } finally {
     repo.cleanup();
   }
 });
 
-test('nivel 1: sin self-review y aceptación automática si las validaciones pasan', async () => {
+test('con review on-failure y sin self-review: aceptación automática si las validaciones pasan', async () => {
   const repo = makeRepo();
   try {
-    const state = await run(repo, { config: { level: 1 }, plan: { implement: GOOD } });
+    const state = await run(repo, { config: { policy: { review: 'on-failure', selfReview: { normal: 'none' } } }, plan: { implement: GOOD } });
     assert.equal(state.status, 'accepted');
     assert.equal(state.acceptedBy, 'policy');
     assert.equal(state.selfReview.mode, 'none');
@@ -96,10 +96,10 @@ test('nivel 1: sin self-review y aceptación automática si las validaciones pas
   }
 });
 
-test('nivel 5: los fallos van al orquestador sin corrección automática', async () => {
+test('con autoFix desactivado: los fallos van al orquestador sin corrección automática', async () => {
   const repo = makeRepo();
   try {
-    const state = await run(repo, { config: { level: 5 }, plan: { implement: BAD } });
+    const state = await run(repo, { config: { policy: { autoFix: false } }, plan: { implement: BAD } });
     assert.equal(state.status, 'awaiting_review');
     assert.equal(state.attempts.length, 1);
   } finally {
@@ -219,7 +219,7 @@ test('revisión: corrección solicitada por el orquestador y aceptación con val
 test('revisión: límite de reintentos y escalado', async () => {
   const repo = makeRepo();
   try {
-    let state = await run(repo, { config: { level: 4 }, plan: { implement: GOOD, 'self-review': {}, fix: GOOD } });
+    let state = await run(repo, { config: { policy: { maxRetries: 1, skipPassMaxFiles: 0, selfReview: { normal: 'pass' } } }, plan: { implement: GOOD, 'self-review': {}, fix: GOOD } });
     state = await applyReview({ root: repo.dir, id: state.id, decision: 'fix', feedback: 'Otra vez' });
     await assert.rejects(
       applyReview({ root: repo.dir, id: state.id, decision: 'fix', feedback: 'Y otra' }),

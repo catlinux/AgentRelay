@@ -157,7 +157,7 @@ export function formatEvent(event, startedAtMs, options = {}) {
   };
   switch (event.type) {
     case 'run_start':
-      return fmt(`▶ Ejecución ${event.runId} · nivel ${event.level} (${event.levelName})\n  ${String(event.title ?? '').slice(0, 100)}`, { tone: '1;36' });
+      return fmt(`▶ Ejecución ${event.runId}\n  ${String(event.title ?? '').slice(0, 100)}`, { tone: '1;36' });
     case 'attempt_start':
       return fmt(`▶ Intento ${event.attempt} (${KIND_NAMES[event.kind] ?? event.kind}) · ${[event.provider, event.model].filter(Boolean).join('/') || 'modelo por defecto'}`, { blank: true, tone: '1;36' });
     case 'activity': {

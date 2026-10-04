@@ -99,7 +99,7 @@ ${list(task.acceptanceCriteria)}
 
 ## Orquestación
 
-- Nivel: ${policy.level} (${policy.name}) · revisión: ${policy.review} · reintentos: ${state.retriesUsed}/${policy.maxRetries}
+- Revisión: ${policy.review} · reintentos: ${state.retriesUsed}/${policy.maxRetries}
 - Ejecutor: ${executor.type} · ${[executor.provider, executor.model].filter(Boolean).join('/') || 'modelo por defecto del ejecutor'}
 - Self-review: ${selfReviewLine(state)}
 

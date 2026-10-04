@@ -43,7 +43,6 @@ test('CLI conserva alias de versión y rechaza modos incompatibles', () => {
   const helpDefault = cli(['--help'], process.cwd());
   assert.match(helpDefault.stdout, /--no-commands/);
   assert.match(helpDefault.stdout, /--browser/);
-  assert.match(helpDefault.stdout, /Opciones de usage:/);
   assert.match(helpDefault.stdout, /-h, --help/);
   assert.match(helpDefault.stdout, /-V, --version/);
   const helpFlagged = cli(['--help', '-q'], process.cwd());

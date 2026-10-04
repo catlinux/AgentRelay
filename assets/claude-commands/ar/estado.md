@@ -1,5 +1,5 @@
 ---
-description: AgentRelay · estado (ejecutor, modelo, esfuerzo, nivel y sesión)
+description: AgentRelay · estado (ejecutor, modelo, esfuerzo y sesión)
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku
@@ -11,4 +11,4 @@ Estado de AgentRelay:
 
 !`agentrelay config`
 
-Resume en 4 líneas como máximo: ejecutor y modelo, esfuerzo, nivel, estado de la sesión y cualquier [aviso] o [fallo]. Nada más.
+Resume en 4 líneas como máximo: ejecutor y modelo, esfuerzo, estado de la sesión y cualquier [aviso] o [fallo]. Nada más.

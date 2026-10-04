@@ -305,8 +305,6 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
     type: 'run_start',
     runId: id,
     title: task.title,
-    level: policy.level,
-    levelName: policy.name,
     selfReview: state.selfReview.mode,
   });
   return guard(root, state, async () => continueCycle(ctx, await attempt(ctx, 'implement')));

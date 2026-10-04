@@ -73,7 +73,7 @@ export async function collectProjectState(root, { now = new Date() } = {}) {
     },
     executor: {
       type: loaded.config.executor.type, model: loaded.config.executor.model,
-      thinking: loaded.config.executor.thinking, level: loaded.config.level,
+      thinking: loaded.config.executor.thinking,
       origin: loaded.origins['executor.type'] || 'defecto',
     },
     instructions, runs: { total: allRuns.length, awaitingReview, running, interrupted, recent }, todo, next,
@@ -87,7 +87,7 @@ const esBlock = (value) => ES_BLOCK[value] || value;
 export function renderProjectState(state) {
   const date = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(state.date));
   const git = `${state.git.branch} · ${state.git.clean ? 'limpio' : `${state.git.pendingCount} cambios pendientes`}`;
-  const executor = `${state.executor.type} · ${state.executor.model || 'sin modelo'} · esfuerzo ${ES_EFFORT[state.executor.thinking] || state.executor.thinking || 'predeterminado'} · nivel ${state.executor.level} (${state.executor.origin})`;
+  const executor = `${state.executor.type} · ${state.executor.model || 'sin modelo'} · esfuerzo ${ES_EFFORT[state.executor.thinking] || state.executor.thinking || 'predeterminado'} (${state.executor.origin})`;
   const runs = `${state.runs.total} total; ${state.runs.awaitingReview.length} por revisar; ${state.runs.running.length} en curso; ${state.runs.interrupted.length} interrumpidas`;
   const lines = [
     `# Estado de ${state.name}`, '', `Actualizado: ${date}`, '', '## Resumen', '',

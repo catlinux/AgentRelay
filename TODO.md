@@ -9,9 +9,23 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
-- [ ] `agentrelay models --all`: inventario de modelos en un solo sitio (dónde corre cada uno, gratis o de pago, probado o no); ver `docs/MODELOS.md`.
+- [x] Inventario de modelos en un solo sitio: `agentrelay use --list` (instalado, coste y esfuerzos por modelo).
 - [ ] Pulir: sangría de las opciones que activa `set`.
 - [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.
+- [x] `agentrelay use`: cambiar de IA (ejecutor, modelo y esfuerzo) con un solo comando, interactivo sin argumentos, con perfiles (`use --save <nombre>`, `use <nombre>`) y `/ar:usar` en el chat (acordado el 2026-10-03).
+- [ ] Simplificar (acordado el 2026-10-03). Hecho: triaje que aprende, `pricing`, `usage`, niveles 1-5, `models`, listado de `executors`, `/ar:modelo|esfuerzo|ejecutor|nivel`, `config refresh` y bloque de modelos. `AGENTS.md`: sección 22 sin duplicados (el grueso del texto es el bloque gestionado, que sale de `PROJECT_BLOCK` y sirve a todos los proyectos; acortarlo es decisión aparte).
+- [x] Documentación clara (acordado el 2026-10-03): manual de uso sencillo con ejemplos (`docs/MANUAL.md`), README más corto y plan paso a paso de cada punto pendiente para que lo ejecute un modelo más pequeño (`docs/PLAN.md`).
+
+> **Cómo hacer cada punto de esta sección, paso a paso: [`docs/PLAN.md`](docs/PLAN.md).**
+
+Decisiones del 2026-10-04 (el usuario autoriza borrar los archivos de la simplificación):
+
+- [x] Triaje: se queda la recomendación de modelo para el orquestador (instrucciones globales); se quita la parte que aprende (`triage advise/record/stats` y `triage.jsonl`).
+- [ ] Esfuerzo por tarea: campo opcional `effort` (y `model`) en el JSON de la tarea, que el orquestador elige según la dificultad; solo afecta a esa ejecución.
+- [ ] Que el orquestador delegue más: hook de Claude Code (lo instala `setup`) que le recuerda delegar cuando va a editar código. Probarlo donde haya ejecutores (VS Code); en la nube no hay `agentrelay` instalado.
+- [ ] Cadena de ejecutores: Luna (Codex, cuota gratuita por cuenta de correo) primero. Al agotarse NO se cambia solo: la ejecución para y ofrece elegir (seguir con Luna más tarde, un gratuito de OpenCode o DeepSeek Flash de pago); el orquestador pregunta al usuario. Se vuelve a probar Luna cada 24 h (o a la hora de reinicio si el error la da). Falta el texto real del error de cuota de Codex y OpenCode.
+- [ ] OpenCode desde el instalador: existe el paquete npm oficial `opencode-ai` (binarios por plataforma, como Codex); instalarlo como Cline en `~/.agentrelay/executors`.
+- [ ] Revisión diaria de modelos gratuitos: en el primer uso de cada día, listar los `-free` de OpenCode y probar solo los nuevos con una prueba fija; aprobar los que superen un mínimo (p. ej. ≥ 24/26 casos, informe estructurado válido, < 300 s, sin errores de API). Sin bloquear la primera tarea. Avisar de que las ofertas gratuitas pueden guardar el código enviado.
 - [ ] Aviso de `start`/`init` dentro de la copia instalada: no se distingue de forma fiable de la copia de desarrollo (ambas son «la raíz del paquete»); decidir con el usuario cómo detectarla.
 
 ## 0.0.x — Prototipo
@@ -139,7 +153,7 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
       - [ ] 4. `doctor --fix`: arreglar solo lo que se sepa arreglar bien (sandbox de Windows, ejecuciones colgadas, `.gitignore`). Hablarlo con más detalle antes: asegurar que lo hace bien y sin riesgo.
       - [ ] 5. Estado vivo del proyecto (qué se hizo, qué falta, ejecuciones), mantenido por AgentRelay para que un orquestador nuevo continúe sin preguntar. Necesario: el usuario se pierde con tanta configuración.
         - [x] Base hecha: `src/project-state.js` y `agentrelay status [--write] [--json]` (resumen de git, ejecutor, instrucciones, ejecuciones, commits y pendientes, con consejos de qué hacer ahora). Falta: actualizarlo solo tras cada `run`/`review`, y que el bloque de instrucciones diga al orquestador que lo lea al empezar.
-      - [ ] 6. Inventario de modelos en un solo lugar (`agentrelay models --all`: dónde corre cada uno, si es local/nube, gratuito o de pago, probado o no).
+      - [x] 6. (hecho como `agentrelay use --list`) Inventario de modelos en un solo lugar (`agentrelay models --all`: dónde corre cada uno, si es local/nube, gratuito o de pago, probado o no).
   - [x] **Configuración en un solo archivo** (petición reiterada del usuario; prioridad alta). Hoy hay 5 capas (valores por defecto, `~/.agentrelay/config.json`, `~/.agentrelay/settings.json`, `agentrelay.config.json`, `agentrelay.config.local.json`). Diseño acordado el 2026-10-01 (estable y fácil para quien no es técnico):
     - Un archivo global `~/.agentrelay/config.json` con TODAS las opciones, cada una con su comentario (qué hace y qué valores admite), y al final una lista comentada de los modelos instalados y disponibles de cada ejecutor (para copiar el nombre).
     - Un único archivo por proyecto, `agentrelay.config.json`, con solo lo que cambia ahí; `init` lo añade al `.gitignore` (lleva ejecutor y modelo personales).
