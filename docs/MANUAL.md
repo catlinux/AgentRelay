@@ -187,7 +187,7 @@ Resume: rama y cambios pendientes, IA en uso, tareas por revisar, últimos commi
 
 ## 6. Comandos en el chat de Claude Code
 
-`agentrelay setup` instala estos comandos. Escribe `/ar` en el chat y aparecen con autocompletado. Cambian la IA **del ejecutor**, no la de Claude (para eso está `/model` de Claude Code).
+`agentrelay setup` instala estos comandos. Escribe `/ar` en el chat y aparecen con autocompletado. Cambian la IA **del ejecutor**, no la de Claude (para eso está `/model` de Claude Code). También añade un hook a Claude Code (`settings.json`) que, al ir a editar código en un proyecto con AgentRelay, le recuerda delegar con `agentrelay run` (como mucho una vez cada 15 minutos por sesión). Se omite con `agentrelay setup --no-hook` y se retira con `agentrelay setup --uninstall`.
 
 | En el chat | Qué hace |
 |---|---|
