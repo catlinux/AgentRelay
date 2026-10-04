@@ -24,7 +24,7 @@ export function loadChecks(home = agentrelayHome()) {
     if (!value || typeof value !== 'object' || Array.isArray(value)
       || !(value.lastRun === null || (typeof value.lastRun === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.lastRun)))
       || !value.models || typeof value.models !== 'object' || Array.isArray(value.models)) return EMPTY_CHECKS();
-    return { lastRun: value.lastRun, models: value.models };
+    return { ...value, lastRun: value.lastRun, models: value.models };
   } catch { return EMPTY_CHECKS(); }
 }
 
@@ -110,7 +110,7 @@ export function evaluateProbe({ result, checkPassed, maxSeconds = MAX_SECONDS })
   return { status: 'failed', reason };
 }
 
-const PROBE_TASK = normalizeTask({
+export const PROBE_TASK = normalizeTask({
   title: 'Implementar una suma y una resta',
   objective: 'Crea sumar.js como módulo ES que exporte sumar(a, b) y restar(a, b), ambas operaciones aritméticas básicas.',
   context: 'Es una prueba sintética aislada. No accedas a archivos fuera de este directorio.',
@@ -118,7 +118,7 @@ const PROBE_TASK = normalizeTask({
   acceptanceCriteria: ['sumar.js exporta sumar y restar correctamente, incluidos negativos y ceros.'],
 });
 
-export async function checkModel({ id, executor, adapter = getExecutor('opencode'), run = runProcess, tmpBase = os.tmpdir(), now = new Date() }) {
+export async function runSyntheticProbe({ id, executor, adapter = getExecutor('opencode'), run = runProcess, tmpBase = os.tmpdir(), now = new Date(), build = buildProbe, task = PROBE_TASK, maxSeconds = MAX_SECONDS }) {
   const checkedAt = now.toISOString();
   let probe;
   let durationMs = 0;
@@ -126,30 +126,36 @@ export async function checkModel({ id, executor, adapter = getExecutor('opencode
   let checkPassed = false;
   let failure = null;
   try {
-    probe = buildProbe(tmpBase);
+    probe = build(tmpBase);
     const promptFile = '.prompt.md';
-    writeFileSync(path.join(probe.workDir, promptFile), buildImplementPrompt(PROBE_TASK, { validationCommands: [], selfReview: 'none' }));
+    writeFileSync(path.join(probe.workDir, promptFile), buildImplementPrompt(task, { validationCommands: [], selfReview: 'none' }));
     const started = Date.now();
     result = await adapter.run({
-      executor: { ...executor, model: id, timeoutSeconds: MAX_SECONDS },
+      executor: { ...executor, model: id, timeoutSeconds: maxSeconds },
       cwd: probe.workDir, promptFile,
     });
     durationMs = result?.durationMs ?? (Date.now() - started);
     if (result?.ok && !result.timedOut) {
-      const checked = await run(process.execPath, [path.basename(probe.checkFile)], { cwd: probe.root, timeoutMs: MAX_SECONDS * 1000 });
+      const checked = await run(process.execPath, [path.basename(probe.checkFile)], { cwd: probe.root, timeoutMs: maxSeconds * 1000 });
       checkPassed = checked.code === 0 && !checked.timedOut && !checked.error;
     }
   } catch (error) { failure = error; }
   finally { if (probe) rmSync(probe.root, { recursive: true, force: true }); }
   const evaluated = failure
     ? { status: 'failed', reason: `No se pudo ejecutar la prueba: ${failure.message}` }
-    : evaluateProbe({ result, checkPassed, maxSeconds: MAX_SECONDS });
+    : evaluateProbe({ result, checkPassed, maxSeconds });
   return {
     ...evaluated,
     checkedAt,
     seconds: Math.round(durationMs / 1000),
     ...(failure ? { reason: evaluated.reason.slice(0, 160) } : {}),
+    raw: result,
   };
+}
+
+export async function checkModel(options) {
+  const { raw, ...record } = await runSyntheticProbe({ ...options, build: buildProbe, task: PROBE_TASK, maxSeconds: MAX_SECONDS });
+  return record;
 }
 
 /** `force` salta la comprobación de «ya se hizo hoy» (para el comando manual). */
