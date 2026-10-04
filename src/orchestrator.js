@@ -21,6 +21,9 @@ import {
 import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
 import { classifyExecutorError, maskSecrets } from './executors/common.js';
+import { isInstalled } from './executors/catalog.js';
+import { loadChecks } from './model-check.js';
+import { alternativesHint } from './alternatives.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -178,9 +181,18 @@ async function continueCycle(ctx, result) {
     if (!result.ok) {
       const errorKind = classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`);
       if (errorKind) {
-        const reason = errorKind === 'credentials'
+        let reason = errorKind === 'credentials'
           ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
-          : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor, o cambia de ejecutor o modelo con `agentrelay set`';
+          : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
+        if (errorKind === 'quota') {
+          try {
+            const installed = {
+              opencode: await isInstalled('opencode'),
+              cline: await isInstalled('cline'),
+            };
+            reason += `\n${alternativesHint({ current: ctx.config.executor, checks: loadChecks(), installed })}`;
+          } catch {}
+        }
         return finalize(ctx, result, check, { status: 'failed', reasons: [reason] });
       }
     }

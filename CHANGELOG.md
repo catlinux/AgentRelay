@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+### Añadido
+
+- Cuando una ejecución falla por cuota o saldo del ejecutor, el informe propone alternativas con el comando exacto (Codex, modelos gratuitos de OpenCode ya aprobados, DeepSeek Flash) y las instrucciones del orquestador le piden preguntar al usuario cuál prefiere. Nunca se cambia de ejecutor solo.
+
 ### Cambiado
 
 - El informe diario `.agentrelay/EJECUTORES.md` es ahora un resumen del estado de las IA: saldos, ejecutor en uso, una línea por ejecutor y solo los modelos gratuitos de OpenCode con su marca (sin listas largas de modelos).
