@@ -27,16 +27,28 @@ test('no clasifica límites de velocidad ni errores normales', () => {
 test('detiene errores de credenciales y cuota sin reintentos ni self-review', async () => {
   for (const [error, reason] of [
     ['invalid api key', /credenciales.*agentrelay doctor.*agentrelay login/],
-    ['insufficient_quota', /cuota o saldo.*agentrelay set/],
+    ['insufficient_quota', /cuota o saldo.*elige otro ejecutor\.[\s\S]*Alternativas \(no se cambia nada solo; elige una\):[\s\S]*agentrelay use codex[\s\S]*Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>\./],
   ]) {
     const repo = makeRepo();
     try {
       fakePlan(repo, { implement: { finishReason: error, text: error, report: null } });
-      const state = await startRun({
-        root: repo.dir,
-        task: normalizeTask(baseTask({ complexity: 'complex' })),
-        config: testConfig({ level: 3 }),
-      });
+      const oldHome = process.env.AGENTRELAY_HOME;
+      const oldExecutors = process.env.AGENTRELAY_EXECUTORS_DIR;
+      process.env.AGENTRELAY_HOME = repo.dir;
+      process.env.AGENTRELAY_EXECUTORS_DIR = repo.dir;
+      let state;
+      try {
+        state = await startRun({
+          root: repo.dir,
+          task: normalizeTask(baseTask({ complexity: 'complex' })),
+          config: testConfig({ level: 3 }),
+        });
+      } finally {
+        if (oldHome === undefined) delete process.env.AGENTRELAY_HOME;
+        else process.env.AGENTRELAY_HOME = oldHome;
+        if (oldExecutors === undefined) delete process.env.AGENTRELAY_EXECUTORS_DIR;
+        else process.env.AGENTRELAY_EXECUTORS_DIR = oldExecutors;
+      }
       assert.equal(state.status, 'failed');
       assert.equal(state.attempts.length, 1);
       assert.equal(state.attempts[0].kind, 'implement');
