@@ -1,0 +1,151 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  discoverFreeModels,
+  fetchModelsDev,
+  loadFreeMetadata,
+  readCache,
+  writeCache,
+} from '../src/free-models.js';
+
+const fixture = (models) => ({ opencode: { models }, other: { models: { ignored: {} } } });
+const zeroCost = (extra = {}) => ({ cost: { input: 0, output: 0 }, ...extra });
+const response = (data) => ({ ok: true, status: 200, json: async () => data });
+const newHome = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-free-models-'));
+
+test('detecta gratuitos sin sufijo y excluye modelos -free con coste', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/grok-code', { id: 'opencode/big-pickle' }, 'opencode/paid-free'],
+    metadata: {
+      'grok-code': zeroCost({ name: 'Grok Code' }),
+      'big-pickle': zeroCost({ name: 'Big Pickle' }),
+      'paid-free': { cost: { input: 1, output: 1 } },
+    },
+    source: 'red',
+  });
+
+  assert.deepEqual(candidates.map(({ id, reason }) => ({ id, reason })), [
+    { id: 'opencode/grok-code', reason: 'metadatos' },
+    { id: 'opencode/big-pickle', reason: 'metadatos' },
+  ]);
+});
+
+test('usa el sufijo cuando falta metadata para un modelo listado', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/model-free', 'opencode/paid'],
+    metadata: { paid: { cost: { input: 2, output: 3 } } },
+    source: 'red',
+  });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].reason, 'sufijo');
+});
+
+test('la caché reciente evita consultar la red y solo conserva opencode', async () => {
+  const home = newHome();
+  const now = new Date('2026-10-05T12:00:00.000Z');
+  let calls = 0;
+  try {
+    writeCache(home, {
+      fetchedAt: '2026-10-05T11:00:00.000Z',
+      ...fixture({ 'grok-code': zeroCost() }),
+    });
+    const stored = JSON.parse(readFileSync(path.join(home, 'models-dev.json'), 'utf8'));
+    assert.deepEqual(Object.keys(stored), ['fetchedAt', 'opencode']);
+    assert.deepEqual(readCache(home), { fetchedAt: stored.fetchedAt, opencode: stored.opencode });
+
+    const result = await loadFreeMetadata({
+      home,
+      now,
+      fetchFn: async () => { calls += 1; throw new Error('no debe consultar'); },
+    });
+    assert.equal(calls, 0);
+    assert.equal(result.source, 'caché');
+    assert.ok(result.models['grok-code']);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('si la red falla usa la caché caducada', async () => {
+  const home = newHome();
+  const now = new Date('2026-10-05T12:00:00.000Z');
+  try {
+    writeCache(home, {
+      fetchedAt: '2026-10-03T11:59:59.000Z',
+      ...fixture({ 'big-pickle': zeroCost() }),
+    });
+    const result = await loadFreeMetadata({
+      home,
+      now,
+      fetchFn: async () => { throw new Error('sin red'); },
+    });
+    assert.equal(result.source, 'caché caducada');
+    assert.ok(result.models['big-pickle']);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('sin red ni caché degrada al sufijo y no lanza errores', async () => {
+  const home = newHome();
+  try {
+    const result = await loadFreeMetadata({
+      home,
+      fetchFn: async () => { throw new Error('sin red'); },
+    });
+    assert.deepEqual(result, { models: {}, source: 'sufijo' });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('una caché corrupta se ignora', async () => {
+  const home = newHome();
+  try {
+    writeFileSync(path.join(home, 'models-dev.json'), '{ roto', 'utf8');
+    assert.equal(readCache(home), null);
+    const result = await loadFreeMetadata({ home, fetchFn: async () => { throw new Error('sin red'); } });
+    assert.deepEqual(result, { models: {}, source: 'sufijo' });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('descarga datos válidos y explica respuestas sin proveedor opencode', async () => {
+  const data = fixture({ 'grok-code': zeroCost() });
+  assert.deepEqual(await fetchModelsDev({ fetchFn: async () => response(data) }), data);
+  await assert.rejects(
+    fetchModelsDev({ fetchFn: async () => response({ another: {} }) }),
+    /proveedor opencode válido/,
+  );
+  await assert.rejects(
+    fetchModelsDev({ fetchFn: async () => ({ ok: true, json: async () => { throw new Error('parse'); } }) }),
+    /JSON válido/,
+  );
+});
+
+test('ordena los candidatos por fecha de lanzamiento y deja los desconocidos al final', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/older-free', 'opencode/unknown-free', 'opencode/newer-free'],
+    metadata: {
+      'older-free': zeroCost({ release_date: '2025-01-01' }),
+      'newer-free': zeroCost({ release_date: '2026-01-01' }),
+    },
+    source: 'red',
+  });
+  assert.deepEqual(candidates.map(({ id }) => id), [
+    'opencode/newer-free', 'opencode/older-free', 'opencode/unknown-free',
+  ]);
+});
+
+test('informa modelos gratuitos que la cuenta no lista', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/listed'],
+    metadata: { listed: zeroCost(), 'grok-code': zeroCost() },
+    source: 'red',
+  });
+  assert.deepEqual(candidates.unlisted, ['opencode/grok-code']);
+});
