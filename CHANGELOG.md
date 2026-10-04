@@ -8,6 +8,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- OpenCode se instala desde AgentRelay como Cline (`agentrelay executors add opencode`, o al elegirlo con `agentrelay use opencode`): paquete npm oficial `opencode-ai` en `~/.agentrelay/executors`. Si ya lo tienes en el PATH, se sigue usando.
+
 - La tarea JSON admite los campos opcionales `effort` y `model`, que sustituyen al esfuerzo y al modelo de la configuración solo en esa ejecución (el orquestador los elige según la dificultad).
 
 - `agentrelay doctor --fix`: arregla lo que es seguro y reversible (instrucciones globales y comandos `/ar:` desactualizados, instrucciones del proyecto si el árbol está limpio, ejecuciones interrumpidas y entradas que faltan en `.gitignore`), preguntando antes de cada arreglo. Sin `--fix`, `doctor` avisa de cuántos arreglos hay. No arregla una sesión caducada: sigue indicando `agentrelay login`.

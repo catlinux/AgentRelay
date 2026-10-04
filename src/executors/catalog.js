@@ -41,8 +41,8 @@ export const CATALOG = [
     description: 'Con los modelos gratuitos de OpenCode (p. ej. opencode/nemotron-3-ultra-free).',
     bundled: false,
     cost: 'gratis',
-    // No se instala con npm: se instala aparte en el PATH (npmPackage: null).
-    npmPackage: null,
+    // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).
+    npmPackage: 'opencode-ai@1',
     connect: 'opencode auth login',
   },
 ];
@@ -70,9 +70,14 @@ export async function isInstalled(name, options = {}) {
   const entry = getCatalogEntry(name, options.dir || executorsDir(options.env, options.home));
   if (!entry) throw new Error(`Ejecutor desconocido: ${name}`);
   if (entry.bundled) return true;
-  // Sin npmPackage: se instala aparte en el PATH, no lo gestiona AgentRelay.
+  // OpenCode puede estar instalado en la carpeta gestionada o en el PATH.
   if (!entry.npmPackage) return Boolean(findOnPath(entry.name, options));
   const dir = options.dir || executorsDir(options.env, options.home);
+  if (name === 'opencode') {
+    const link = path.join(dir, 'node_modules', '.bin', `opencode${(options.platform || process.platform) === 'win32' ? '.cmd' : ''}`);
+    if ((options.exists || existsSync)(link)) return true;
+    return Boolean(findOnPath(entry.name, options));
+  }
   const parts = clineCommandParts('cline', { executorsDir: dir, exists: options.exists || existsSync });
   const candidate = parts.length > 1 && parts[0] === process.execPath ? parts[1] : parts[0];
   return (options.exists || existsSync)(candidate);
