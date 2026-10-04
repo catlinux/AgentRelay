@@ -8,6 +8,8 @@ import { getExecutor } from './executors/index.js';
 import { buildImplementPrompt } from './prompts.js';
 import { normalizeTask } from './task.js';
 import { runProcess } from './proc.js';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 export const MAX_PER_DAY = 5;
 export const MAX_SECONDS = 300;
@@ -38,10 +40,31 @@ function localDate(now) {
 
 export function isDue(checks, now = new Date()) { return checks?.lastRun !== localDate(now); }
 
-export function pendingModels(listedIds, checks, max = MAX_PER_DAY) {
+export function pendingModels(listedIds, checks, max = MAX_PER_DAY, now = new Date()) {
   const models = checks?.models || {};
+  const retryBefore = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   return listedIds.map((item) => typeof item === 'string' ? item : item?.id)
-    .filter((id) => isFreeModel(id) && !Object.hasOwn(models, id)).slice(0, Math.max(0, max));
+    .filter((id) => {
+      if (!isFreeModel(id)) return false;
+      const record = models[id];
+      if (!record) return true;
+      return record.status === 'failed' && Date.parse(record.checkedAt) < retryBefore;
+    }).slice(0, Math.max(0, max));
+}
+
+export async function startDailyCheck({ executor, env = process.env, home, now = new Date(), spawnFn = spawn, isInstalled, authStatus, log = (line) => process.stderr.write(`${line}\n`) }) {
+  try {
+    if (env.AGENTRELAY_NO_MODEL_CHECK === '1' || env.NODE_TEST_CONTEXT !== undefined
+      || !isDue(loadChecks(home), now) || !isInstalled || !authStatus) return false;
+    if (!await isInstalled('opencode') || !(await authStatus(executor)).ok) return false;
+    const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
+    const child = spawnFn(process.execPath, [entry, 'executors', 'check', '--background'], {
+      detached: true, stdio: 'ignore', windowsHide: true,
+    });
+    child.unref();
+    log('Revisando en segundo plano los modelos gratuitos nuevos de OpenCode (solo se les envía una tarea de prueba, nunca tu código).');
+    return true;
+  } catch { return false; }
 }
 
 export function buildProbe(baseDir = os.tmpdir()) {
@@ -135,7 +158,7 @@ export async function runChecks({ executor, adapter = getExecutor('opencode'), h
   // El día se marca antes de probar (y aunque no haya nada nuevo): evita revisiones simultáneas y repetidas.
   checks.lastRun = localDate(now);
   saveChecks(checks, home);
-  const ids = pendingModels(listed, checks);
+  const ids = pendingModels(listed, checks, MAX_PER_DAY, now);
   const checked = [];
   for (const id of ids) {
     let record;
@@ -143,7 +166,7 @@ export async function runChecks({ executor, adapter = getExecutor('opencode'), h
     catch (error) { record = { status: 'failed', checkedAt: now.toISOString(), seconds: 0, reason: `No se pudo ejecutar la prueba: ${error.message}` }; }
     checks.models[id] = record;
     saveChecks(checks, home);
-    const summary = { id, status: record.status, reason: record.reason };
+    const summary = { id, status: record.status, reason: record.reason, seconds: record.seconds };
     checked.push(summary);
     log(summary);
   }
