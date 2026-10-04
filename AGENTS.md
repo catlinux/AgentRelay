@@ -55,7 +55,6 @@ El desarrollo de este proyecto sigue el flujo de AgentRelay: el orquestador anal
 - El orquestador hace el trabajo directamente cuando delegar no compensa: cambios triviales, decisiones de diseño, documentación sensible, archivos internos o tareas escaladas. Si una tarea delegada rompe AgentRelay, el orquestador asume la corrección.
 - Informar al usuario en el chat de qué se delega, por qué y qué se decide al revisar. El usuario puede seguir la ejecución con `agentrelay watch`.
 - Informar con fidelidad: no decir que una ejecución está aceptada si `agentrelay list` no lo indica.
-- Anotar el resultado del ejecutor con `agentrelay triage record --kind executor --run <id>`.
 
 ## 23. Mantener TODO.md al día
 
@@ -89,7 +88,7 @@ Sigue estos pasos en orden, sin saltarte ninguno. Si un paso falla o no estás s
 4. Busca escapes `\u00` en los archivos `.js` modificados; si aparecen, restáuralos a caracteres reales.
 5. Comprueba que el cambio no deshace trabajo anterior (compáralo con `git log -p` del archivo si dudas).
 6. Decide con `agentrelay review <id> --decision ...` y confirma con `agentrelay list` que el estado ha cambiado.
-7. Commit con un mensaje descriptivo y `agentrelay triage record --kind executor --run <id>`.
+7. Commit con un mensaje descriptivo.
 
 ### Antes de informar al usuario
 - Vuelve a ejecutar `git status --short` y `agentrelay list`. Lo que digas debe coincidir con su salida.
