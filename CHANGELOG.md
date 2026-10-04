@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Sin publicar]
 
+## [0.2.0] - 2026-10-04
+
+Simplificación (menos comandos, una sola política de revisión), `agentrelay use`, comandos `/ar:` completos en Claude Code, ayuda por comando, `doctor --fix`, hook de delegación, OpenCode instalable y revisión diaria de modelos gratuitos. **Cambio incompatible:** se eliminan los niveles de orquestación 1-5, el triaje que aprende, `usage`, `pricing` y `models` (ver «Eliminado»).
+
 ### Añadido
 
 - Ayuda por comando: `agentrelay help <comando>` y `agentrelay <comando> --help` muestran descripción, uso, opciones y ejemplos de cada comando; `agentrelay help` sin argumentos muestra la ayuda general.
