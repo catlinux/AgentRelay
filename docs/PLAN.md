@@ -38,7 +38,9 @@ Redactado el 2026-10-03 sobre el commit `2a9c81b`. Si el código ha cambiado muc
 | 4 | Aviso al ejecutar `start`/`init` dentro de la carpeta de AgentRelay | 🛑 Sí: elegir la opción | Pequeño |
 | 5 | Inventario de modelos (`agentrelay use --list`) | No | Mediano |
 | 6 | `doctor --fix` | 🛑 Sí: confirmar qué arregla | Mediano |
-| 7 | Cambio de ejecutor cuando se agota la cuota | 🛑 Sí: elegir el diseño | Mediano |
+| 7 | Cambio de ejecutor cuando se agota la cuota | Decidido (2026-10-04); falta el texto real del error | Mediano |
+
+Nuevos puntos decididos el 2026-10-04 (esfuerzo por tarea, hook de delegación, OpenCode con el instalador, revisión diaria de modelos gratuitos): ver «Decisiones del 2026-10-04» en `TODO.md`; el plan detallado se añadirá aquí.
 
 ---
 
@@ -420,6 +422,8 @@ Delega con la plantilla de 1a: un encargo para el código y otro para el manual.
 ---
 
 ## 7. Cambio de ejecutor cuando se agota la cuota
+
+✅ **Decidido el 2026-10-04:** al agotarse Luna, la ejecución **para y ofrece elegir** (seguir con Luna más tarde, un gratuito de OpenCode o DeepSeek Flash), el orquestador pregunta al usuario y aplica la elección con `agentrelay use <perfil>`; Luna se vuelve a probar cada 24 h. Es la opción A de abajo más la lista de alternativas. Lo que sigue queda como referencia.
 
 🛑 **PARA:** es una decisión de diseño. Presenta al usuario estas opciones y espera su elección. **No empieces sin ella** (está en `TODO.md` desde el 2026-10-02).
 
