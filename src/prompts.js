@@ -37,6 +37,7 @@ const RULES = `## Rules
 - Keep the changes minimal and focused on the objective. Do not modify unrelated files.
 - Do not create git commits, branches, stashes or tags, and never push.
 - Do not read or modify anything inside the \`.agentrelay/\` directory, except the instruction file you were given.
+- On Windows, if PowerShell blocks \`npm.ps1\` (execution policy), run \`npm.cmd\` instead (for example \`npm.cmd test\`) and do not report it as an issue.
 - If you cannot complete the task (missing information, unclear requirements, something outside your reach), stop and report status "blocked" instead of guessing.
 `;
 
