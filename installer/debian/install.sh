@@ -247,6 +247,7 @@ run "$AGENTRELAY" doctor
 
 printf 'Instalación preparada en %s.\n' "$INSTALL_DIR"
 printf 'Comando: %s/agentrelay.\n' "$HOME/.local/bin"
+printf 'Las instrucciones de delegación solo se cargan en sesiones nuevas: cierra y abre de nuevo Claude Code.\n'
 if [[ "$DRY_RUN" == true ]]; then
   printf 'La simulación no cambió el sistema; ejecuta el script sin --dry-run para instalar.\n'
 elif [[ "$LOGIN" != true ]]; then

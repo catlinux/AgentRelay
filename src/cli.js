@@ -798,9 +798,15 @@ async function cmdSetup(values) {
     const hook = removeHook(values['claude-dir'] || path.join(os.homedir(), '.claude'));
     process.stdout.write(`Hook de Claude Code ${hook.removed ? 'eliminado' : 'no instalado'} (${path.join(values['claude-dir'] || path.join(os.homedir(), '.claude'), 'settings.json')})\n`);
   } else {
-    const { action } = applyBlockToFile(file, GLOBAL_BLOCK);
+    let action;
+    try { ({ action } = applyBlockToFile(file, GLOBAL_BLOCK)); }
+    catch (error) {
+      process.stderr.write(`No se pudo escribir ${file}: ${error.message}\nSin ese archivo Claude Code no recibirá las instrucciones de delegación. Revisa los permisos o indica otra carpeta con --claude-dir.\n`);
+      return 1;
+    }
     const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
     process.stdout.write(`${label} ${file}\n`);
+    if (!values.quiet) process.stdout.write('Las instrucciones solo se cargan en sesiones nuevas: cierra y abre de nuevo Claude Code para que las use.\n');
   }
   if (!removing) {
     if (!values['no-hook']) {
