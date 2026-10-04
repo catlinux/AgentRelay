@@ -199,14 +199,14 @@ La CLI sigue siendo el núcleo; la extensión es una capa fina que lee `.agentre
 - [ ] Decisión de self-review y revisión basada también en el tamaño del diff y el tipo de tarea. (Parcial: `src/policy.js` ya usa complejidad y cantidad de archivos cambiados para decidir revisión/self-review; falta basarla explícitamente en el tamaño del diff y tipo de tarea.)
 - [x] Registro de consumo por proveedor y modelo (solicitudes, tokens y coste cuando el proveedor lo informe), sin inventar costes. (Parcial: `agentrelay usage` agrega ejecuciones, intentos y tokens por ejecutor/modelo; no separa proveedor ni cuenta solicitudes.) (Obsoleto: el triaje que aprende, los niveles 1-5 y `usage` se eliminaron el 2026-10-04.)
 - [x] Resumen de consumo acumulado (`agentrelay usage`).
-- [ ] Plantillas de tareas por tipo (feature, fix, refactor, docs, test).
+- [x] Plantillas de tareas por tipo: descartadas por ahora (2026-10-04); el orquestador ya escribe cada JSON y las plantillas añaden complejidad sin valor claro. Reabrir si el usuario las quiere.
 - [x] Modo silencioso y modo detallado en todos los comandos.
 
 ## Posteriores
 
 - [ ] Instrucciones independientes del orquestador: hoy el bloque global es para Claude Code (`~/.claude/CLAUDE.md`). Cuando se admitan otros orquestadores o agentes (Codex, Cline…), decidir cómo darles las instrucciones de delegación (cada uno tiene su propio archivo o mecanismo).
 - [ ] Bloque por proyecto opcional: detectar que el proyecto no tiene las instrucciones de AgentRelay y preguntar si se quieren añadir (ahora `init` siempre las añade). Tener en cuenta que un `CLAUDE.md` versionado haría públicas esas instrucciones.
-- [ ] `init`: preguntar si se quiere subir el proyecto a un repositorio remoto y si se crea el `.gitignore`.
+- [x] `init`: el `.gitignore` ya se crea (preguntando) al preparar un repositorio nuevo. Subir a un remoto se descarta (2026-10-04): es arriesgado y fuera del alcance (AGENTS.md §16 y §18). Reabrir si el usuario lo quiere.
 - [ ] Interfaz estable de ejecutores y adaptadores adicionales (Codex, Continue, otros CLIs).
 - [ ] Proveedores adicionales (OpenAI, Anthropic, Qwen, Gemini…) a través de los ejecutores.
 - [ ] Integración opcional para que el orquestador reciba el informe sin pasar por la terminal.
