@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { spawn } from 'node:child_process';
 import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
@@ -36,6 +37,8 @@ import { collectProjectState, refreshProjectState, renderProjectState, writeProj
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { isDue, loadChecks, markDay, runChecks, startDailyCheck } from './model-check.js';
+import { loadFreeMetadata, discoverFreeModels } from './free-models.js';
+import { rankModels, renderRanking } from './model-rank.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 
@@ -64,8 +67,8 @@ Uso:
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
-  agentrelay executors [add <nombre> | check [--force]]
-                                    Instala un ejecutor o revisa modelos gratuitos nuevos
+  agentrelay executors [add <nombre> | check [--force] | rank ...]
+                                    Instala ejecutores, revisa o ranquea modelos gratuitos
 
 Avanzado:
   agentrelay set <clave> <valor> [--local] Cambia un ajuste suelto (ejemplo: set timeout 1800)
@@ -130,6 +133,10 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   background: { type: 'boolean' },
+  max: { type: 'string' },
+  all: { type: 'boolean' },
+  show: { type: 'boolean' },
+  detach: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   fix: { type: 'boolean' },
   yes: { type: 'boolean' },
@@ -700,8 +707,93 @@ async function cmdExecutors(positionals, values) {
     }
     return 0;
   }
+  if (action === 'rank') {
+    if (positionals.length !== 1) {
+      process.stderr.write('Uso: agentrelay executors rank [--max <N>] [--all] [--show] [--detach]\n');
+      return 1;
+    }
+    const max = values.max === undefined ? 8 : Number(values.max);
+    if (values.max !== undefined && (!/^\d+$/.test(values.max) || max < 1 || !Number.isSafeInteger(max))) {
+      process.stderr.write('La opción --max debe ser un entero mayor o igual que 1.\n');
+      return 1;
+    }
+    const home = agentrelayHome();
+    if (values.show) {
+      const ranking = loadChecks(home).ranking;
+      if (!ranking) {
+        process.stdout.write('Aún no hay ranquing. Ejecuta: agentrelay executors rank\n');
+        return 0;
+      }
+      if (values.json) {
+        process.stdout.write(`${JSON.stringify(ranking, null, 2)}\n`);
+        return 0;
+      }
+      const date = new Date(ranking.at);
+      const localDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+      process.stdout.write(`Último ranquing guardado (${localDate})\n`);
+      process.stdout.write(`${renderRanking({ entries: ranking.entries, skipped: [], stoppedBy: ranking.stoppedBy, tested: ranking.entries.length }, { date, total: ranking.entries.length })}\n`);
+      return 0;
+    }
+    const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
+    const executor = config.executor.type === 'opencode'
+      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+    const adapter = getExecutor('opencode');
+    if (!await isInstalled('opencode', { dir })) {
+      if (!values.background) process.stderr.write('OpenCode no está instalado. Instálalo con: agentrelay executors add opencode\n');
+      return values.background ? 0 : 1;
+    }
+    const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
+    if (!auth.ok) {
+      if (!values.background) process.stderr.write(`OpenCode no tiene sesión. Inicia sesión con: opencode auth login${auth.message ? ` (${auth.message})` : ''}\n`);
+      return values.background ? 0 : 1;
+    }
+    if (values.detach) {
+      const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
+      const args = [entry, 'executors', 'rank', '--background'];
+      if (values.max !== undefined) args.push('--max', String(max));
+      if (values.all) args.push('--all');
+      const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true });
+      child.unref();
+      process.stdout.write('Ranquing en marcha en segundo plano (puede tardar varios minutos y usa la cuota gratuita de los modelos). Mira el resultado con: agentrelay executors rank --show\n');
+      return 0;
+    }
+    const listed = await adapter.listModels(executor);
+    const metadata = await loadFreeMetadata({ home });
+    const candidates = discoverFreeModels({ listed, metadata: metadata.models, source: metadata.source });
+    if (!candidates.length) {
+      if (!values.background) {
+        const message = 'No hay modelos gratuitos disponibles en tu cuenta de OpenCode.';
+        if (values.json) {
+          process.stderr.write(`${message}\n`);
+          process.stdout.write(`${JSON.stringify({ entries: [], skipped: [], stoppedBy: null, tested: 0 }, null, 2)}\n`);
+        } else process.stdout.write(`${message}\n`);
+      }
+      return 0;
+    }
+    const selected = values.all ? candidates.length : Math.min(candidates.length, max);
+    if (!values.background && !values.json) {
+      process.stdout.write(`Probando ${selected} de ${candidates.length} modelos gratuitos de OpenCode (máx. ${max}; usa --all para todos). Puede tardar varios minutos: cada prueba consume cuota gratuita.\n`);
+      process.stdout.write(`Metadatos: ${metadata.source}\n`);
+    }
+    const now = new Date();
+    let result;
+    try {
+      result = await rankModels({
+        candidates, executor, adapter, max, all: values.all, home, now,
+        log: values.background || values.json ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/2 (${item.seconds} s)\n`),
+      });
+    } catch (error) {
+      if (values.background) return 0;
+      throw error;
+    }
+    if (!values.background) {
+      if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      else process.stdout.write(`${renderRanking(result, { date: now, unlisted: candidates.unlisted, total: candidates.length })}\n`);
+    }
+    return 0;
+  }
   if (action !== 'add' || positionals.length !== 2) {
-    process.stderr.write('Uso: agentrelay executors [add <nombre> | check [--force]]\n');
+    process.stderr.write('Uso: agentrelay executors [add <nombre> | check [--force] | rank ...]\n');
     return 1;
   }
   const name = positionals[1];
