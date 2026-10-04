@@ -55,7 +55,7 @@ agentrelay setup
 
 Done. Go to [Getting started](#getting-started).
 
-**Alternative: installer wizard (in preparation).** `installer/windows/` contains a script that does steps 1 to 3 for you and an Inno Setup wizard that presents it with windows. Not compiled yet and not tested on a real machine: for now use the steps above. To try the script on its own, `powershell -ExecutionPolicy Bypass -File installerwindowsinstall.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install for real (options: `-InstallDir`, `-Executors cline,opencode`, `-Login`). To build the `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installerwindowsagentrelay.iss` (output goes to `.agentrelayinstaller`). To uninstall: run `agentrelay setup --uninstall`, `npm unlink -g agentrelay` and delete the folder.
+**Alternative: installer wizard (in preparation).** `installer/windows/` contains a script that does steps 1 to 3 for you and an Inno Setup wizard that presents it with windows. Not compiled yet and not tested on a real machine: for now use the steps above. To try the script on its own, `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install for real (options: `-InstallDir`, `-Executors cline,opencode`, `-Login`). To build the `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installer\windows\agentrelay.iss` (output goes to `.agentrelay\installer\`). To uninstall: run `agentrelay setup --uninstall`, `npm unlink -g agentrelay` and delete the folder.
 
 ---
 
@@ -175,6 +175,8 @@ Done. Go to [Getting started](#getting-started).
 2. In that project's terminal run `agentrelay start`. It prepares the project (and the git repository if it does not exist yet), leaves the repository clean and checks everything works; it asks for confirmation before changing anything.
 3. Open a second terminal and keep `agentrelay watch` running to see live what the agent does.
 4. Ask Claude for the work in the chat, in your own words. For example: *"Add a function that validates emails and delegate the implementation with AgentRelay."*
+
+**Important:** the instructions that make Claude triage and delegate are installed by `agentrelay setup` (the installers run it for you; in the manual installation it is step 5) and are only loaded in **new** Claude Code sessions: after installing, close and reopen Claude Code (or start a new chat). They only apply where the `agentrelay` command is available, so they do not affect projects that do not use it.
 
 Want to try it first on a demo project? Follow the ["Delegar a mano"](docs/MANUAL.md#8-delegar-a-mano-sin-orquestador) section of the user manual (in Spanish).
 

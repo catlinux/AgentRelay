@@ -357,3 +357,21 @@ test('init en la carpeta de AgentRelay sin TTY cancela sin modificarla', () => {
   assert.match(result.stdout, /Cancelado\./);
   assert.equal(git(root, 'status', '--porcelain', '--untracked-files=all'), before);
 });
+
+test('setup avisa de que las instrucciones solo se cargan en sesiones nuevas y falla con claridad si no puede escribir', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-fail-'));
+  try {
+    fakeCodexConfig(dir);
+    const ok = run(['setup', '--yes', '--no-hook', '--no-commands', '--claude-dir', path.join(dir, 'claude')], dir);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.match(ok.stdout, /solo se cargan en sesiones nuevas/);
+    const blocker = path.join(dir, 'archivo');
+    writeFileSync(blocker, 'no es una carpeta');
+    const failed = run(['setup', '--yes', '--no-hook', '--no-commands', '--claude-dir', path.join(blocker, '.claude')], dir);
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /No se pudo escribir .*CLAUDE.md/);
+    assert.match(failed.stderr, /no recibirá las instrucciones de delegación/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -240,7 +240,7 @@ run_installation() {
   fi
 
   escaped_log="$(escape_markup "$LOG_FILE")"
-  local success_text='<b>Instalación terminada.</b>\n\nAbre una terminal nueva y ejecuta:  <b>agentrelay doctor</b>'
+  local success_text='<b>Instalación terminada.</b>\n\nAbre una terminal nueva y ejecuta:  <b>agentrelay doctor</b>\n\n<b>Cierra y abre de nuevo Claude Code</b>: las instrucciones de delegación solo se cargan en sesiones nuevas.'
   if [[ "$LOGIN" == true ]]; then
     success_text+="\n\nSi no se abrió el navegador para iniciar sesión en ChatGPT, ejecuta:  <b>agentrelay login</b>"
   fi

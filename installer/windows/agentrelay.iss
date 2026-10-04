@@ -29,7 +29,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Source: "install.ps1"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
 
 [Messages]
-FinishedLabel=La instalación terminó. Abre una terminal nueva y ejecuta: agentrelay doctor.
+FinishedLabel=La instalación terminó. Abre una terminal nueva y ejecuta: agentrelay doctor. Las instrucciones de delegación solo se cargan en sesiones nuevas: cierra y abre de nuevo Claude Code.
 
 [Code]
 var

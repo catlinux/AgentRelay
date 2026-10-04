@@ -316,6 +316,7 @@ try {
     }
     else {
         Write-Host 'Instalación de AgentRelay completada.'
+        Write-Host 'Las instrucciones de delegación solo se cargan en sesiones nuevas: cierra y abre de nuevo Claude Code.'
         if ($Login) {
             Write-Host 'Se solicitó conectar la cuenta de ChatGPT durante setup.'
         }
