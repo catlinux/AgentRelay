@@ -67,6 +67,14 @@ test('run quieto imprime id y estado, verbose añade comando y rutas', () => {
     const verbose = cli(['run', 'task.json', '-v'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
     assert.equal(verbose.status, 2, verbose.stderr);
     assert.match(verbose.stdout, /Ejecutor:/); assert.match(verbose.stdout, /Archivos del intento/);
+    assert.doesNotMatch(verbose.stdout, /AVISO: el ejecutor no devolvió el informe estructurado/);
+
+    fakePlan(repo, { implement: { report: null, text: 'Done without a structured report', write: { 'hello.txt': 'hi' } } });
+    const missingReport = cli(['run', 'task.json'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
+    assert.equal(missingReport.status, 0, missingReport.stderr);
+    assert.match(missingReport.stderr, /\[aviso\] El ejecutor no devolvió el informe estructurado; revisa el diff y las validaciones\./);
+    assert.match(missingReport.stdout, /\*\*AVISO: el ejecutor no devolvió el informe estructurado \(estado, archivos, incidencias\)\./);
+    assert.match(missingReport.stdout, /agentrelay review [\w-]+ --decision fix --feedback "Termina con el bloque JSON del informe final"/);
   } finally { repo.cleanup(); }
 });
 
