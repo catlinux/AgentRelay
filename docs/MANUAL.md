@@ -121,6 +121,8 @@ Cline (cline) · no instalado · clave de API
 
 **Informe diario de ejecutores.** Ese mismo disparo del primer uso del día (o `agentrelay executors check`) escribe `.agentrelay/EJECUTORES.md` en la carpeta donde esté AgentRelay, aunque no tengas OpenCode. El archivo se sobrescribe cada día (no acumula historial) y empieza por los **saldos**: el de DeepSeek se consulta si defines la variable de entorno `DEEPSEEK_API_KEY` (AgentRelay solo la lee de ahí y no la guarda ni la imprime); OpenAI no ofrece ninguna API para consultar el saldo con una clave, así que el informe solo enlaza a su panel de facturación. Después van el ejecutor en uso y, por cada ejecutor, si está instalado, si tiene sesión y sus modelos (con las marcas de la prueba diaria en los de OpenCode).
 
+**Ranquing de modelos gratuitos de OpenCode.** `agentrelay executors rank` busca los modelos gratuitos que ofrece tu cuenta, los prueba con dos tareas de ejemplo (una sencilla y otra más difícil) y los ordena de mejor a peor como ejecutor (primero los que aprueban las dos pruebas y, entre ellos, los más rápidos). Los gratuitos se detectan con los precios de [models.dev](https://models.dev), la misma fuente que usa OpenCode, así que también salen los que no llevan `-free` en el nombre. La cuota que te queda no se puede consultar: se deduce de las pruebas, y un modelo que devuelve «límite o cuota agotada» sale marcado así (y si varios seguidos lo hacen, se detienen las pruebas). Por defecto prueba 8 modelos (`--max N`, o `--all` para todos; cada prueba gasta cuota gratuita y tarda unos minutos). `--detach` lo lanza en segundo plano y `--show` enseña el último ranquing guardado sin probar nada. Para usar el primero: `agentrelay use opencode <modelo>`. Solo se envía una tarea de ejemplo a los modelos gratuitos, nunca tu código.
+
 **Perfiles** (guarda tus combinaciones favoritas con un nombre):
 
 ```sh
@@ -201,6 +203,8 @@ Resume: rama y cambios pendientes, IA en uso, tareas por revisar, últimos commi
 | `/ar:usar codex alto` | Cambia ejecutor y esfuerzo. |
 | `/ar:usar gratis` | Aplica el perfil «gratis». |
 | `/ar:ayuda` | Lista de comandos; `/ar:ayuda use` explica un comando con opciones y ejemplos. |
+| `/ar:ranquing` | Último ranquing de modelos gratuitos de OpenCode (de mejor a peor como ejecutor). |
+| `/ar:ranquing-nuevo` | Lanza un ranquing nuevo en segundo plano (`--max N`, `--all`); tarda varios minutos. |
 | `/ar:doctor` | Comprueba el entorno; `/ar:doctor --fix --yes` aplica los arreglos seguros. |
 | `/ar:lista` | Resumen de las ejecuciones del proyecto (destaca las que necesitan atención). |
 | `/ar:ver <id>` | Informe de una ejecución (sin id, la última). |

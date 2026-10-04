@@ -100,7 +100,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     const current = doctor(dir, claudeDir);
     assert.match(current.stdout, /Comandos de Claude Code .*al d[aí]a/);
     assert.match(current.stdout, /Instrucciones de AgentRelay en este proyecto: al día/);
-    for (const name of ['actualizar', 'ayuda', 'doctor', 'estado', 'iniciar', 'lista', 'usar', 'ver']) {
+    for (const name of ['actualizar', 'ayuda', 'doctor', 'estado', 'iniciar', 'lista', 'ranquing-nuevo', 'ranquing', 'usar', 'ver']) {
       writeFileSync(path.join(claudeDir, 'commands', 'ar', `${name}.md`), 'archivo propio');
     }
     const foreign = doctor(dir, claudeDir);

@@ -108,6 +108,11 @@ export function classifyProbeFailure(raw, record) {
   return 'fail';
 }
 
+function failureDetail(raw) {
+  const text = String(raw?.error ?? raw?.rawError ?? '').replace(/s+/g, ' ').trim();
+  return text ? text.slice(0, 100) : null;
+}
+
 function secondsOf(record) {
   return Number.isFinite(record?.seconds) ? record.seconds : 0;
 }
@@ -160,12 +165,17 @@ export async function rankModels({ candidates = [], executor, adapter, max = 8, 
     const basic = probeView(rawBasic);
     let hard = null;
     let failedKind = null;
+    let detail = null;
     if (basic.status !== 'approved') {
       failedKind = classifyProbeFailure(rawBasic?.raw, rawBasic);
+      detail = failureDetail(rawBasic?.raw);
     } else {
       const rawHard = await safelyProbe(hardProbe, { ...common, build: buildHardProbe, task: HARD_TASK }, now);
       hard = probeView(rawHard);
-      if (hard.status !== 'approved') failedKind = classifyProbeFailure(rawHard?.raw, rawHard);
+      if (hard.status !== 'approved') {
+        failedKind = classifyProbeFailure(rawHard?.raw, rawHard);
+        detail = failureDetail(rawHard?.raw);
+      }
     }
 
     const score = Number(basic.status === 'approved') + Number(hard?.status === 'approved');
@@ -179,6 +189,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = 8, 
       reasoning: candidate.reasoning,
       basic,
       hard,
+      detail,
       score,
       seconds,
       kind,
@@ -236,6 +247,7 @@ function noteFor(entry) {
   if (entry.kind === 'quota') notes.push('sin cuota o límite alcanzado');
   else if (entry.kind === 'credentials') notes.push('sin sesión');
   else if (entry.kind === 'timeout') notes.push('tiempo agotado');
+  if (entry.score === 0 && entry.detail) notes.push(entry.detail);
   const context = contextNote(entry.context);
   if (context) notes.push(context);
   if (entry.reasoning) notes.push('razona');
@@ -245,7 +257,8 @@ function noteFor(entry) {
 }
 
 export function renderRanking(result, { date, unlisted = [], total } = {}) {
-  const dateText = date instanceof Date ? date.toISOString().slice(0, 10) : String(date ?? '');
+  const localDay = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  const dateText = date instanceof Date ? localDay(date) : String(date ?? '');
   const lines = [
     `Ranquing de modelos gratuitos de OpenCode — ${dateText}`,
     'La cuota restante no se puede consultar; se deduce de los resultados de estas pruebas.',
