@@ -118,6 +118,7 @@ Cline (cline) · no instalado · clave de API
 `●` marca el modelo en uso y `*`, el esfuerzo por defecto. En el chat: `/ar:usar --list`.
 
 **Modelos gratuitos de OpenCode.** Cambian a menudo, así que AgentRelay los prueba por ti: el primer uso de cada día (`run` o `start`), y en segundo plano, prueba con una tarea de ejemplo los modelos `-free` que aún no conoce. A esa prueba solo se le envía esa tarea de ejemplo, nunca tu código. En `use --list` y en el menú de `use` cada modelo gratuito sale marcado: `✔ probado (fecha)`, `✘ no pasó la prueba` o `· sin probar`. Nunca se cambia de modelo solo: tú eliges. Para lanzarlo a mano: `agentrelay executors check` (con `--force` repite la revisión del día). Para desactivarlo: variable de entorno `AGENTRELAY_NO_MODEL_CHECK=1`.
+
 **Informe diario de ejecutores.** Ese mismo disparo del primer uso del día (o `agentrelay executors check`) escribe `.agentrelay/EJECUTORES.md` en la carpeta donde esté AgentRelay, aunque no tengas OpenCode. El archivo se sobrescribe cada día (no acumula historial) y empieza por los **saldos**: el de DeepSeek se consulta si defines la variable de entorno `DEEPSEEK_API_KEY` (AgentRelay solo la lee de ahí y no la guarda ni la imprime); OpenAI no ofrece ninguna API para consultar el saldo con una clave, así que el informe solo enlaza a su panel de facturación. Después van el ejecutor en uso y, por cada ejecutor, si está instalado, si tiene sesión y sus modelos (con las marcas de la prueba diaria en los de OpenCode).
 
 **Perfiles** (guarda tus combinaciones favoritas con un nombre):
