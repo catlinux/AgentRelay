@@ -152,7 +152,7 @@ export function setConfigValue(text, dottedKey, value) {
   if (parentPath && blocks.has(parentPath)) {
     uncommentAncestors(lines, blocks, parts);
     const block = blocks.get(parentPath);
-    const indent = indentOf(lines[block.open]);
+    const indent = `${indentOf(lines[block.open])}  `;
     lines.splice(block.close, 0, leafLine(indent, false, parts.at(-1), valueText));
     return lines.join(eol);
   }

@@ -9,7 +9,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
 - [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
 - [x] Inventario de modelos en un solo sitio: `agentrelay use --list` (instalado, coste y esfuerzos por modelo).
-- [ ] Pulir: sangría de las opciones que activa `set`.
+- [x] Pulir: sangría de las opciones que activa `set`.
 - [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.
 - [x] `agentrelay use`: cambiar de IA (ejecutor, modelo y esfuerzo) con un solo comando, interactivo sin argumentos, con perfiles (`use --save <nombre>`, `use <nombre>`) y `/ar:usar` en el chat (acordado el 2026-10-03).
 - [ ] Simplificar (acordado el 2026-10-03). Hecho: triaje que aprende, `pricing`, `usage`, niveles 1-5, `models`, listado de `executors`, `/ar:modelo|esfuerzo|ejecutor|nivel`, `config refresh` y bloque de modelos. `AGENTS.md`: sección 22 sin duplicados (el grueso del texto es el bloque gestionado, que sale de `PROJECT_BLOCK` y sirve a todos los proyectos; acortarlo es decisión aparte).

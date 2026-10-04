@@ -31,6 +31,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- Las opciones que activan `set` y `use` dentro de un bloque de la configuración (`executor`, `policy`, `validation`, `report`) quedan con 2 espacios más de sangría que su bloque.
+
 - `/ar:ejecutor` mostraba solo `codex|cline` como opciones; ahora incluye `opencode`.
 
 - `agentrelay update` ya no devuelve error cuando `doctor` avisa de algo (por ejemplo, que no hay sesión iniciada): la actualización se considera hecha y `doctor` solo informa.
