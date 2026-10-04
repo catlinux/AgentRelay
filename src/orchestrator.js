@@ -58,6 +58,10 @@ function addUsage(state, usage) {
   if (typeof usage.totalCost === 'number') total.estimatedCost += usage.totalCost;
 }
 
+function normalizeRepoPath(file) {
+  return path.posix.normalize(String(file).replace(/\\/g, '/')).replace(/^\.\//, '');
+}
+
 async function attempt(ctx, kind, { feedback, check } = {}) {
   const { state, task, config, root } = ctx;
   const n = state.attempts.length + 1;
@@ -150,6 +154,15 @@ async function evaluate(ctx) {
   const check = {
     at: new Date().toISOString(), passed, files: diff.files, validations, scopeViolations: violations, headMoved,
   };
+  const lastAttempt = state.attempts.at(-1);
+  if (lastAttempt?.report) {
+    const declaredFiles = new Set((lastAttempt.report.filesChanged || []).map(normalizeRepoPath));
+    const undeclaredFiles = diff.files
+      .map((file) => normalizeRepoPath(file.path))
+      .filter((file) => !file.startsWith('.agentrelay/') && !declaredFiles.has(file));
+    if (undeclaredFiles.length) lastAttempt.undeclaredFiles = undeclaredFiles;
+    else delete lastAttempt.undeclaredFiles;
+  }
   writeRunFile(root, state.id, 'diff.patch', diff.patch);
   state.lastCheck = check;
   saveState(root, state);

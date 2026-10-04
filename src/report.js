@@ -119,6 +119,7 @@ ${agentReportSection(lastAttempt, state.id)}
 ## Archivos modificados
 
 ${check ? list(check.files.map((f) => `\`${f.status}\` ${f.path}`)) : '_(sin validar)_'}
+${lastAttempt?.undeclaredFiles?.length ? `\n**AVISO: estos archivos han cambiado pero el ejecutor no los declaró (¿los modificaste tú mientras trabajaba, o los tocó sin decirlo?): ${lastAttempt.undeclaredFiles.map((file) => `\`${file}\``).join(', ')}. Revisa el diff antes de aceptar.**\n` : ''}
 ${check?.headMoved ? '\n**Aviso:** HEAD ha cambiado durante la ejecución (el ejecutor ha creado commits).\n' : ''}${check?.scopeViolations?.length ? `\n**Archivos protegidos modificados:**\n${list(check.scopeViolations)}\n` : ''}
 ## Validaciones
 
