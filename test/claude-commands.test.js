@@ -8,10 +8,10 @@ import { RETIRED_COMMANDS, commandsSourceDir, commandsStatus, commandsTargetDir,
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
-test('listCommands lee los dos comandos reales y su metadato', () => {
+test('listCommands lee los comandos reales y su metadato', () => {
   assert.match(commandsSourceDir(), /claude-commands[\\/]ar[\\/]?$/);
   const commands = listCommands();
-  assert.deepEqual(commands.map(({ name }) => name), ['estado.md', 'usar.md']);
+  assert.deepEqual(commands.map(({ name }) => name), ['actualizar.md', 'ayuda.md', 'doctor.md', 'estado.md', 'iniciar.md', 'lista.md', 'usar.md', 'ver.md']);
   for (const { content } of commands) {
     const frontmatter = content.split('---')[1];
     assert.ok(content.includes(MANAGED_MARK));
@@ -33,7 +33,7 @@ test('removeLegacyCommands retira solo comandos gestionados conocidos', () => {
     writeFileSync(path.join(legacy, 'propio.md'), 'archivo propio');
     writeFileSync(path.join(legacy, 'otro.md'), `otro ${MANAGED_MARK}`);
     const result = removeLegacyCommands(dir);
-    assert.equal(result.removed.length, 2);
+    assert.equal(result.removed.length, commands.length);
     assert.equal(readFileSync(path.join(legacy, 'propio.md'), 'utf8'), 'archivo propio');
     assert.equal(readFileSync(path.join(legacy, 'otro.md'), 'utf8'), `otro ${MANAGED_MARK}`);
     assert.ok(existsSync(legacy));
@@ -58,9 +58,9 @@ test('install, estado, normalización CRLF, protección de archivos propios y re
     assert.throws(() => listCommands(emptySource), /No se encontraron comandos \.md/);
     assert.equal(commandsStatus(claude, source).status, 'missing');
     const first = installCommands(claude, source);
-    assert.equal(first.created.length, 2);
-    assert.equal(readdirSync(commandsTargetDir(claude)).length, 2);
-    assert.equal(installCommands(claude, source).unchanged.length, 2);
+    assert.equal(first.created.length, original.length);
+    assert.equal(readdirSync(commandsTargetDir(claude)).length, original.length);
+    assert.equal(installCommands(claude, source).unchanged.length, original.length);
     assert.equal(commandsStatus(claude, source).status, 'current');
 
     const target = path.join(commandsTargetDir(claude), 'estado.md');
@@ -80,7 +80,7 @@ test('install, estado, normalización CRLF, protección de archivos propios y re
 
     writeFileSync(path.join(commandsTargetDir(claude), 'nota.txt'), 'mía');
     const removed = removeCommands(claude, source);
-    assert.equal(removed.removed.length, 1);
+    assert.equal(removed.removed.length, original.length - 1);
     assert.deepEqual(removed.kept, ['usar.md']);
     assert.ok(existsSync(commandsTargetDir(claude)));
     assert.equal(readFileSync(ownFile, 'utf8'), 'archivo propio\r\n');
@@ -107,7 +107,7 @@ test('los comandos retirados se borran del equipo solo si llevan la marca de Age
     assert.equal(readFileSync(path.join(target, 'triaje.md'), 'utf8'), 'comando propio del usuario');
     assert.deepEqual(installCommands(dir).retired, []);
     const removed = removeCommands(dir);
-    assert.deepEqual(removed.removed.sort(), ['estado.md', 'usar.md']);
+    assert.deepEqual(removed.removed.sort(), listCommands().map(({ name }) => name));
     assert.ok(existsSync(path.join(target, 'triaje.md')));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

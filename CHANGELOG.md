@@ -8,6 +8,9 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- Ayuda por comando: `agentrelay help <comando>` y `agentrelay <comando> --help` muestran descripción, uso, opciones y ejemplos de cada comando; `agentrelay help` sin argumentos muestra la ayuda general.
+- Seis comandos nuevos en el chat de Claude Code, para poder hacer desde allí lo mismo que en el terminal: `/ar:ayuda [comando]`, `/ar:doctor`, `/ar:lista`, `/ar:ver [id]`, `/ar:actualizar` y `/ar:iniciar`. Los que cambian algo (`/ar:actualizar`, `/ar:iniciar`, `/ar:doctor --fix`) no aplican nada sin `--yes`. Se instalan con `agentrelay setup`.
+
 - Informe diario de ejecutores: el mismo disparo diario (o `agentrelay executors check`) escribe `.agentrelay/EJECUTORES.md` en la carpeta de AgentRelay, sobrescribiéndolo cada día (sin historial), aunque no haya OpenCode. Empieza por los saldos (DeepSeek, si defines `DEEPSEEK_API_KEY`; OpenAI no tiene API de saldo y se enlaza a su panel) y sigue con el ejecutor en uso y, por ejecutor, instalación, sesión y modelos con las marcas de la prueba diaria. `executors check` ya no falla si falta OpenCode: omite la prueba de modelos y genera el informe.
 
 - Revisión diaria de los modelos gratuitos de OpenCode: el primer uso de cada día (`run` o `start`), en segundo plano y sin bloquear nada, AgentRelay prueba con una tarea sintética mínima los modelos `-free` que aún no conoce (nunca se envía código del usuario). El resultado se guarda en `~/.agentrelay/model-checks.json` y `agentrelay use --list` y el menú de `use` marcan cada modelo como `✔ probado`, `✘ no pasó la prueba` o `· sin probar`. Un modelo fallido se vuelve a probar a los 7 días. Nunca se cambia solo de modelo. Comando manual: `agentrelay executors check [--force]`; se desactiva con `AGENTRELAY_NO_MODEL_CHECK=1`.
