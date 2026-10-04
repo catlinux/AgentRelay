@@ -8,7 +8,7 @@ Hoja de ruta orientativa. Las versiones siguen [Semantic Versioning](https://sem
 - [ ] Estabilizar la 0.1.x (acordado el 2026-10-03): (a) [x] errores de credenciales/cuota del ejecutor sin reintentos y con mensaje claro; (b) [x] prueba `proc:` que no dependa de `taskkill`; (c) probar `start` en Taller; (d) recolocar la etiqueta `v0.1.0` (no está subida) en el commit estable, con permiso; (e) actualizar la copia de producción con `agentrelay update`.
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
 - [ ] Cambio de ejecutor cuando se agota la cuota o falla: ESTUDIARLO con el usuario antes de hacerlo (¿cadena automática o menú?).
-- [ ] `doctor --fix`: arreglar solo lo seguro (sandbox de Windows, ejecuciones colgadas, `.gitignore`); hablarlo antes.
+- [x] `doctor --fix`: arregla solo lo seguro (instrucciones globales y del proyecto, ejecuciones interrumpidas, `.gitignore`), preguntando antes de cada arreglo. El sandbox de Windows queda fuera hasta definir qué falla exactamente.
 - [x] Inventario de modelos en un solo sitio: `agentrelay use --list` (instalado, coste y esfuerzos por modelo).
 - [x] Pulir: sangría de las opciones que activa `set`.
 - [x] Reintento (una vez) si `opencode models` falla o sale vacío en frío.

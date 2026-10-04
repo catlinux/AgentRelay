@@ -51,7 +51,7 @@ Uso:
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
-  agentrelay doctor                 Comprueba el entorno (git, ejecutor, configuración)
+  agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
   agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
@@ -98,6 +98,9 @@ Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
   --with-config           Crea además ${CONFIG_FILE}
 
+Opciones de doctor:
+  --fix                   Pregunta antes de aplicar arreglos seguros (con --yes, sin preguntar)
+
 Opciones de config init:
   --project               Crea ${CONFIG_FILE} en el proyecto
   --local                 Alias obsoleto de --project
@@ -119,6 +122,7 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
+  fix: { type: 'boolean' },
   yes: { type: 'boolean' },
   check: { type: 'boolean' },
   uninstall: { type: 'boolean' },
@@ -322,7 +326,8 @@ async function cmdRecover(positionals, values) {
   return 0;
 }
 
-async function cmdDoctor(values) {
+async function cmdDoctor(values, rerun = false) {
+  const fixes = [];
   let ok = true;
   const line = (good, text) => {
     if (!good) ok = false;
@@ -377,8 +382,10 @@ async function cmdDoctor(values) {
   // Instrucciones del orquestador: tras actualizar AgentRelay pueden haber cambiado.
   const globalStatus = blockStatus(globalInstructionsPath(values['claude-dir']), GLOBAL_BLOCK);
   if (globalStatus === 'current') line(true, 'Instrucciones globales del orquestador: al día');
-  else if (globalStatus === 'outdated') warn('Las instrucciones globales del orquestador están desactualizadas. Ejecuta "agentrelay setup".');
-  else warn('Las instrucciones globales del orquestador no están instaladas. Ejecuta "agentrelay setup".');
+  else {
+    warn(globalStatus === 'outdated' ? 'Las instrucciones globales del orquestador están desactualizadas. Ejecuta "agentrelay setup".' : 'Las instrucciones globales del orquestador no están instaladas. Ejecuta "agentrelay setup".');
+    fixes.push({ text: 'Actualizar las instrucciones globales y los comandos de Claude Code.', apply: () => cmdSetup({ ...values, yes: true }) });
+  }
   const commandStatus = commandsStatus(values['claude-dir']);
   const legacyCommands = legacyCommandsStatus(values['claude-dir']);
   if (legacyCommands.length) warn('Quedan comandos antiguos /agentrelay:â€¦ de una versión anterior. Ejecuta "agentrelay setup" para sustituirlos por /ar:â€¦.');
@@ -387,14 +394,39 @@ async function cmdDoctor(values) {
   } else if (commandStatus.status === 'current') line(true, 'Comandos de Claude Code (/ar:…): al día');
   else if (commandStatus.status === 'outdated') warn('Los comandos de Claude Code (/ar:…) están desactualizados. Ejecuta "agentrelay setup".');
   else warn('Los comandos de Claude Code (/ar:…) no están instalados. Ejecuta "agentrelay setup".');
+  if (!fixes.length && (legacyCommands.length || commandStatus.status !== 'current') && globalStatus === 'current') {
+    fixes.push({ text: 'Actualizar las instrucciones globales y los comandos de Claude Code.', apply: () => cmdSetup({ ...values, yes: true }) });
+  }
   if (root) {
     const interrupted = listRunIds(root).filter((id) => { const state = loadState(root, id); return state.status === 'interrupted' || isOrphaned(state, { lastEventMs: lastActivityMs(root, id) }); });
     if (interrupted.length) warn(`Hay ${interrupted.length} ejecución(es) interrumpida(s): ${interrupted.join(', ')}. Ejecuta "agentrelay recover".`);
+    for (const id of interrupted) {
+      const state = loadState(root, id);
+      if (isOrphaned(state, { lastEventMs: lastActivityMs(root, id) })) fixes.push({ text: `Marcar la ejecución ${id} como interrumpida.`, apply: () => cmdRecover([id], values) });
+    }
     const projectStatus = projectInstructionStatus(root);
     if (projectStatus === 'current') line(true, 'Instrucciones de AgentRelay en este proyecto: al día');
-    else if (projectStatus === 'outdated') warn('Las instrucciones de AgentRelay de este proyecto están desactualizadas. Ejecuta "agentrelay init".');
+    else if (projectStatus === 'outdated') {
+      warn('Las instrucciones de AgentRelay de este proyecto están desactualizadas. Ejecuta "agentrelay init".');
+      if (await isClean(root)) fixes.push({ text: 'Actualizar las instrucciones de AgentRelay de este proyecto.', apply: () => cmdInit({ ...values, cwd: root, yes: true }) });
+    }
     else warn('Este proyecto no tiene las instrucciones de AgentRelay. Ejecuta "agentrelay init".');
+    const gitignore = path.join(root, '.gitignore');
+    const ignoredEntries = existsSync(gitignore) ? readFileSync(gitignore, 'utf8').split(/\r?\n/) : [];
+    if (!ignoredEntries.includes('.agentrelay/') || !ignoredEntries.includes(CONFIG_FILE)) {
+      warn('Falta .agentrelay/ o agentrelay.config.json en .gitignore. Ejecuta "agentrelay init".');
+      fixes.push({ text: 'Añadir las entradas de AgentRelay que faltan a .gitignore.', apply: async () => { ensureProjectConfigIgnored(root); return 0; } });
+    }
   }
+  if (!rerun && values.fix) {
+    for (const fix of fixes) {
+      const answer = await confirm(`${fix.text} ¿Arreglarlo?`, { yes: values.yes });
+      if (answer === true) await fix.apply();
+      else if (answer === null) process.stderr.write('Ejecuta de nuevo con --yes para aplicar el cambio.\n');
+    }
+    return cmdDoctor({ ...values, fix: false }, true);
+  }
+  if (!rerun && !values.fix && fixes.length) warn(`Puedes arreglar ${fixes.length} problema(s) con: agentrelay doctor --fix`);
   return ok ? 0 : 1;
 }
 
