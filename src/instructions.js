@@ -54,7 +54,7 @@ export const PROJECT_BLOCK = [
   'EOF',
   '```',
   '',
-  '   `context` debe bastar para que el ejecutor trabaje sin preguntarte: stack, convenciones y decisiones ya tomadas.',
+  '   `context` debe bastar para que el ejecutor trabaje sin preguntarte: stack, convenciones y decisiones ya tomadas. Opcionalmente, `effort` (low, medium, high, xhigh) y `model` ajustan el esfuerzo y el modelo solo para esa tarea: esfuerzo bajo en las sencillas, alto en las difíciles.',
   '',
   '### Cómo revisar',
   '',
