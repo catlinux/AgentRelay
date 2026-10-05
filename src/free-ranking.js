@@ -20,18 +20,56 @@ export function pruneExhausted(checks, now = new Date()) {
   return checks;
 }
 
-export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada', ttlMs } = {}) {
+export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada', ttlMs, until: resetAt, resetKnown } = {}) {
   const checks = pruneExhausted(loadChecks(home), now);
-  const until = ttlMs === undefined ? endOfLocalDay(now) : new Date(now.getTime() + ttlMs);
+  const until = resetAt instanceof Date ? resetAt : ttlMs === undefined ? endOfLocalDay(now) : new Date(now.getTime() + ttlMs);
   const exhausted = checks.exhausted && typeof checks.exhausted === 'object' && !Array.isArray(checks.exhausted)
     ? checks.exhausted
     : {};
+  const record = { at: now.toISOString(), until: until.toISOString(), reason };
+  if (resetKnown !== undefined) record.resetKnown = Boolean(resetKnown);
   checks.exhausted = {
     ...exhausted,
-    [id]: { at: now.toISOString(), until: until.toISOString(), reason },
+    [id]: record,
   };
   saveChecks(checks, home);
   return checks.exhausted[id];
+}
+
+export function logQuotaEvent(home, { id, event, until, resetKnown, reason, now = new Date() } = {}) {
+  if (!['agotada', 'restablecida'].includes(event)) throw new TypeError('Evento de cuota no válido');
+  const checks = loadChecks(home);
+  const record = { at: now.toISOString(), id, event };
+  if (until instanceof Date) record.until = until.toISOString();
+  else if (until !== undefined) record.until = new Date(until).toISOString();
+  if (resetKnown !== undefined) record.resetKnown = Boolean(resetKnown);
+  if (reason !== undefined) record.reason = reason;
+  const quotaLog = Array.isArray(checks.quotaLog) ? checks.quotaLog : [];
+  checks.quotaLog = [...quotaLog, record].slice(-30);
+  saveChecks(checks, home);
+  return record;
+}
+
+export function lastQuotaEvent(checks, id) {
+  return Array.isArray(checks?.quotaLog) ? [...checks.quotaLog].reverse().find((entry) => entry?.id === id) ?? null : null;
+}
+
+export function clearExhausted(home = agentrelayHome(), id) {
+  const checks = loadChecks(home);
+  if (!checks.exhausted || typeof checks.exhausted !== 'object' || Array.isArray(checks.exhausted) || !(id in checks.exhausted)) return false;
+  delete checks.exhausted[id];
+  if (Object.keys(checks.exhausted).length === 0) delete checks.exhausted;
+  saveChecks(checks, home);
+  return true;
+}
+
+export function recordQuotaRecovered(id, { home = agentrelayHome(), now = new Date() } = {}) {
+  const checks = loadChecks(home);
+  const previous = lastQuotaEvent(checks, id);
+  if (previous?.event !== 'agotada' && !checks.exhausted?.[id]) return false;
+  clearExhausted(home, id);
+  logQuotaEvent(home, { id, event: 'restablecida', now });
+  return true;
 }
 
 // Devuelve una lista con .at y .stale no enumerables para conservar el contrato de array.

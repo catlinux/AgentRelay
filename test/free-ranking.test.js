@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isExhausted, markExhausted, rankPosition, rankedFree } from '../src/free-ranking.js';
+import { clearExhausted, isExhausted, lastQuotaEvent, logQuotaEvent, markExhausted, rankPosition, rankedFree, recordQuotaRecovered } from '../src/free-ranking.js';
 import { loadChecks, saveChecks } from '../src/model-check.js';
 
 function makeHome() {
@@ -78,6 +78,46 @@ test('isExhausted compara el instante actual con until', () => {
   assert.equal(isExhausted(checks, 'vendor/model-free', new Date('2026-10-05T23:59:59.999Z')), true);
   assert.equal(isExhausted(checks, 'vendor/model-free', new Date('2026-10-06T00:00:00.000Z')), false);
   assert.equal(isExhausted(checks, 'vendor/missing-free', new Date('2026-10-05T00:00:00.000Z')), false);
+});
+
+test('el registro de cuota conserva datos previos y solo guarda los treinta eventos recientes', () => {
+  const home = makeHome();
+  try {
+    saveChecks({ lastRun: null, models: { keep: { status: 'approved' } }, ranking: { entries: [] } }, home);
+    const now = new Date('2026-10-05T14:30:00.000Z');
+    for (let index = 0; index < 32; index += 1) {
+      logQuotaEvent(home, { id: `codex:${index}`, event: 'agotada', reason: 'cuota agotada', now });
+    }
+    const checks = loadChecks(home);
+    assert.equal(checks.quotaLog.length, 30);
+    assert.equal(checks.quotaLog[0].id, 'codex:2');
+    assert.equal(checks.quotaLog.at(-1).id, 'codex:31');
+    assert.deepEqual(checks.models, { keep: { status: 'approved' } });
+    assert.equal(lastQuotaEvent(checks, 'codex:31').event, 'agotada');
+    assert.equal(lastQuotaEvent(checks, 'codex:missing'), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('recordQuotaRecovered limpia la marca una sola vez y registra el restablecimiento', () => {
+  const home = makeHome();
+  try {
+    const now = new Date('2026-10-05T14:30:00.000Z');
+    const until = new Date(now.getTime() + 60_000);
+    markExhausted('codex:chatgpt', { home, now, until, resetKnown: true });
+    logQuotaEvent(home, { id: 'codex:chatgpt', event: 'agotada', until, resetKnown: true, now });
+    assert.equal(recordQuotaRecovered('codex:chatgpt', { home, now: new Date(now.getTime() + 120_000) }), true);
+    const checks = loadChecks(home);
+    assert.equal(checks.exhausted, undefined);
+    assert.deepEqual(lastQuotaEvent(checks, 'codex:chatgpt'), {
+      at: new Date(now.getTime() + 120_000).toISOString(), id: 'codex:chatgpt', event: 'restablecida',
+    });
+    assert.equal(recordQuotaRecovered('codex:chatgpt', { home, now }), false);
+    assert.equal(clearExhausted(home, 'codex:missing'), false);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('rankPosition es uno basado y rankedFree queda vacío sin ranquing', () => {

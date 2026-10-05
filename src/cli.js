@@ -40,7 +40,7 @@ import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { isDue, loadChecks, markDay, startDailyCheck } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels } from './free-models.js';
 import { rankModels, renderRanking } from './model-rank.js';
-import { isExhausted } from './free-ranking.js';
+import { isExhausted, lastQuotaEvent } from './free-ranking.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 import { commandParts as opencodeCommandParts } from './executors/opencode.js';
@@ -446,6 +446,23 @@ async function cmdDoctor(values, rerun = false) {
           ? 'Respaldo por API de pago: configurado (solo se usa si se agota la cuota gratuita de ChatGPT)'
           : 'Respaldo por API de pago: desactivado (executor.apiFallback = false)'
         : 'Respaldo por API de pago: no configurado (para tenerlo: agentrelay login --api)');
+      const checks = loadChecks(agentrelayHome());
+      const quotaId = 'codex:chatgpt';
+      if (isExhausted(checks, quotaId)) {
+        const until = new Date(checks.exhausted[quotaId].until);
+        const hour = `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
+        const apiUse = configured && fallbackEnabled ? 'la API de pago' : 'nada: no hay respaldo por API';
+        line(true, `Cuota gratuita de ChatGPT: agotada hasta las ${hour} (se vuelve a probar sola; mientras tanto se usa ${apiUse})`);
+      }
+      const lastQuota = lastQuotaEvent(checks, quotaId);
+      const recoveredAt = lastQuota?.event === 'restablecida' ? new Date(lastQuota.at) : null;
+      const now = new Date();
+      if (recoveredAt && Number.isFinite(recoveredAt.getTime())
+        && recoveredAt.getFullYear() === now.getFullYear()
+        && recoveredAt.getMonth() === now.getMonth()
+        && recoveredAt.getDate() === now.getDate()) {
+        line(true, `Cuota gratuita de ChatGPT: restablecida (${recoveredAt.toLocaleString()})`);
+      }
     }
     if (modelCheckAllowed) {
       const modelCheck = await checkExecutorModel(executor, { adapter });

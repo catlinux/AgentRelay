@@ -1,6 +1,6 @@
 ---
-description: Conecta una cuenta del ejecutor configurado o de OpenCode
-argument-hint: [opencode] [--device]
+description: Conecta una cuenta del ejecutor o configura el respaldo por API de pago
+argument-hint: [opencode | --api [--remove]] [--device]
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku

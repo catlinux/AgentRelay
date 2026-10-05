@@ -23,7 +23,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `run <tarea.json>` | Delega una tarea a mano. |
 | `check [id]` · `recover [id]` | Repite las validaciones · recupera tareas interrumpidas. |
 | `doctor [--fix]` | Diagnostica el entorno y arregla lo seguro. |
-| `login [opencode]` | Conecta tu cuenta de ChatGPT, o la de OpenCode con `login opencode`. |
+| `login [opencode | --api]` | Conecta tu cuenta de ChatGPT; `login opencode` conecta OpenCode; `login --api` guarda el respaldo por API de pago de Luna. |
 | `config` · `set` · `unset` | Ver o cambiar ajustes sueltos. |
 | `executors add\|check` | Instala un ejecutor opcional · actualiza el ranquing y el informe diario. |
 | `update [--yes]` | Actualiza AgentRelay. |
@@ -73,8 +73,23 @@ Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `hi
 
 AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
 
-### Modelos gratuitos de OpenCode
+### Luna: cuota gratuita y respaldo por API de pago
 
+Luna (Codex) gasta la cuota gratuita de tu cuenta de ChatGPT. Para no quedarte parado cuando se agota, puedes guardar una clave de API de OpenAI como **respaldo**:
+
+```sh
+agentrelay login --api          # pega tu clave (no se muestra); o: printenv OPENAI_API_KEY | agentrelay login --api
+agentrelay login --api --remove # quita el respaldo
+```
+
+La clave se guarda en un perfil propio de AgentRelay (`~/.agentrelay/codex-api/`): **tu sesión de ChatGPT no se toca**. Después funciona sola:
+
+- Cada tarea prueba **primero la cuota gratuita**. Solo si se agota (el error de límite de uso de ChatGPT) repite ese intento con la API de pago y lo avisa en el informe.
+- Lee del error la hora de restablecimiento y guarda en `model-checks.json` cuándo se agotó y cuándo se restableció. Mientras no llegue esa hora usa la API; al llegar, **vuelve a la gratuita** sin que hagas nada. Si el error no da la hora, la vuelve a probar cada 10 minutos.
+- `agentrelay doctor` muestra si el respaldo está configurado y, si la cuota está agotada, hasta cuándo. Sin respaldo no cambia nada: el aviso de cuota te propone alternativas.
+- Se desactiva con `agentrelay set executor.apiFallback false --local`. Solo se gasta dinero si tú has guardado la clave.
+
+### Modelos gratuitos de OpenCode
 Cambian a menudo, así que AgentRelay los vigila por ti. **El primer uso de cada día** (`run` o `start`), en segundo plano, prueba con dos tareas de ejemplo los modelos gratuitos que tu cuenta lista, los ordena de mejor a peor y escribe `.agentrelay/EJECUTORES.md` (saldos, estado de cada IA y los mejores gratuitos de hoy). Solo se envía una tarea de ejemplo, nunca tu código.
 
 - `agentrelay use` y `use --list` muestran esos gratuitos **en orden** y con su tiempo; los que fallaron no aparecen (`--all` los muestra todos).
