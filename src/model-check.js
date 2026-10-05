@@ -11,7 +11,6 @@ import { runProcess } from './proc.js';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export const MAX_PER_DAY = 5;
 export const MAX_SECONDS = 300;
 const EMPTY_CHECKS = () => ({ lastRun: null, models: {} });
 
@@ -46,18 +45,6 @@ export function markDay(home = agentrelayHome(), now = new Date()) {
   saveChecks(checks, home);
 }
 
-export function pendingModels(listedIds, checks, max = MAX_PER_DAY, now = new Date()) {
-  const models = checks?.models || {};
-  const retryBefore = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-  return listedIds.map((item) => typeof item === 'string' ? item : item?.id)
-    .filter((id) => {
-      if (!isFreeModel(id)) return false;
-      const record = models[id];
-      if (!record) return true;
-      return record.status === 'failed' && Date.parse(record.checkedAt) < retryBefore;
-    }).slice(0, Math.max(0, max));
-}
-
 export async function startDailyCheck({ executor, env = process.env, home, now = new Date(), spawnFn = spawn, log = (line) => process.stderr.write(`${line}\n`) }) {
   try {
     if (env.AGENTRELAY_NO_MODEL_CHECK === '1' || env.NODE_TEST_CONTEXT !== undefined || !isDue(loadChecks(home), now)) return false;
@@ -66,7 +53,7 @@ export async function startDailyCheck({ executor, env = process.env, home, now =
       detached: true, stdio: 'ignore', windowsHide: true,
     });
     child.unref();
-    log('Preparando en segundo plano el informe diario de ejecutores (y probando los modelos gratuitos nuevos de OpenCode, solo con una tarea de ejemplo, nunca con tu código).');
+    log('Actualizando en segundo plano el ranquing de modelos gratuitos de OpenCode y el informe diario (solo se usan tareas de ejemplo, nunca tu código).');
     return true;
   } catch { return false; }
 }
@@ -151,34 +138,4 @@ export async function runSyntheticProbe({ id, executor, adapter = getExecutor('o
     ...(failure ? { reason: evaluated.reason.slice(0, 160) } : {}),
     raw: result,
   };
-}
-
-export async function checkModel(options) {
-  const { raw, ...record } = await runSyntheticProbe({ ...options, build: buildProbe, task: PROBE_TASK, maxSeconds: MAX_SECONDS });
-  return record;
-}
-
-/** `force` salta la comprobación de «ya se hizo hoy» (para el comando manual). */
-export async function runChecks({ executor, adapter = getExecutor('opencode'), home = agentrelayHome(), now = new Date(), check = checkModel, log = () => {}, force = false }) {
-  const checks = loadChecks(home);
-  if (!force && !isDue(checks, now)) return { checked: [] };
-  let listed;
-  try { listed = await adapter.listModels(executor); } catch { return { checked: [] }; }
-  if (!Array.isArray(listed) || !listed.length) return { checked: [] };
-  // El día se marca antes de probar (y aunque no haya nada nuevo): evita revisiones simultáneas y repetidas.
-  checks.lastRun = localDate(now);
-  saveChecks(checks, home);
-  const ids = pendingModels(listed, checks, MAX_PER_DAY, now);
-  const checked = [];
-  for (const id of ids) {
-    let record;
-    try { record = await check({ id, executor, adapter, now }); }
-    catch (error) { record = { status: 'failed', checkedAt: now.toISOString(), seconds: 0, reason: `No se pudo ejecutar la prueba: ${error.message}` }; }
-    checks.models[id] = record;
-    saveChecks(checks, home);
-    const summary = { id, status: record.status, reason: record.reason, seconds: record.seconds };
-    checked.push(summary);
-    log(summary);
-  }
-  return { checked };
 }

@@ -37,9 +37,10 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
-import { isDue, loadChecks, markDay, runChecks, startDailyCheck } from './model-check.js';
+import { isDue, loadChecks, markDay, startDailyCheck } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels } from './free-models.js';
 import { rankModels, renderRanking } from './model-rank.js';
+import { isExhausted } from './free-ranking.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 
@@ -789,13 +790,17 @@ async function cmdExecutors(positionals, values) {
     if (await isInstalled('opencode', { dir })) {
       const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
       if (auth.ok) {
-        const result = await runChecks({ executor, adapter, force: true });
-        if (!values.background) {
-          if (!result.checked.length) process.stdout.write('Nada nuevo que probar.\n');
-          for (const item of result.checked) process.stdout.write(item.status === 'approved'
-            ? `✔ ${item.id} aprobado (${item.seconds ?? 0} s)\n`
-            : `✘ ${item.id} fallido: ${item.reason}\n`);
-        }
+        const listed = await adapter.listModels(executor);
+        const metadata = await loadFreeMetadata({ home });
+        const candidates = discoverFreeModels({ listed, metadata: metadata.models, source: metadata.source, includeUnlisted: false });
+        const checks = loadChecks(home);
+        const available = candidates.filter(({ id }) => !isExhausted(checks, id));
+        const now = new Date();
+        const result = await rankModels({
+          candidates: available, executor, adapter, home, now,
+          log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/2 (${item.seconds} s)\n`),
+        });
+        if (!values.background) process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: available.length })}\n`);
       } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (opencode auth login); se omite la prueba de modelos.\n');
     } else if (!values.background) process.stdout.write('OpenCode no está instalado (agentrelay executors add opencode); se omite la prueba de modelos.\n');
     let written;
