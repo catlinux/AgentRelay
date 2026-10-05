@@ -114,20 +114,33 @@ function releaseTimestamp(value) {
 }
 
 /** Cruza los modelos de la cuenta con metadatos y devuelve los candidatos gratuitos. */
-export function discoverFreeModels({ listed = [], metadata = {}, source = 'sufijo' } = {}) {
+export function discoverFreeModels({ listed = [], metadata = {}, source = 'sufijo', includeUnlisted = true } = {}) {
   const models = metadata instanceof Map ? Object.fromEntries(metadata) : metadata;
   const ids = Array.isArray(listed) ? listed.map(listedId).filter((id) => typeof id === 'string') : [];
   const listedMetadataIds = new Set(ids.map(metadataId));
   const candidates = [];
+  const hasMetadata = Object.keys(models || {}).length > 0;
 
   for (const id of ids) {
     const model = models?.[metadataId(id)];
-    const hasMetadata = isObject(model);
-    if (hasMetadata ? !isZeroCost(model) : !isFreeModel(id)) continue;
+    const hasModelMetadata = isObject(model);
+    let reason;
+    if (hasModelMetadata && isZeroCost(model)) {
+      reason = 'metadatos';
+    } else if (hasModelMetadata && (model.cost?.input > 0 || model.cost?.output > 0)) {
+      continue;
+    } else if (isFreeModel(id)) {
+      reason = 'sufijo';
+    } else if (hasMetadata) {
+      reason = 'sin precio conocido';
+    } else {
+      continue;
+    }
     candidates.push({
       id,
       free: true,
-      reason: hasMetadata ? 'metadatos' : 'sufijo',
+      listed: true,
+      reason,
       name: model?.name ?? null,
       context: model?.limit?.context ?? null,
       reasoning: model?.reasoning ?? null,
@@ -136,7 +149,26 @@ export function discoverFreeModels({ listed = [], metadata = {}, source = 'sufij
     });
   }
 
+  const unlistedModels = Object.entries(models || {})
+    .filter(([id, model]) => isObject(model) && isZeroCost(model) && !listedMetadataIds.has(metadataId(id)))
+    .map(([id, model]) => ({
+      id: openCodeId(metadataId(id)),
+      free: true,
+      listed: false,
+      reason: 'metadatos, no listado',
+      name: model?.name ?? null,
+      context: model?.limit?.context ?? null,
+      reasoning: model?.reasoning ?? null,
+      toolCall: model?.tool_call ?? null,
+      releaseDate: model?.release_date ?? null,
+    }));
+  const unlisted = unlistedModels.map(({ id }) => id);
+  if (includeUnlisted) candidates.push(...unlistedModels);
+
+  const listedPriority = (candidate) => candidate.reason === 'sin precio conocido' ? 1 : 0;
   candidates.sort((a, b) => {
+    if (a.listed !== b.listed) return a.listed ? -1 : 1;
+    if (a.listed && listedPriority(a) !== listedPriority(b)) return listedPriority(a) - listedPriority(b);
     const aDate = releaseTimestamp(a.releaseDate);
     const bDate = releaseTimestamp(b.releaseDate);
     if (aDate === null) return bDate === null ? 0 : 1;
@@ -144,9 +176,6 @@ export function discoverFreeModels({ listed = [], metadata = {}, source = 'sufij
     return bDate - aDate;
   });
 
-  const unlisted = Object.entries(models || {})
-    .filter(([id, model]) => isObject(model) && isZeroCost(model) && !listedMetadataIds.has(metadataId(id)))
-    .map(([id]) => openCodeId(metadataId(id)));
   Object.defineProperty(candidates, 'unlisted', { value: unlisted, enumerable: true });
   return candidates;
 }

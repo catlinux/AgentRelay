@@ -712,7 +712,7 @@ async function cmdExecutors(positionals, values) {
       process.stderr.write('Uso: agentrelay executors rank [--max <N>] [--all] [--show] [--detach]\n');
       return 1;
     }
-    const max = values.max === undefined ? 8 : Number(values.max);
+    const max = values.max === undefined ? Infinity : Number(values.max);
     if (values.max !== undefined && (!/^\d+$/.test(values.max) || max < 1 || !Number.isSafeInteger(max))) {
       process.stderr.write('La opción --max debe ser un entero mayor o igual que 1.\n');
       return 1;
@@ -770,9 +770,10 @@ async function cmdExecutors(positionals, values) {
       }
       return 0;
     }
-    const selected = values.all ? candidates.length : Math.min(candidates.length, max);
+    const selected = Math.min(candidates.length, max);
+    const unlistedCount = candidates.filter((candidate) => candidate.listed === false).length;
     if (!values.background && !values.json) {
-      process.stdout.write(`Probando ${selected} de ${candidates.length} modelos gratuitos de OpenCode (máx. ${max}; usa --all para todos). Puede tardar varios minutos: cada prueba consume cuota gratuita.\n`);
+      process.stdout.write(`Rastreando ${selected} modelos que se sospecha que son gratuitos (${candidates.length - unlistedCount} de tu cuenta y ${unlistedCount} que solo constan como gratuitos en models.dev: si no existen en tu cuenta se descartan al momento). Puede tardar bastante: cada prueba consume cuota gratuita. Usa --max N para limitarlo.\n`);
       process.stdout.write(`Metadatos: ${metadata.source}\n`);
     }
     const now = new Date();
@@ -788,7 +789,7 @@ async function cmdExecutors(positionals, values) {
     }
     if (!values.background) {
       if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-      else process.stdout.write(`${renderRanking(result, { date: now, unlisted: candidates.unlisted, total: candidates.length })}\n`);
+      else process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: candidates.length })}\n`);
     }
     return 0;
   }

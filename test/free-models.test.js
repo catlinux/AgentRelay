@@ -41,6 +41,35 @@ test('usa el sufijo cuando falta metadata para un modelo listado', () => {
   });
   assert.equal(candidates.length, 1);
   assert.equal(candidates[0].reason, 'sufijo');
+  assert.equal(candidates[0].listed, true);
+});
+
+test('incluye precio desconocido solo cuando hay metadatos parciales disponibles', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/unknown-price', 'opencode/incomplete-price', 'opencode/model-free', 'opencode/paid-free', 'opencode/paid'],
+    metadata: {
+      'incomplete-price': { cost: { input: 0 } },
+      'paid-free': { cost: { input: 1, output: 1 } },
+      paid: { cost: { input: 2, output: 3 } },
+    },
+    source: 'red',
+  });
+  assert.deepEqual(candidates.map(({ id, reason, listed }) => ({ id, reason, listed })), [
+    { id: 'opencode/model-free', reason: 'sufijo', listed: true },
+    { id: 'opencode/unknown-price', reason: 'sin precio conocido', listed: true },
+    { id: 'opencode/incomplete-price', reason: 'sin precio conocido', listed: true },
+  ]);
+});
+
+test('sin metadatos solo considera candidatos con sufijo -free', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/unknown-price', 'opencode/model-free'],
+    metadata: {},
+    source: 'sufijo',
+  });
+  assert.deepEqual(candidates.map(({ id, reason }) => ({ id, reason })), [
+    { id: 'opencode/model-free', reason: 'sufijo' },
+  ]);
 });
 
 test('la caché reciente evita consultar la red y solo conserva opencode', async () => {
@@ -148,4 +177,40 @@ test('informa modelos gratuitos que la cuenta no lista', () => {
     source: 'red',
   });
   assert.deepEqual(candidates.unlisted, ['opencode/grok-code']);
+  assert.deepEqual(candidates.map(({ id, reason, listed }) => ({ id, reason, listed })), [
+    { id: 'opencode/listed', reason: 'metadatos', listed: true },
+    { id: 'opencode/grok-code', reason: 'metadatos, no listado', listed: false },
+  ]);
+});
+
+test('puede excluir los no listados sin perder la propiedad unlisted', () => {
+  const candidates = discoverFreeModels({
+    listed: [],
+    metadata: { 'grok-code': zeroCost() },
+    source: 'red',
+    includeUnlisted: false,
+  });
+  assert.equal(candidates.length, 0);
+  assert.deepEqual(candidates.unlisted, ['opencode/grok-code']);
+});
+
+test('ordena listados gratuitos, listados desconocidos y no listados en ese orden', () => {
+  const candidates = discoverFreeModels({
+    listed: ['opencode/unknown-price', 'opencode/listed-old', 'opencode/suffix-free', 'opencode/listed-new'],
+    metadata: {
+      'listed-old': zeroCost({ release_date: '2024-01-01' }),
+      'listed-new': zeroCost({ release_date: '2026-01-01' }),
+      'unknown-unlisted': zeroCost({ release_date: '2027-01-01' }),
+      'unknown-price-anchor': zeroCost(),
+    },
+    source: 'red',
+  });
+  assert.deepEqual(candidates.map(({ id, reason }) => ({ id, reason })), [
+    { id: 'opencode/listed-new', reason: 'metadatos' },
+    { id: 'opencode/listed-old', reason: 'metadatos' },
+    { id: 'opencode/suffix-free', reason: 'sufijo' },
+    { id: 'opencode/unknown-price', reason: 'sin precio conocido' },
+    { id: 'opencode/unknown-unlisted', reason: 'metadatos, no listado' },
+    { id: 'opencode/unknown-price-anchor', reason: 'metadatos, no listado' },
+  ]);
 });

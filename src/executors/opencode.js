@@ -59,6 +59,11 @@ export function buildArgs(executor, instruction) {
 }
 
 /** Extrae el resultado estructurado de la salida JSON de OpenCode. */
+// OpenCode informa el error como { type: 'error', error: { type, message } }; se admite también `message` plano.
+function errorMessage(event) {
+  return event.message ?? event.error?.message ?? event.error?.data?.message ?? '';
+}
+
 export function parseOutput(output) {
   const parsed = {
     text: '',
@@ -92,7 +97,7 @@ export function parseOutput(output) {
     } else if (event.type === 'text') {
       parsed.text += event.part?.text ?? '';
     } else if (event.type === 'error') {
-      parsed.errors.push(String(event.message ?? 'error desconocido'));
+      parsed.errors.push(String(errorMessage(event) || 'error desconocido'));
     }
   }
   parsed.usage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalCost };
@@ -135,7 +140,7 @@ export function toActivity(event, cwd) {
     const tokens = event.part?.tokens ?? {};
     return { kind: 'usage', inputTokens: tokens.input, outputTokens: tokens.output, cost: event.part?.cost };
   }
-  if (event.type === 'error') return { kind: 'error', message: String(event.message ?? '') };
+  if (event.type === 'error') return { kind: 'error', message: String(errorMessage(event)) };
   return null;
 }
 

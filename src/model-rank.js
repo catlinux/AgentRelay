@@ -102,14 +102,19 @@ export const HARD_TASK = normalizeTask({
 
 export function classifyProbeFailure(raw, record) {
   if (record?.status === 'approved') return null;
-  const executorFailure = classifyExecutorError(`${raw?.error ?? ''} ${raw?.rawError ?? ''}`);
+  const errorText = `${raw?.error ?? ''} ${raw?.rawError ?? ''}`;
+  const executorFailure = classifyExecutorError(errorText);
   if (executorFailure) return executorFailure;
+  if (/model not found|model unavailable|ProviderModelNotFoundError|unknown model|model (?:.*? )?(?:is )?not (?:available|supported)|does not exist|no such model/i.test(errorText)) return 'unavailable';
   if (raw?.timedOut || /tiempo agotado|tiempo máximo|tiempo maximo|timeout|timed out/i.test(record?.reason ?? '')) return 'timeout';
   return 'fail';
 }
 
+const ANSI = new RegExp(String.fromCharCode(27) + '\[[0-9;]*m', 'g');
+
 function failureDetail(raw) {
-  const text = String(raw?.error ?? raw?.rawError ?? '').replace(/s+/g, ' ').trim();
+  const clean = (value) => String(value ?? '').replace(ANSI, '').replace(/s+/g, ' ').trim();
+  const text = clean(raw?.rawError) || clean(raw?.error);
   return text ? text.slice(0, 100) : null;
 }
 
@@ -126,7 +131,7 @@ function probeView(record) {
 }
 
 function kindPriority(kind) {
-  return ({ fail: 0, timeout: 1, quota: 2, credentials: 3 })[kind] ?? 4;
+  return ({ fail: 0, timeout: 1, unavailable: 2, quota: 3, credentials: 4 })[kind] ?? 5;
 }
 
 function rankingOrder(a, b) {
@@ -145,7 +150,7 @@ async function safelyProbe(probe, options, now) {
   }
 }
 
-export async function rankModels({ candidates = [], executor, adapter, max = 8, all = false, home, now = new Date(), probes, log = () => {}, stopAfterQuota = 3 }) {
+export async function rankModels({ candidates = [], executor, adapter, max = Infinity, all = false, home, now = new Date(), probes, log = () => {}, stopAfterQuota = 3 }) {
   const orderedCandidates = candidates
     .map((candidate, index) => ({ candidate, index }))
     .sort((a, b) => Number(a.candidate?.toolCall === false) - Number(b.candidate?.toolCall === false) || a.index - b.index)
@@ -184,6 +189,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = 8, 
     const entry = {
       id: candidate.id,
       name: candidate.name,
+      listed: candidate.listed,
       source: candidate.reason,
       context: candidate.context,
       reasoning: candidate.reasoning,
@@ -207,7 +213,8 @@ export async function rankModels({ candidates = [], executor, adapter, max = 8, 
       saveChecks(lastChecks, home);
     }
 
-    quotaStreak = failedKind === 'quota' ? quotaStreak + 1 : 0;
+    if (failedKind === 'quota') quotaStreak += 1;
+    else if (failedKind !== 'unavailable') quotaStreak = 0;
     log(entry);
     if (stopAfterQuota > 0 && quotaStreak >= stopAfterQuota) {
       stoppedBy = 'cuota';
@@ -244,15 +251,18 @@ function contextNote(context) {
 
 function noteFor(entry) {
   const notes = [];
+  if (entry.kind === 'unavailable') notes.push('no disponible en tu cuenta');
   if (entry.kind === 'quota') notes.push('sin cuota o límite alcanzado');
   else if (entry.kind === 'credentials') notes.push('sin sesión');
   else if (entry.kind === 'timeout') notes.push('tiempo agotado');
-  if (entry.score === 0 && entry.detail) notes.push(entry.detail);
+  if (entry.kind === 'fail' && entry.detail) notes.push(entry.detail);
   const context = contextNote(entry.context);
   if (context) notes.push(context);
   if (entry.reasoning) notes.push('razona');
   if (entry.source === 'metadatos') notes.push('detectado por metadatos');
   else if (entry.source === 'sufijo') notes.push('por sufijo -free');
+  else if (entry.source === 'sin precio conocido') notes.push('precio desconocido');
+  else if (entry.source === 'metadatos, no listado') notes.push('no listado en tu cuenta');
   return notes.join(', ');
 }
 
@@ -285,7 +295,7 @@ export function renderRanking(result, { date, unlisted = [], total } = {}) {
   const tested = result?.tested ?? result?.entries?.length ?? 0;
   const totalCount = total ?? tested + (result?.skipped?.length ?? 0);
   const untested = Math.max(result?.skipped?.length ?? 0, totalCount - tested);
-  if (untested > 0 || totalCount > tested) {
+  if ((result?.skipped?.length ?? 0) > 0 || totalCount > tested) {
     lines.push(`Sin probar: ${untested} de ${totalCount} (usa --all para probarlos todos).`);
   }
   if (unlisted.length) {
