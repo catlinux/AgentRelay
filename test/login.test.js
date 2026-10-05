@@ -30,6 +30,7 @@ function cli(dir, args, extra = {}) {
       ...process.env,
       SSH_CONNECTION: '', SSH_TTY: '', DISPLAY: '', WAYLAND_DISPLAY: '', WSL_DISTRO_NAME: '',
       FAKE_CODEX_LOG: path.join(dir, 'calls.log'),
+      AGENTRELAY_HOME: path.join(dir, 'home'),
       ...extra,
     },
   });
