@@ -197,3 +197,19 @@ test('use interactivo muestra las marcas de prueba en los modelos de OpenCode', 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('use avisa cuando el archivo del proyecto vuelve a fijar el ejecutor o el modelo que se acaba de cambiar', () => {
+  const dir = temp();
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'codex', model: 'gpt-6-luna' } }, null, 2));
+    const changed = run(['use', 'cline', 'deepseek-v4-flash'], dir);
+    assert.equal(changed.status, 0, changed.stderr);
+    assert.match(changed.stdout, /Ojo: este cambio NO tiene efecto en este proyecto/);
+    assert.match(changed.stdout, /type, model/);
+    assert.match(changed.stdout, /agentrelay use --local/);
+    const local = run(['use', '--local', 'cline', 'deepseek-v4-flash'], dir);
+    assert.equal(local.status, 0, local.stderr);
+    assert.doesNotMatch(local.stdout, /Ojo: este cambio NO tiene efecto/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
