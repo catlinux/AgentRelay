@@ -246,10 +246,10 @@ const COMMANDS = {
   executors: {
     summary: 'Instala ejecutores y revisa modelos gratuitos.',
     usage: ['agentrelay executors', 'agentrelay executors add <nombre>', 'agentrelay executors check [--force]'],
-    description: 'Muestra cómo gestionar ejecutores, instala un ejecutor opcional o revisa modelos gratuitos nuevos de OpenCode. La comprobación diaria se ejecuta como máximo una vez al día salvo que indiques force.',
+    description: 'Muestra cómo gestionar ejecutores, instala un ejecutor opcional o actualiza el ranquing de modelos gratuitos de OpenCode y el informe diario. La comprobación diaria se ejecuta como máximo una vez al día salvo que indiques force.',
     options: [
       ['add <nombre>', 'Instala el ejecutor opcional indicado.'],
-      ['check [--force]', 'Revisa modelos gratuitos nuevos; force repite la comprobación del día.'],
+      ['check [--force]', 'Actualiza el ranquing de modelos gratuitos de OpenCode y el informe diario; force repite la comprobación del día.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],

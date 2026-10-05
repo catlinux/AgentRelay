@@ -6,6 +6,7 @@ import { EXECUTOR_DEFAULTS, agentrelayHome, loadConfig } from './config.js';
 import { CATALOG, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
 import { loadChecks } from './model-check.js';
+import { isExhausted, rankedFree, rankPosition } from './free-ranking.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dateOf = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -62,16 +63,6 @@ export async function collectReport({ current, home, now = new Date(), listModel
   return { current, now, date, balances, entries, checks };
 }
 
-function mark(model, checks, date) {
-  if (!model.id?.endsWith('-free')) return '';
-  const record = checks?.models?.[model.id];
-  const checkedDate = record?.checkedAt ? dateOf(new Date(record.checkedAt)) : null;
-  if (!record) return ' — · sin probar';
-  if (record.status === 'approved') return ` — ✔ probado (${checkedDate}, ${record.seconds ?? 0} s)`;
-  if (record.status === 'failed') return ` — ✘ no pasó la prueba: ${record.reason || 'motivo no indicado'}`;
-  return ' — · sin probar';
-}
-
 export function renderReport(data) {
   const lines = [`# Ejecutores disponibles — ${data.date}`, `Generado: ${data.now.toLocaleString('es-ES')}`, '', '## Saldos',
     `DeepSeek: ${data.balances.deepseek?.text || 'saldo no consultado: define la variable DEEPSEEK_API_KEY'}`,
@@ -87,12 +78,19 @@ export function renderReport(data) {
   }
   const opencode = data.entries.find((entry) => entry.name === 'opencode' && entry.installed);
   if (opencode) {
-    lines.push('', '## OpenCode: modelos gratuitos');
-    const models = (opencode.models || []).filter((model) => model.id?.endsWith('-free'));
-    const others = (opencode.models || []).filter((model) => !model.id?.endsWith('-free')).length;
-    if (models.length) for (const model of models) lines.push(`- ${model.id}${mark(model, data.checks, data.date)}`);
-    else lines.push('Sin modelos gratuitos disponibles');
-    if (others) lines.push(`Otros modelos de OpenCode (de pago o sin marca): ${others}`);
+    lines.push('', '## OpenCode: mejores gratuitos de hoy');
+    const models = rankedFree(data.checks, { now: data.now, max: 8 });
+    if (Array.isArray(data.checks?.ranking?.entries)) {
+      for (const model of models) {
+        const mark = model.score === 2 ? '✔✔' : '✔';
+        lines.push(`${rankPosition(data.checks, model.id)}. ${model.id} — ${mark} ${model.seconds ?? 0} s`);
+      }
+      if (models.stale) lines.push('(ranquing de hace más de 36 h; se actualiza el primer uso de cada día)');
+    } else {
+      lines.push('Sin ranquing todavía: agentrelay rank --run');
+    }
+    const exhausted = Object.keys(data.checks?.exhausted || {}).filter((id) => isExhausted(data.checks, id, data.now));
+    if (exhausted.length) lines.push(`Agotados hoy: ${exhausted.join(', ')}`);
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
