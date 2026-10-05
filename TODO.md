@@ -7,6 +7,7 @@ Solo lo pendiente. Lo hecho está en [CHANGELOG.md](CHANGELOG.md). Versiones: [S
 Necesitan al usuario en casa o una clave:
 
 - [ ] Probar `agentrelay start` en Taller con el orquestador y ajustar lo que falle.
+- [ ] Probar con una clave real el respaldo de Luna por API (`agentrelay login --api`) y, cuando se agote la cuota gratuita, el cambio automático y la vuelta a la gratuita; confirmar el texto real del error de Codex para afinar `parseQuotaReset`.
 - [ ] Probar los instaladores en equipos reales: compilar el `.exe` de Windows con Inno Setup y probarlo; probar `install-gui.sh` y el `.deb` en Debian/Ubuntu con pantalla. Después, decidir si se publican en una release de GitHub.
 - [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración previa) y dejarlo documentado. Windows y Linux (Debian) probados en la 0.0.2; falta rehacerlo con la 0.2.
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe diario).
@@ -14,7 +15,7 @@ Necesitan al usuario en casa o una clave:
 
 Mejoras acordadas:
 
-- [ ] Cadena de ejecutores: cuando se agota Luna (cuota gratuita por cuenta) el aviso ya propone alternativas y nunca cambia solo; falta afinar con el texto real del error de cuota de Codex y OpenCode (hoy se detecta con patrones genéricos).
+- [ ] Cadena de ejecutores: cuando se agota Luna (cuota gratuita por cuenta) el aviso ya propone alternativas (y, con respaldo `login --api`, Luna continúa con la API de pago y vuelve a la gratuita al restablecerse); con otros ejecutores nunca se cambia solo; falta afinar con el texto real del error de cuota de Codex y OpenCode (hoy se detecta con patrones genéricos).
 - [ ] Ranquing: más pruebas (hoy son dos) para distinguir mejor entre modelos que pasan ambas.
 - [ ] `doctor`: comprobar proveedor y credencial de Cline (hoy solo comprueba la sesión de Codex).
 - [ ] Alternativa con nvm en el instalador de Linux para distribuciones sin `apt` (decidir con el usuario).

@@ -12,9 +12,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInteractive, runProcess } from '../proc.js';
-import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, relativize, tail } from './common.js';
+import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, parseQuotaReset, relativize, tail } from './common.js';
 import { agentrelayHome } from '../config.js';
-import { isExhausted, markExhausted } from '../free-ranking.js';
+import { isExhausted, logQuotaEvent, markExhausted, recordQuotaRecovered } from '../free-ranking.js';
 import { loadChecks } from '../model-check.js';
 
 export const name = 'codex';
@@ -295,22 +295,56 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
     };
   };
 
-  if (quotaExhausted) return runCodex(true);
+  const exhaustedRecord = () => {
+    try { return loadChecks(agentrelayHome()).exhausted?.['codex:chatgpt'] ?? null; } catch { return null; }
+  };
+  const quotaResetAt = () => {
+    const until = exhaustedRecord()?.until;
+    return Number.isFinite(Date.parse(until)) ? new Date(until).toISOString() : undefined;
+  };
+  if (quotaExhausted) {
+    const apiResult = await runCodex(true);
+    const resetAt = quotaResetAt();
+    return resetAt ? { ...apiResult, quotaResetAt: resetAt } : apiResult;
+  }
 
   const result = await runCodex(false);
-  if (result.ok || !apiEnabled || classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`) !== 'quota') return result;
+  if (result.ok) {
+    try { recordQuotaRecovered('codex:chatgpt', { home: agentrelayHome() }); } catch { /* El registro no debe alterar la ejecución gratuita. */ }
+    return result;
+  }
+  if (!apiEnabled || classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`) !== 'quota') return result;
 
+  const now = new Date();
+  const reset = parseQuotaReset(`${result.error ?? ''} ${result.rawError ?? ''}`, now);
+  const resetKnown = Boolean(reset);
+  const delayMs = reset
+    ? Math.min(8 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, reset.getTime() - now.getTime() + 60 * 1000))
+    : 10 * 60 * 1000;
+  const until = new Date(now.getTime() + delayMs);
   try {
     markExhausted('codex:chatgpt', {
       home: agentrelayHome(),
-      ttlMs: 60 * 60 * 1000,
+      until,
+      resetKnown,
       reason: 'cuota gratuita de ChatGPT agotada',
+    });
+    logQuotaEvent(agentrelayHome(), {
+      id: 'codex:chatgpt', event: 'agotada', until, resetKnown,
+      reason: 'cuota gratuita de ChatGPT agotada', now,
     });
   } catch {
     // Un fallo al guardar el límite no debe impedir el intento con la API.
   }
-  onActivity?.({ kind: 'thinking', text: 'Cuota gratuita de ChatGPT agotada: sigo con tu clave de API (de pago).' });
-  return { ...await runCodex(true), fellBackFromQuota: true };
+  const hour = `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
+  onActivity?.({ kind: 'thinking', text: `Cuota gratuita de ChatGPT agotada (se vuelve a probar a las ${hour}): sigo con tu clave de API (de pago).` });
+  const apiResult = await runCodex(true);
+  const storedReset = quotaResetAt();
+  return {
+    ...apiResult,
+    fellBackFromQuota: true,
+    ...(storedReset ? { quotaResetAt: storedReset } : { quotaResetAt: until.toISOString() }),
+  };
 }
 
 export async function version(executor) {

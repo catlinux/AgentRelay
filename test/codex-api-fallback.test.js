@@ -46,7 +46,7 @@ function makeContext({ profile = false, quota = true } = {}) {
   };
 }
 
-test('codex: reintenta con API al agotar ChatGPT y después usa API directamente durante una hora', async () => {
+test('codex: reintenta con API al agotar ChatGPT y después usa API directamente hasta el siguiente reintento', async () => {
   const context = makeContext({ profile: true });
   try {
     assert.equal(hasApiProfile(), true);
@@ -57,7 +57,7 @@ test('codex: reintenta con API al agotar ChatGPT y después usa API directamente
     assert.equal(first.billing, 'api');
     assert.equal(first.fellBackFromQuota, true);
     assert.equal(isExhausted(loadChecks(context.home), 'codex:chatgpt'), true);
-    assert.ok(activity.some((event) => event.kind === 'thinking' && event.text === 'Cuota gratuita de ChatGPT agotada: sigo con tu clave de API (de pago).'));
+    assert.ok(activity.some((event) => event.kind === 'thinking' && /Cuota gratuita de ChatGPT agotada \(se vuelve a probar a las \d{2}:\d{2}\): sigo con tu clave de API \(de pago\)\./.test(event.text)));
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME, apiProfileDir()]);
 
     writeFileSync(context.log, '');

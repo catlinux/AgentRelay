@@ -89,13 +89,19 @@ export function renderReport(state, patch = '', { maxDiffChars = 60000 } = {}) {
       ? '**Aviso:** la cuota gratuita de ChatGPT se agotó y este trabajo se hizo con tu clave de API (de pago).'
       : '**Facturación:** este trabajo se hizo con tu clave de API (de pago), porque la cuota gratuita de ChatGPT sigue agotada.'
     : '';
+  const resetAtValue = [...state.attempts].reverse().find((attempt) => attempt.quotaResetAt)?.quotaResetAt;
+  const resetAt = resetAtValue ? new Date(resetAtValue) : null;
+  const quotaRetryNotice = resetAt && Number.isFinite(resetAt.getTime())
+    ? ` La cuota gratuita se vuelve a probar a las ${String(resetAt.getHours()).padStart(2, '0')}:${String(resetAt.getMinutes()).padStart(2, '0')} (hora local).`
+    : '';
+  const fullBillingNotice = billingNotice ? `${billingNotice}${quotaRetryNotice}` : '';
   const truncated = patch.length > maxDiffChars;
   const diff = truncated ? `${patch.slice(0, maxDiffChars)}\n... (diff truncado: ver diff.patch)` : patch;
   const executor = state.config.executor;
 
   return `# AgentRelay · ejecución ${state.id}
 
-${billingNotice ? `${billingNotice}\n\n` : ''}**Estado:** ${STATUS_LABELS[state.status] ?? state.status}
+${fullBillingNotice ? `${fullBillingNotice}\n\n` : ''}**Estado:** ${STATUS_LABELS[state.status] ?? state.status}
 ${state.statusReasons?.length ? `\n**Motivos:**\n${list(state.statusReasons)}\n` : ''}
 ## Tarea
 

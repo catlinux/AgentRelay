@@ -34,6 +34,58 @@ export function classifyExecutorError(text) {
   return null;
 }
 
+/** Extrae del error de cuota el instante a partir del que se puede reintentar. */
+export function parseQuotaReset(text, now = new Date()) {
+  const value = String(text ?? '');
+  const maxDelay = 8 * 24 * 60 * 60 * 1000;
+  const valid = (date) => {
+    if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return null;
+    const delay = date.getTime() - now.getTime();
+    return delay > 0 && delay <= maxDelay ? date : null;
+  };
+
+  for (const match of value.matchAll(/"resets_in_seconds"\s*:\s*(\d+(?:\.\d+)?)/gi)) {
+    const date = valid(new Date(now.getTime() + Number(match[1]) * 1000));
+    if (date) return date;
+  }
+  for (const match of value.matchAll(/"resets_at"\s*:\s*(\d{10}|\d{13})(?!\d)/gi)) {
+    const stamp = Number(match[1]);
+    const date = valid(new Date(match[1].length === 13 ? stamp : stamp * 1000));
+    if (date) return date;
+  }
+
+  const duration = value.match(/\btry again in\s+((?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|days?|d|seconds?|secs?|s)\s*(?:and\s*)?)+)/i);
+  if (duration) {
+    let milliseconds = 0;
+    const units = /([\d.]+)\s*(hours?|hrs?|h|minutes?|mins?|m|days?|d|seconds?|secs?|s)/gi;
+    for (const [, amount, unit] of duration[1].matchAll(units)) {
+      const factor = /^h/i.test(unit) ? 60 * 60 * 1000
+        : /^m/i.test(unit) ? 60 * 1000
+          : /^d/i.test(unit) ? 24 * 60 * 60 * 1000 : 1000;
+      milliseconds += Number(amount) * factor;
+    }
+    const date = valid(new Date(now.getTime() + milliseconds));
+    if (date) return date;
+  }
+
+  const time = value.match(/\btry again at\s+(\d{1,2}):(\d{2})(?:\s*(AM|PM))?\b/i);
+  if (time) {
+    let hour = Number(time[1]);
+    const minute = Number(time[2]);
+    if (minute < 60 && (time[3] ? hour >= 1 && hour <= 12 : hour <= 23)) {
+      if (time[3]) hour = (hour % 12) + (/PM/i.test(time[3]) ? 12 : 0);
+      let date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
+      if (date.getTime() <= now.getTime()) date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, minute);
+      const parsed = valid(date);
+      if (parsed) return parsed;
+    }
+  }
+
+  const dateText = value.match(/\btry again (?:at|on)\s+(.+?)(?:[\r\n]|$)/i)?.[1]?.trim().replace(/[.,]+$/, '');
+  if (dateText) return valid(new Date(Date.parse(dateText)));
+  return null;
+}
+
 /** Busca el último bloque JSON del texto final con el informe del ejecutor. */
 export function extractAgentReport(text) {
   if (!text) return null;

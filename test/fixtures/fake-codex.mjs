@@ -34,7 +34,8 @@ if (args[0] === '--version') {
 if (process.env.FAKE_CODEX_QUOTA_UNLESS_HOME) {
   appendFileSync(process.env.FAKE_CODEX_LOG, `${JSON.stringify({ CODEX_HOME: process.env.CODEX_HOME || null })}\n`);
   if (path.resolve(process.env.CODEX_HOME || '') !== path.resolve(process.env.FAKE_CODEX_QUOTA_UNLESS_HOME)) {
-    process.stdout.write(`${JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit. Try again in 3 hours." } })}\n`);
+    const message = process.env.FAKE_CODEX_QUOTA_MESSAGE || "You've hit your usage limit. Try again in 3 hours.";
+    process.stdout.write(`${JSON.stringify({ type: 'turn.failed', error: { message } })}\n`);
     process.exit(1);
   }
   process.stdout.write(`${JSON.stringify({ type: 'thread.started', thread_id: 'fake-thread' })}\n`);
