@@ -83,7 +83,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex') } });
     writeFileSync(path.join(dir, 'CLAUDE.md'), `${PROJECT_BLOCK.replace('## Delegación con AgentRelay', '## Delegación (versión anterior)')}\n`);
 
-    writeFileSync(path.join(claudeDir, 'commands', 'ar', 'estado.md'), 'anterior\n<!-- agentrelay:managed -->');
+    writeFileSync(path.join(claudeDir, 'commands', 'ar', 'status.md'), 'anterior\n<!-- agentrelay:managed -->');
     const outdated = doctor(dir, claudeDir);
     assert.match(outdated.stdout, /Los comandos de Claude Code .*desactualizados\. Ejecuta "agentrelay setup"/);
     const legacyDir = path.join(claudeDir, 'commands', 'agentrelay');
@@ -100,7 +100,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     const current = doctor(dir, claudeDir);
     assert.match(current.stdout, /Comandos de Claude Code .*al d[aí]a/);
     assert.match(current.stdout, /Instrucciones de AgentRelay en este proyecto: al día/);
-    for (const name of ['actualizar', 'ayuda', 'doctor', 'estado', 'iniciar', 'lista', 'ranquing-nuevo', 'ranquing', 'usar', 'ver']) {
+    for (const name of ['check', 'config', 'doctor', 'executors', 'help', 'init', 'list', 'login', 'rank', 'recover', 'review', 'run', 'set', 'setup', 'show', 'start', 'status', 'unset', 'update', 'use']) {
       writeFileSync(path.join(claudeDir, 'commands', 'ar', `${name}.md`), 'archivo propio');
     }
     const foreign = doctor(dir, claudeDir);

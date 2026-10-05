@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 export const MANAGED_MARK = '<!-- agentrelay:managed -->';
 
-// Comandos de versiones anteriores que ya no existen (los sustituye /ar:usar).
+// Comandos de versiones anteriores que ya no existen (ahora cada /ar:<comando> se llama igual que en el terminal).
 // Se retiran del equipo del usuario, pero solo si llevan la marca de AgentRelay.
-export const RETIRED_COMMANDS = ['modelo.md', 'esfuerzo.md', 'ejecutor.md', 'nivel.md', 'triaje.md'];
+export const RETIRED_COMMANDS = ['modelo.md', 'esfuerzo.md', 'ejecutor.md', 'nivel.md', 'triaje.md', 'estado.md', 'usar.md', 'ayuda.md', 'lista.md', 'ver.md', 'actualizar.md', 'iniciar.md', 'ranquing.md', 'ranquing-nuevo.md'];
 
 export function commandsSourceDir() {
   return fileURLToPath(new URL('../assets/claude-commands/ar/', import.meta.url));
