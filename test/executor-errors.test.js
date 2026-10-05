@@ -15,7 +15,15 @@ test('clasifica errores de credenciales', () => {
 });
 
 test('clasifica errores de cuota o saldo', () => {
-  for (const text of ['insufficient_quota', 'Quota exceeded', 'exceeded your current quota', 'billing issue', 'insufficient balance', 'out of credits', 'payment required', 'HTTP 402']) {
+  for (const text of [
+    'insufficient_quota', 'Quota exceeded', 'exceeded your current quota', 'billing issue', 'insufficient balance', 'out of credits', 'payment required', 'HTTP 402',
+    "You've hit your usage limit. Upgrade to Pro or try again in 3 hours",
+    "You've reached your usage limit",
+    'usage limit reached', 'usage_limit_reached',
+    '5-hour usage limit', 'weekly usage limit',
+    'Usage limit reached; try again at midnight',
+    'plan limit',
+  ]) {
     assert.equal(classifyExecutorError(text), 'quota', text);
   }
 });

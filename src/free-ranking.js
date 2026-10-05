@@ -20,14 +20,15 @@ export function pruneExhausted(checks, now = new Date()) {
   return checks;
 }
 
-export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada' } = {}) {
+export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada', ttlMs } = {}) {
   const checks = pruneExhausted(loadChecks(home), now);
+  const until = ttlMs === undefined ? endOfLocalDay(now) : new Date(now.getTime() + ttlMs);
   const exhausted = checks.exhausted && typeof checks.exhausted === 'object' && !Array.isArray(checks.exhausted)
     ? checks.exhausted
     : {};
   checks.exhausted = {
     ...exhausted,
-    [id]: { at: now.toISOString(), until: endOfLocalDay(now).toISOString(), reason },
+    [id]: { at: now.toISOString(), until: until.toISOString(), reason },
   };
   saveChecks(checks, home);
   return checks.exhausted[id];

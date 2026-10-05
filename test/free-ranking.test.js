@@ -61,6 +61,18 @@ test('markExhausted guarda hasta medianoche local y conserva datos previos', () 
   }
 });
 
+test('markExhausted admite una duración personalizada', () => {
+  const home = makeHome();
+  try {
+    const now = new Date('2026-10-05T14:30:00.000Z');
+    const record = markExhausted('codex:chatgpt', { home, now, ttlMs: 60 * 60 * 1000, reason: 'cuota gratuita agotada' });
+    assert.equal(record.until, '2026-10-05T15:30:00.000Z');
+    assert.equal(record.reason, 'cuota gratuita agotada');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('isExhausted compara el instante actual con until', () => {
   const checks = { exhausted: { 'vendor/model-free': { until: '2026-10-06T00:00:00.000Z' } } };
   assert.equal(isExhausted(checks, 'vendor/model-free', new Date('2026-10-05T23:59:59.999Z')), true);

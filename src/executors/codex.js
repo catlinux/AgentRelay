@@ -12,9 +12,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInteractive, runProcess } from '../proc.js';
-import { clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, relativize, tail } from './common.js';
+import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, relativize, tail } from './common.js';
+import { agentrelayHome } from '../config.js';
+import { isExhausted, markExhausted } from '../free-ranking.js';
+import { loadChecks } from '../model-check.js';
 
 export const name = 'codex';
+
+export function apiProfileDir() {
+  return path.join(agentrelayHome(), 'codex-api');
+}
+
+export function hasApiProfile() {
+  return existsSync(path.join(apiProfileDir(), 'auth.json'));
+}
 
 /** Modelos visibles de la caché local de Codex; nunca falla si no está disponible. */
 export async function listModels(executor, { codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex') } = {}) {
@@ -232,44 +243,74 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   const args = [...prefix, ...buildArgs(executor, instructionFor(promptFile), schemaFile)];
   const timeoutMs = executor.timeoutSeconds ? executor.timeoutSeconds * 1000 : undefined;
 
-  const res = await runProcess(command, args, {
-    cwd,
-    timeoutMs,
-    onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
-  });
-  const parsed = parseOutput(`${res.stdout}\n${res.stderr}`);
-  const ok = res.code === 0 && parsed.finishReason === 'completed';
-
-  let error = null;
-  if (res.error) {
-    error = res.error.code === 'ENOENT'
-      ? `No se encuentra Codex CLI ("${command}"). Instala la extensión de OpenAI para VS Code o Codex CLI (npm i -g @openai/codex), inicia sesión con "codex login" y vuelve a probar, o ajusta executor.command.`
-      : res.error.message;
-  } else if (res.timedOut) {
-    error = `El ejecutor ha superado el tiempo máximo (${executor.timeoutSeconds} s)`;
-  } else if (!ok) {
-    error = parsed.errors.join('\n')
-      || (parsed.finishReason ? `Finalización no completada: ${parsed.finishReason}` : '')
-      || tail(res.stderr.trim())
-      || `El ejecutor terminó con código ${res.code}`;
+  const apiEnabled = executor.apiFallback !== false && hasApiProfile();
+  let quotaExhausted = false;
+  if (apiEnabled) {
+    try {
+      quotaExhausted = isExhausted(loadChecks(), 'codex:chatgpt');
+    } catch {
+      quotaExhausted = false;
+    }
   }
+  const runCodex = async (useApi) => {
+    const res = await runProcess(command, args, {
+      cwd,
+      timeoutMs,
+      ...(useApi ? { env: { CODEX_HOME: apiProfileDir() } } : {}),
+      onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
+    });
+    const parsed = parseOutput(`${res.stdout}\n${res.stderr}`);
+    const ok = res.code === 0 && parsed.finishReason === 'completed';
 
-  return {
-    ok,
-    exitCode: res.code,
-    timedOut: res.timedOut,
-    finishReason: parsed.finishReason,
-    text: parsed.text,
-    report: extractAgentReport(parsed.text),
-    usage: parsed.usage,
-    model: executor.model ? { provider: 'openai', id: executor.model } : null,
-    iterations: parsed.iterations,
-    toolCalls: parsed.toolCalls,
-    durationMs: res.durationMs,
-    error,
-    rawOutput: res.stdout,
-    rawError: res.stderr,
+    let error = null;
+    if (res.error) {
+      error = res.error.code === 'ENOENT'
+        ? `No se encuentra Codex CLI ("${command}"). Instala la extensión de OpenAI para VS Code o Codex CLI (npm i -g @openai/codex), inicia sesión con "codex login" y vuelve a probar, o ajusta executor.command.`
+        : res.error.message;
+    } else if (res.timedOut) {
+      error = `El ejecutor ha superado el tiempo máximo (${executor.timeoutSeconds} s)`;
+    } else if (!ok) {
+      error = parsed.errors.join('\n')
+        || (parsed.finishReason ? `Finalización no completada: ${parsed.finishReason}` : '')
+        || tail(res.stderr.trim())
+        || `El ejecutor terminó con código ${res.code}`;
+    }
+
+    return {
+      ok,
+      exitCode: res.code,
+      timedOut: res.timedOut,
+      finishReason: parsed.finishReason,
+      text: parsed.text,
+      report: extractAgentReport(parsed.text),
+      usage: parsed.usage,
+      model: executor.model ? { provider: 'openai', id: executor.model } : null,
+      iterations: parsed.iterations,
+      toolCalls: parsed.toolCalls,
+      durationMs: res.durationMs,
+      error,
+      rawOutput: res.stdout,
+      rawError: res.stderr,
+      billing: useApi ? 'api' : 'chatgpt',
+    };
   };
+
+  if (quotaExhausted) return runCodex(true);
+
+  const result = await runCodex(false);
+  if (result.ok || !apiEnabled || classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`) !== 'quota') return result;
+
+  try {
+    markExhausted('codex:chatgpt', {
+      home: agentrelayHome(),
+      ttlMs: 60 * 60 * 1000,
+      reason: 'cuota gratuita de ChatGPT agotada',
+    });
+  } catch {
+    // Un fallo al guardar el límite no debe impedir el intento con la API.
+  }
+  onActivity?.({ kind: 'thinking', text: 'Cuota gratuita de ChatGPT agotada: sigo con tu clave de API (de pago).' });
+  return { ...await runCodex(true), fellBackFromQuota: true };
 }
 
 export async function version(executor) {
