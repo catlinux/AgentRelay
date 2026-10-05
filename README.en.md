@@ -45,7 +45,7 @@ AgentRelay never commits or pushes: changes stay in your folder for you to revie
 | **OpenCode** (optional) | OpenCode free models | Free |
 | **Cline** (optional) | Any provider with an API key (e.g. DeepSeek) | Whatever the provider charges |
 
-Switch between them with a single command: `agentrelay use` (interactive) or `agentrelay use opencode`.
+Switch between them with a single command: `agentrelay use` (interactive) or `agentrelay use opencode`. The first use each day, AgentRelay tests and ranks the free OpenCode models for you (`agentrelay rank`) and `use` offers today's best.
 
 ## Requirements
 
@@ -55,7 +55,7 @@ Switch between them with a single command: `agentrelay use` (interactive) or `ag
 
 ## Installation
 
-Step-by-step guide for each system: **[INSTALL.en.md](INSTALL.en.md)**. In short:
+Guide for each system, with installers for Windows and Debian: **[INSTALL.en.md](INSTALL.en.md)**. In short:
 
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
@@ -76,6 +76,8 @@ agentrelay watch    # 2. (in another terminal) watch the executor work
 3. In your orchestrator's chat, ask for what you want in plain language. It delegates, reviews and reports back.
 
 To switch AI: `agentrelay use`. To see where you are: `agentrelay status`. If something fails: `agentrelay doctor`.
+
+**The same commands in the terminal and in the Claude Code chat:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay rank` ↔ `/ar:rank`... (all except `watch`). `agentrelay help` lists them.
 
 **Everything else, with examples: [User manual](docs/MANUAL.md)** (in Spanish; the commands and examples are the same).
 

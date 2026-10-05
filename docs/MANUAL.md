@@ -2,246 +2,126 @@
 
 [Volver al README](../README.md) · [Instalación](../INSTALL.md)
 
-Este manual explica cómo usar AgentRelay día a día, con ejemplos. Cada apartado responde a la pregunta «quiero hacer X».
-
-**Idea básica:** hablas con tu orquestador (por ejemplo, Claude Code) como siempre. El orquestador piensa y revisa, y AgentRelay le pasa el trabajo de escribir código a una IA más barata (el **ejecutor**). Casi nunca tendrás que escribir comandos de `agentrelay` tú: los lanza el orquestador. Este manual sirve para lo que sí haces tú: preparar, elegir la IA y vigilar.
+**Idea básica:** hablas con tu orquestador (por ejemplo, Claude Code) como siempre. Él piensa y revisa; AgentRelay pasa el trabajo de escribir código a una IA más barata, el **ejecutor**. Casi nunca tendrás que escribir comandos: el orquestador los usa por ti.
 
 > En Windows (PowerShell o cmd) escribe `agentrelay.cmd` en lugar de `agentrelay`.
 
-## Índice
+## 1. Los comandos: iguales en el terminal y en el chat
 
-1. [Empezar en un proyecto](#1-empezar-en-un-proyecto)
-2. [Cambiar de IA](#2-cambiar-de-ia)
-3. [Ver qué hace el ejecutor](#3-ver-qué-hace-el-ejecutor)
-4. [Revisar y decidir](#4-revisar-y-decidir)
-5. [Saber en qué punto está el proyecto](#5-saber-en-qué-punto-está-el-proyecto)
-6. [Comandos en el chat de Claude Code](#6-comandos-en-el-chat-de-claude-code)
-7. [Cuando algo falla](#7-cuando-algo-falla)
-8. [Delegar a mano (sin orquestador)](#8-delegar-a-mano-sin-orquestador)
-9. [Configuración](#9-configuración)
-10. [Chuleta de comandos](#10-chuleta-de-comandos)
+Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En el chat de Claude Code solo hay que añadir `/ar:` delante: `agentrelay use opencode` ↔ `/ar:use opencode`. Escribe `/ar` y aparecen con autocompletado. `agentrelay help <comando>` (o `/ar:help <comando>`) explica cualquiera con opciones y ejemplos.
 
----
+| Comando | Qué hace |
+|---|---|
+| `setup` | Instala las instrucciones globales, los comandos `/ar:` y el hook de Claude Code (una vez por equipo). |
+| `start` | Prepara el proyecto y comprueba que todo funciona. |
+| `init` | Añade las instrucciones de AgentRelay al proyecto (y el repositorio git si falta). |
+| `use` | Cambia de IA (ejecutor, modelo, esfuerzo) o aplica un perfil. `use --list` lista todos los modelos. |
+| `rank` | Muestra el ranquing de modelos gratuitos de OpenCode; `--run` lo calcula; `--detach` lo lanza en segundo plano. |
+| `status` | En qué punto está el proyecto y qué hacer ahora. |
+| `list` · `show [id]` | Tareas delegadas y el informe de una. |
+| `review <id> --decision …` | Acepta, corrige, escala o rechaza una tarea. |
+| `run <tarea.json>` | Delega una tarea a mano. |
+| `check [id]` · `recover [id]` | Repite las validaciones · recupera tareas interrumpidas. |
+| `doctor [--fix]` | Diagnostica el entorno y arregla lo seguro. |
+| `login` | Conecta tu cuenta de ChatGPT. |
+| `config` · `set` · `unset` | Ver o cambiar ajustes sueltos. |
+| `executors add\|check` | Instala un ejecutor opcional · actualiza el ranquing y el informe diario. |
+| `update [--yes]` | Actualiza AgentRelay. |
+| `help [comando]` | Ayuda. |
 
-## 1. Empezar en un proyecto
+Solo en el terminal: `watch` (sigue en directo lo que hace el ejecutor; en el chat no se puede seguir en directo) y `hook` (uso interno de Claude Code). En el chat, los comandos que cambian algo (`setup`, `init`, `start`, `update`) explican qué harían y se aplican añadiendo `--yes`.
 
-**Una sola vez, después de instalar** (ver [INSTALL.md](../INSTALL.md)):
+## 2. Empezar
+
+**Una vez, después de instalar** ([INSTALL.md](../INSTALL.md)):
 
 ```sh
 agentrelay setup
 ```
 
-Enseña a Claude Code a delegar con AgentRelay en cualquier proyecto e instala los comandos `/ar:…` del chat. Te ofrece también conectar tu cuenta de ChatGPT.
-
-**En cada proyecto** (en su carpeta):
+**En cada proyecto**, en su carpeta:
 
 ```sh
 agentrelay start
 ```
 
-Hace todo lo necesario, preguntando antes de cambiar nada:
+Prepara la carpeta (git y las instrucciones para el orquestador), deja el repositorio limpio con un commit si hace falta, comprueba que todo funciona y te da un mensaje para pegar en el chat del orquestador. Después pídele el trabajo en lenguaje normal: «Añade un formulario de contacto con validación».
 
-1. Prepara la carpeta: crea el repositorio git si no existe y añade las instrucciones para el orquestador (`AGENTS.md` y `CLAUDE.md`).
-2. Deja el repositorio limpio con un commit, si hace falta.
-3. Comprueba que todo funciona (como `agentrelay doctor`).
-4. Te dice qué hacer ahora y te da un mensaje para pegar en el chat del orquestador.
+Las instrucciones de `setup` solo se cargan en **sesiones nuevas** de Claude Code: tras instalar, ciérralo y ábrelo de nuevo. En otra terminal, `agentrelay watch` te deja ver trabajar al ejecutor.
 
-Ejemplo:
+## 3. Cambiar de IA
 
 ```sh
-cd ~/proyectos/mi-web
-agentrelay start
+agentrelay use                       # interactivo: te pregunta con números
+agentrelay use opencode              # directo: ejecutor (con su modelo por defecto)
+agentrelay use codex gpt-5.5 alto    # ejecutor, modelo y esfuerzo, en cualquier orden
+agentrelay use bajo                  # solo el esfuerzo
+agentrelay use --list                # todos los modelos, con el esfuerzo que admite cada uno
 ```
 
-Después, abre el chat de tu orquestador en esa carpeta y pídele el trabajo en lenguaje normal: «Añade un formulario de contacto con validación».
+Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `high`, `xhigh`, `max`). Usa el más bajo que funcione: gasta menos.
 
-## 2. Cambiar de IA
+**Perfiles:** `agentrelay use --save gratis` guarda la combinación actual; `agentrelay use gratis` la aplica.
 
-Un solo comando: `agentrelay use`.
-
-**Interactivo** (te pregunta todo con números):
-
-```sh
-agentrelay use
-```
-
-```
-En uso: codex · gpt-6-luna · esfuerzo por defecto
-
-¿Qué ejecutor?
-   1) Codex (OpenAI)  ← en uso
-   2) Cline  (no instalado)
-   3) OpenCode
-Elige un número (Enter = sin cambios): 3
-¿Qué modelo?
-   1) opencode/nemotron-3-ultra-free
-   2) opencode/mimo-v2.6-flash-free
-   …
-¿Qué esfuerzo de razonamiento?
-   1) por defecto
-   2) bajo
-   3) medio
-   4) alto
-✔ Ahora: opencode · opencode/nemotron-3-ultra-free · esfuerzo alto
-¿Guardarlo como perfil? Escribe un nombre (Enter = no): gratis
-```
-
-**Directo** (ejecutor, modelo y esfuerzo, en cualquier orden; pon solo lo que quieras cambiar):
-
-```sh
-agentrelay use opencode                    # cambia de ejecutor (con su modelo por defecto)
-agentrelay use codex gpt-5.5               # ejecutor y modelo
-agentrelay use codex alto                  # ejecutor y esfuerzo
-agentrelay use bajo                        # solo el esfuerzo
-agentrelay use gpt-6-luna                  # solo el modelo
-agentrelay use codex defecto               # vuelve al esfuerzo por defecto
-```
-
-Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o en inglés: `low`, `medium`, `high`, `xhigh`, `max`). Usa el más bajo que funcione: gasta menos.
-
-**Ver todos los modelos** de todos los ejecutores, con el esfuerzo que admite cada uno:
-
-```sh
-agentrelay use --list
-```
-
-```
-Codex (OpenAI) (codex) · instalado · cuenta de ChatGPT · en uso
-  ● gpt-6-luna  bajo* medio alto extremo máximo
-    gpt-5.5     medio* alto
-OpenCode (opencode) · no instalado · gratis
-    (instálalo con: opencode auth login)
-Cline (cline) · no instalado · clave de API
-    (instálalo con: agentrelay executors add cline)
-```
-
-`●` marca el modelo en uso y `*`, el esfuerzo por defecto. En el chat: `/ar:usar --list`.
-
-**Modelos gratuitos de OpenCode.** Cambian a menudo, así que AgentRelay los prueba por ti: el primer uso de cada día (`run` o `start`), y en segundo plano, prueba con una tarea de ejemplo los modelos `-free` que aún no conoce. A esa prueba solo se le envía esa tarea de ejemplo, nunca tu código. En `use --list` y en el menú de `use` cada modelo gratuito sale marcado: `✔ probado (fecha)`, `✘ no pasó la prueba` o `· sin probar`. Nunca se cambia de modelo solo: tú eliges. Para lanzarlo a mano: `agentrelay executors check` (con `--force` repite la revisión del día). Para desactivarlo: variable de entorno `AGENTRELAY_NO_MODEL_CHECK=1`.
-
-**Informe diario de ejecutores.** Ese mismo disparo del primer uso del día (o `agentrelay executors check`) escribe `.agentrelay/EJECUTORES.md` en la carpeta donde esté AgentRelay, aunque no tengas OpenCode. El archivo se sobrescribe cada día (no acumula historial) y empieza por los **saldos**: el de DeepSeek se consulta si defines la variable de entorno `DEEPSEEK_API_KEY` (AgentRelay solo la lee de ahí y no la guarda ni la imprime); OpenAI no ofrece ninguna API para consultar el saldo con una clave, así que el informe solo enlaza a su panel de facturación. Después van el ejecutor en uso y, por cada ejecutor, si está instalado, si tiene sesión y sus modelos (con las marcas de la prueba diaria en los de OpenCode).
-
-**Ranquing de modelos gratuitos de OpenCode.** `agentrelay executors rank` busca los modelos gratuitos que ofrece tu cuenta, los prueba con dos tareas de ejemplo (una sencilla y otra más difícil) y los ordena de mejor a peor como ejecutor (primero los que aprueban las dos pruebas y, entre ellos, los más rápidos). Los gratuitos se detectan con los precios de [models.dev](https://models.dev), la misma fuente que usa OpenCode, así que también salen los que no llevan `-free` en el nombre. La cuota que te queda no se puede consultar: se deduce de las pruebas, y un modelo que devuelve «límite o cuota agotada» sale marcado así (y si varios seguidos lo hacen, se detienen las pruebas). Rastrea **todos** los que se sospecha que son gratuitos: los que tu cuenta lista con coste cero, los que acaban en `-free`, los listados de los que no se conoce el precio, y los que models.dev da por gratuitos aunque tu cuenta no los liste (se intentan igualmente y, si no existen en tu cuenta, salen como «no disponible» al instante). Con `--max N` puedes limitar cuántos prueba; cada prueba gasta cuota gratuita y puede tardar minutos. `--detach` lo lanza en segundo plano y `--show` enseña el último ranquing guardado sin probar nada. Para usar el primero: `agentrelay use opencode <modelo>`. Solo se envía una tarea de ejemplo a los modelos gratuitos, nunca tu código.
-
-**Perfiles** (guarda tus combinaciones favoritas con un nombre):
-
-```sh
-agentrelay use opencode bajo
-agentrelay use --save gratis      # guarda lo actual como «gratis»
-
-agentrelay use codex alto
-agentrelay use --save bueno       # guarda lo actual como «bueno»
-
-agentrelay use gratis             # cambia a la combinación «gratis»
-agentrelay use bueno              # y vuelve a «bueno»
-```
-
-**Ver qué está en uso:** `agentrelay use` fuera de un terminal interactivo (o `/ar:usar` en el chat) muestra el ejecutor, el modelo, el esfuerzo y tus perfiles.
-
-**Ajustes sueltos** (poco frecuentes): `agentrelay set timeout 1800` y `agentrelay unset timeout`.
-
-**Solo para este proyecto:** añade `--local` (`agentrelay use --local opencode`). Se guarda en `agentrelay.config.json` del proyecto y tiene prioridad sobre tu ajuste general.
-
-**Los ejecutores:**
+**Solo para este proyecto:** añade `--local` (`agentrelay use --local opencode`). Se guarda en `agentrelay.config.json` del proyecto y tiene prioridad sobre tu ajuste general. Si el proyecto ya fija un ajuste que acabas de cambiar, `use` te avisa de que no tendrá efecto allí.
 
 | Ejecutor | Qué necesita | Cómo se conecta |
 |---|---|---|
-| `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita). Viene incluido. | `agentrelay login` |
-| `opencode` | Modelos gratuitos de OpenCode. Se instala con `agentrelay executors add opencode` (o desde `agentrelay use opencode`); si ya lo tienes en el PATH, se usa ese. | `opencode auth login` |
-| `cline` | Una clave de API (por ejemplo, DeepSeek). `agentrelay use` ofrece instalarlo. | `npx cline auth …` (el comando exacto aparece al instalarlo) |
+| `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita) o clave de API de OpenAI. Viene incluido. | `agentrelay login` |
+| `opencode` | Modelos gratuitos y de pago de OpenCode. Se instala con `agentrelay executors add opencode`. | `opencode auth login` |
+| `cline` | Una clave de API, por ejemplo de DeepSeek. Se instala con `agentrelay executors add cline`. | El comando que muestra al instalarlo |
 
-## 3. Ver qué hace el ejecutor
+AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
 
-Abre **otro terminal** en la carpeta del proyecto y deja esto en marcha:
+### Modelos gratuitos de OpenCode
 
-```sh
-agentrelay watch
-```
+Cambian a menudo, así que AgentRelay los vigila por ti. **El primer uso de cada día** (`run` o `start`), en segundo plano, prueba con dos tareas de ejemplo los modelos gratuitos que tu cuenta lista, los ordena de mejor a peor y escribe `.agentrelay/EJECUTORES.md` (saldos, estado de cada IA y los mejores gratuitos de hoy). Solo se envía una tarea de ejemplo, nunca tu código.
 
-Verás en directo cada paso: qué archivos lee y edita, qué pruebas lanza y si pasan. Sigue automáticamente cada tarea nueva hasta que pulses Ctrl+C.
-
-En VS Code: divide el terminal, ejecuta `agentrelay watch` en una mitad y trabaja en la otra o en el chat.
+- `agentrelay use` y `use --list` muestran esos gratuitos **en orden** y con su tiempo; los que fallaron no aparecen (`--all` los muestra todos).
+- Los gratuitos se detectan con los precios de [models.dev](https://models.dev), la misma fuente que usa OpenCode, así que también salen los que no llevan `-free` en el nombre.
+- La cuota restante no se puede consultar: se deduce de las pruebas. Si una tarea real se queda sin cuota con un modelo, queda marcado como agotado hasta mañana y el aviso te propone los siguientes del ranquing. **Nunca se cambia de modelo solo.**
+- `agentrelay rank` enseña el último ranquing; `rank --run` lo recalcula (también los modelos que models.dev da por gratuitos aunque tu cuenta no los liste, que salen como «no disponible»).
+- Saldos: DeepSeek se consulta si defines `DEEPSEEK_API_KEY` (AgentRelay solo la lee de ahí); OpenAI no ofrece ninguna API de saldo, así que el informe enlaza a su panel.
+- Se desactiva con la variable de entorno `AGENTRELAY_NO_MODEL_CHECK=1`.
 
 ## 4. Revisar y decidir
 
 Normalmente lo hace el orquestador, pero puedes hacerlo tú:
 
 ```sh
-agentrelay list                  # todas las tareas y su estado
-agentrelay show                  # informe de la última (diff, pruebas, informe del ejecutor)
-agentrelay show 20261003-101500-ab12
+agentrelay list                     # tareas y su estado
+agentrelay show                     # informe de la última (diff, pruebas, informe del ejecutor)
+agentrelay review <id> --decision accept                           # vale (repite las pruebas antes)
+agentrelay review <id> --decision fix --feedback "falta el caso vacío"
+agentrelay review <id> --decision escalate                         # lo hará el orquestador
+agentrelay review <id> --decision reject                           # descartar
 ```
 
-Decidir sobre una tarea:
+AgentRelay **nunca** hace commits ni push: los cambios quedan en tu carpeta. Si el ejecutor no devuelve su informe estructurado, o cambia archivos que no declaró, el informe lo avisa arriba.
 
-```sh
-agentrelay review <id> --decision accept                          # vale (repite las pruebas antes)
-agentrelay review <id> --decision fix --feedback "falta el caso vacío"   # que lo corrija
-agentrelay review <id> --decision escalate                        # lo hará el orquestador
-agentrelay review <id> --decision reject                          # descartar
-```
+`agentrelay status` resume rama, IA en uso, tareas por revisar y **qué hacer ahora**; se guarda también en `.agentrelay/ESTADO.md`, que el orquestador lee al empezar.
 
-AgentRelay **nunca** hace commits ni push: los cambios quedan en tu carpeta. Tras aceptar, el commit lo haces tú o el orquestador.
+## 5. Cuando algo falla
 
-## 5. Saber en qué punto está el proyecto
-
-```sh
-agentrelay status
-```
-
-Resume: rama y cambios pendientes, IA en uso, tareas por revisar, últimos commits, pendientes del `TODO.md` y **qué hacer ahora**. El mismo resumen se guarda en `.agentrelay/ESTADO.md` y se actualiza solo; el orquestador lo lee al empezar, así que basta con decirle «continúa».
-
-## 6. Comandos en el chat de Claude Code
-
-`agentrelay setup` instala estos comandos. Escribe `/ar` en el chat y aparecen con autocompletado. Todo lo importante se puede hacer desde el chat, sin salir de Claude Code. Ojo: `/ar:usar` cambia la IA **del ejecutor**, no la de Claude (para eso está `/model` de Claude Code).
-
-| En el chat | Qué hace |
-|---|---|
-| `/ar:estado` | Ejecutor, modelo, esfuerzo, sesión y avisos. |
-| `/ar:usar` | Muestra la IA en uso y tus perfiles. |
-| `/ar:usar opencode` | Cambia de ejecutor. |
-| `/ar:usar codex alto` | Cambia ejecutor y esfuerzo. |
-| `/ar:usar gratis` | Aplica el perfil «gratis». |
-| `/ar:ayuda` | Lista de comandos; `/ar:ayuda use` explica un comando con opciones y ejemplos. |
-| `/ar:ranquing` | Último ranquing de modelos gratuitos de OpenCode (de mejor a peor como ejecutor). |
-| `/ar:ranquing-nuevo` | Lanza un ranquing nuevo en segundo plano (`--max N`, `--all`); tarda varios minutos. |
-| `/ar:doctor` | Comprueba el entorno; `/ar:doctor --fix --yes` aplica los arreglos seguros. |
-| `/ar:lista` | Resumen de las ejecuciones del proyecto (destaca las que necesitan atención). |
-| `/ar:ver <id>` | Informe de una ejecución (sin id, la última). |
-| `/ar:actualizar` | Comprueba si hay una versión nueva; `/ar:actualizar --yes` la aplica. |
-| `/ar:iniciar` | Prepara el proyecto; sin `--yes` solo explica qué haría, con `/ar:iniciar --yes` lo aplica. |
-
-En el terminal son los mismos comandos sin `/ar:` (`agentrelay use …`, `agentrelay doctor`, `agentrelay help …`). Lo que necesita seguir en directo (`watch`) o decidir tú (`review`) se hace desde el terminal.
-
-## 7. Cuando algo falla
-
-**Primer paso siempre:**
-
-```sh
-agentrelay doctor
-```
-
-Comprueba Node, git, el ejecutor, la sesión y las instrucciones, y dice qué comando arregla cada cosa. Si hay arreglos seguros disponibles, `agentrelay doctor --fix` los aplica preguntando antes de cada uno (con `--yes`, sin preguntar).
+**Primer paso siempre:** `agentrelay doctor` (`--fix` aplica los arreglos seguros, preguntando antes de cada uno).
 
 | Problema | Solución |
 |---|---|
-| «no es un repositorio git» | `agentrelay start` (o `agentrelay init`) |
-| «No hay sesión» de Codex | `agentrelay login` (sin navegador: `agentrelay login --device`) |
-| El repositorio tiene cambios sin confirmar | Haz commit antes de delegar: `git add -A && git commit -m "..."` |
-| Una tarea se quedó colgada (`running (¿interrumpida?)`) | `agentrelay recover` lista las interrumpidas y `agentrelay recover <id>` la cierra |
+| «no es un repositorio git» | `agentrelay start` (o `init`) |
+| «No hay sesión» de Codex | `agentrelay login` (sin navegador: `login --device`) |
+| El repositorio tiene cambios sin confirmar | Haz commit antes de delegar |
+| El modelo «X» no está disponible para el ejecutor Y | Mira de dónde sale con `agentrelay config` y cámbialo con `agentrelay use` |
+| Tarea colgada (`running (¿interrumpida?)`) | `agentrelay recover` y `recover <id>` |
 | Instrucciones desactualizadas tras actualizar | `agentrelay setup` y, en el proyecto, `agentrelay init` |
 | En Windows, errores de `sed`, `dirname` o `uname` | Usa `agentrelay.cmd` |
-| Ejecutor no instalado | `agentrelay use` y elígelo: te ofrece instalarlo |
+| Ejecutor no instalado | `agentrelay executors add <nombre>` |
+| Codex falla en Windows con «apply deny-read ACLs» | Añade `-c windows.sandbox=unelevated` a `executor.extraArgs` |
 
-**Actualizar AgentRelay:**
+Con una clave de API en Codex se **sustituye la sesión de ChatGPT**: para volver a la cuenta, `agentrelay login`.
 
-```sh
-agentrelay update
-```
+## 6. Delegar a mano (sin orquestador)
 
-## 8. Delegar a mano (sin orquestador)
-
-Útil para probar. Escribe la tarea en un archivo JSON:
+Útil para probar. Escribe la tarea en un JSON y lánzala con `agentrelay run tarea.json`:
 
 ```json
 {
@@ -253,75 +133,25 @@ agentrelay update
 }
 ```
 
-Y lánzala:
-
-```sh
-agentrelay run tarea.json
-```
-
 | Campo | Para qué |
 |---|---|
 | `objective` | **Obligatorio.** Qué hay que conseguir. |
-| `context` | Lo que el ejecutor debe saber: tecnología, convenciones, decisiones ya tomadas. |
-| `files` | Archivos que puede tocar. |
-| `constraints` | Restricciones («no cambies la API pública»). |
-| `acceptanceCriteria` | Cómo saber que está bien. |
-| `validation` | Comandos que comprueban el resultado (`npm test`, `npm run lint`…). |
-| `doNotModify` | Archivos prohibidos; si acaba en `/`, una carpeta entera. |
+| `context` | Lo que el ejecutor debe saber: tecnología, convenciones, decisiones tomadas. |
+| `files` · `doNotModify` | Archivos que puede tocar · prohibidos (si acaba en `/`, una carpeta). |
+| `constraints` · `acceptanceCriteria` | Restricciones · cómo saber que está bien. |
+| `validation` | Comandos que comprueban el resultado (`npm test`…). |
 | `complexity` | `trivial`, `normal` (por defecto) o `complex`. |
-| `effort` | Opcional. Esfuerzo de razonamiento solo para esta tarea (`low`, `medium`, `high`, `xhigh`, `max`, `none`); sustituye al de la configuración. |
-| `model` | Opcional. Modelo solo para esta tarea; sustituye al de la configuración. |
+| `effort` · `model` | Opcionales: esfuerzo y modelo solo para esta tarea. |
 
-Prueba completa con el proyecto de ejemplo: [examples/demo](../examples/demo) y [examples/demo-task.json](../examples/demo-task.json).
+Prueba completa con el proyecto de ejemplo: [examples/demo](../examples/demo) y [examples/demo-task.json](../examples/demo-task.json). Si algo falla, el ejecutor recibe los errores y lo corrige solo, hasta 2 veces; después la tarea pasa al orquestador.
 
-```sh
-cp -r /ruta/a/AgentRelay/examples/demo ~/agentrelay-demo
-cd ~/agentrelay-demo
-git init && git add -A && git commit -m "demo"
-agentrelay run /ruta/a/AgentRelay/examples/demo-task.json
-```
+## 7. Configuración
 
-Si algo falla, el ejecutor recibe los errores y lo corrige solo, hasta 2 veces. Después, la tarea pasa al orquestador.
-
-## 9. Configuración
-
-No hace falta tocar archivos: `agentrelay use` cubre lo habitual. Si quieres ver o ajustar el resto:
-
-```sh
-agentrelay config            # valores en uso y de qué archivo sale cada uno
-agentrelay config path       # dónde están los archivos
-agentrelay config init       # crea tu archivo, con cada opción explicada
-```
-
-Hay dos archivos:
+`agentrelay use` cubre lo habitual. Para el resto: `agentrelay config` (valores en uso y de qué archivo sale cada uno), `config path`, `config init`.
 
 | Archivo | Para qué |
 |---|---|
 | `~/.agentrelay/config.json` | Tus ajustes generales y tus perfiles. |
 | `agentrelay.config.json` (en el proyecto) | Lo que cambia solo en ese proyecto. Se añade a `.gitignore`. |
 
-Los dos admiten comentarios `//`. Las opciones más útiles:
-
-- `executor.timeoutSeconds`: tiempo máximo de una tarea (por defecto, 1200 s).
-- `validation.commands`: comandos que se ejecutan en todas las tareas del proyecto, por ejemplo `["npm test"]`.
-
-## 10. Chuleta de comandos
-
-| Quiero… | Comando |
-|---|---|
-| Preparar AgentRelay (una vez) | `agentrelay setup` |
-| Empezar o continuar un proyecto | `agentrelay start` |
-| Cambiar de IA | `agentrelay use` |
-| Cambiar de IA directamente | `agentrelay use opencode` · `agentrelay use codex alto` |
-| Guardar / usar un perfil | `agentrelay use --save gratis` · `agentrelay use gratis` |
-| Ver al ejecutor trabajando | `agentrelay watch` |
-| Ver el estado del proyecto | `agentrelay status` |
-| Listar tareas | `agentrelay list` |
-| Ver un informe | `agentrelay show [id]` |
-| Aceptar o pedir corrección | `agentrelay review <id> --decision accept` · `… fix --feedback "…"` |
-| Diagnosticar | `agentrelay doctor` |
-| Conectar ChatGPT | `agentrelay login` |
-| Actualizar | `agentrelay update` |
-| Ayuda completa | `agentrelay --help` |
-
-Opciones que valen en casi todos: `-q` (solo lo esencial), `-v` (más detalle), `--json` (salida para programas).
+Admiten comentarios `//`. Los más útiles: `executor.timeoutSeconds` (por defecto 1200 s) y `validation.commands` (comandos que se ejecutan en todas las tareas, por ejemplo `["npm test"]`). Opciones comunes de casi todos los comandos: `-q`, `-v`, `--json`.

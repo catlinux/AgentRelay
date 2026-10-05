@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { commandNames } from '../src/help.js';
 import { RETIRED_COMMANDS, commandsSourceDir, commandsStatus, commandsTargetDir, installCommands, listCommands, MANAGED_MARK, removeCommands, legacyCommandsDir, removeLegacyCommands } from '../src/claude-commands.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
@@ -110,4 +111,9 @@ test('los comandos retirados se borran del equipo solo si llevan la marca de Age
     assert.deepEqual(removed.removed.sort(), listCommands().map(({ name }) => name));
     assert.ok(existsSync(path.join(target, 'triaje.md')));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('cada comando del terminal tiene su /ar:<comando> con el mismo nombre (salvo watch y hook) y no sobra ninguno', () => {
+  const expected = commandNames().filter((name) => !['watch', 'hook'].includes(name)).map((name) => `${name}.md`).sort();
+  assert.deepEqual(listCommands().map(({ name }) => name), expected);
 });

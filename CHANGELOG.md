@@ -8,19 +8,28 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
-- `agentrelay executors rank`: busca los modelos gratuitos de OpenCode (por los precios de models.dev, así que incluye los gratuitos sin `-free` en el nombre; con caché de 24 h y recurso al sufijo sin conexión), los prueba con una tarea sencilla y otra más difícil, detecta los que fallan por cuota o límite, y los ordena de mejor a peor como ejecutor, mostrando el comando para usar el primero. Rastrea todos los modelos sospechosos de ser gratuitos: con coste cero, con `-free`, de precio desconocido y los que models.dev da por gratuitos aunque la cuenta no los liste (si no existen salen como «no disponible»). Opciones `--max N`, `--show` (último ranquing guardado), `--detach` (segundo plano) y `--json`; en el chat, `/ar:ranquing` y `/ar:ranquing-nuevo`. La cuota restante no se puede consultar: se deduce de las pruebas.
-- `agentrelay setup` avisa de que las instrucciones de delegación solo se cargan en sesiones nuevas de Claude Code (también los instaladores de Windows y Debian y `INSTALL.md`), y, si no puede escribir el archivo global de instrucciones, lo dice con claridad (qué archivo, por qué y cómo cambiar de carpeta con `--claude-dir`) en lugar de mostrar el error técnico.
-- Instalador de Debian/Ubuntu en `installer/debian/`: `install.sh` (Git y Node.js con apt si se pide con `--install-deps`, clon o actualización del repositorio, `npm ci`, comando en `~/.local/bin`, `setup` con los ejecutores elegidos y `doctor`; admite `--dry-run`), `install-gui.sh` (asistente con Zenity que lo llama y pide la contraseña de sudo con una ventana) y `build-deb.sh` (genera el paquete `.deb` del asistente). Sin probar todavía en un equipo Debian real.
-- Instalador de Windows en `installer/windows/`: `install.ps1` (instala Node.js y Git con winget si faltan, clona o actualiza el repositorio, `npm ci`, `npm link`, `agentrelay setup` con los ejecutores elegidos y `doctor`; admite `-DryRun`) y `agentrelay.iss`, el asistente de Inno Setup que lo presenta con ventanas. El `.exe` no se publica en el repositorio y aún no está compilado ni probado en un equipo real.
-- Cuando una ejecución falla por cuota o saldo del ejecutor, el informe propone alternativas con el comando exacto (Codex, modelos gratuitos de OpenCode ya aprobados, DeepSeek Flash) y las instrucciones del orquestador le piden preguntar al usuario cuál prefiere. Nunca se cambia de ejecutor solo.
+- **Comandos iguales en el terminal y en el chat.** Cada comando de `agentrelay` tiene su `/ar:<comando>` con el mismo nombre y los mismos argumentos (20 comandos; sin `watch` ni `hook`). Los archivos se generan a partir de la ayuda. En el chat, los que cambian algo (`setup`, `init`, `start`, `update`) se aplican añadiendo `--yes`.
+- **`agentrelay rank`**: busca los modelos gratuitos de OpenCode por los precios de models.dev (también los que no llevan `-free`, con caché de 24 h y recurso al sufijo sin conexión), los prueba con una tarea sencilla y otra más difícil, detecta cuota agotada o modelo no disponible y los ordena de mejor a peor. Sin opciones muestra el último ranquing; `--run` lo calcula, `--detach` lo lanza en segundo plano, `--max N` limita, `--json`.
+- **Ranquing automático.** La revisión diaria (primer uso de cada día, en segundo plano) actualiza el ranquing de los modelos gratuitos que la cuenta lista y el informe `.agentrelay/EJECUTORES.md` (saldos de DeepSeek con `DEEPSEEK_API_KEY`, estado de cada IA y los mejores gratuitos de hoy). `agentrelay use` y `use --list` muestran esos gratuitos en orden y con su tiempo (`--all` los muestra todos). Si una tarea real agota la cuota de un modelo, queda marcado hasta el día siguiente. Nunca se cambia de modelo solo.
+- **Protección de la configuración.** `run` y `doctor` comprueban que el modelo existe para el ejecutor antes de gastar intentos (evita el 404 de Codex con un modelo de DeepSeek), y `use` avisa si el archivo del proyecto vuelve a fijar el ejecutor, el modelo, el proveedor o el esfuerzo que acabas de cambiar.
+- **Avisos en los informes:** ejecutor sin informe estructurado y archivos cambiados que no declaró (por ejemplo, ediciones tuyas durante la ejecución). Si una ejecución falla por cuota, se proponen alternativas con el comando exacto.
+- `agentrelay setup` avisa de que las instrucciones solo se cargan en sesiones nuevas de Claude Code y, si no puede escribir el archivo global, lo explica con claridad.
+- **Instaladores** en `installer/` (sin probar en equipos reales): `install.ps1` y un asistente de Inno Setup para Windows; `install.sh`, un asistente con Zenity y `build-deb.sh` para Debian/Ubuntu.
 
 ### Cambiado
 
-- El informe diario `.agentrelay/EJECUTORES.md` es ahora un resumen del estado de las IA: saldos, ejecutor en uso, una línea por ejecutor y solo los modelos gratuitos de OpenCode con su marca (sin listas largas de modelos).
+- Documentación revisada y reducida: manual, instalación, README, diseño y TODO (solo lo pendiente).
+- Los tests ya no dependen de la configuración personal del usuario.
+
+### Eliminado
+
+- Los nombres en castellano de los comandos del chat (`/ar:estado`, `usar`, `ayuda`, `lista`, `ver`, `actualizar`, `iniciar`, `ranquing`, `ranquing-nuevo`): ahora se llaman como en el terminal (`/ar:status`, `use`, `help`, `list`, `show`, `update`, `start`, `rank`). `agentrelay setup` los retira.
+- La antigua revisión diaria de 5 modelos nuevos, `executors rank` (ahora `rank`) y los documentos `docs/PLAN.md` y `docs/MODELOS.md`.
 
 ### Corregido
 
-- El adaptador de OpenCode leía mal los errores: el mensaje viene en `error.message` y se perdía («error desconocido»), con lo que no se detectaban bien los errores de cuota o de modelo no disponible. Ahora se lee el mensaje real.
+- El adaptador de OpenCode leía mal los errores (el mensaje viene en `error.message`), con lo que no se detectaban bien la cuota agotada ni el modelo no disponible.
+- El prompt del ejecutor indica usar `npm.cmd` si PowerShell bloquea `npm.ps1`.
 
 ## [0.2.0] - 2026-10-04
 
