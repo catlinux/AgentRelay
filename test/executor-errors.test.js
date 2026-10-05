@@ -4,6 +4,8 @@ import { readEvents } from '../src/events.js';
 import { startRun } from '../src/orchestrator.js';
 import { normalizeTask } from '../src/task.js';
 import { classifyExecutorError } from '../src/executors/common.js';
+import { isExhausted } from '../src/free-ranking.js';
+import { loadChecks } from '../src/model-check.js';
 import { baseTask, fakePlan, makeRepo, testConfig } from './helpers.js';
 
 test('clasifica errores de credenciales', () => {
@@ -78,6 +80,33 @@ test('un error normal continúa reintentándose', async () => {
     assert.deepEqual(state.attempts.slice(0, 2).map((attempt) => attempt.kind), ['implement', 'fix']);
     assert.equal(readEvents(repo.dir, state.id).some((event) => event.type === 'retry'), true);
   } finally {
+    repo.cleanup();
+  }
+});
+
+test('marca agotado un modelo de OpenCode cuando la ejecución falla por cuota', async () => {
+  const repo = makeRepo();
+  const home = `${repo.dir}/agentrelay-home`;
+  const oldHome = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = home;
+  try {
+    const model = 'vendor/model-free';
+    const state = await startRun({
+      root: repo.dir,
+      task: normalizeTask(baseTask()),
+      config: testConfig({
+        executor: {
+          type: 'opencode', provider: 'fake', model,
+          command: [process.execPath, '-e', "const args=process.argv.slice(1); if (args[0] === 'auth') process.stdout.write('OpenCode account stored'); else if (args[0] === '--version') process.stdout.write('opencode test'); else { process.stderr.write('insufficient_quota'); process.exit(1); }"],
+        },
+      }),
+    });
+
+    assert.equal(state.status, 'failed');
+    assert.equal(isExhausted(loadChecks(home), model), true);
+  } finally {
+    if (oldHome === undefined) delete process.env.AGENTRELAY_HOME;
+    else process.env.AGENTRELAY_HOME = oldHome;
     repo.cleanup();
   }
 });

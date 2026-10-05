@@ -25,6 +25,8 @@ import { isInstalled } from './executors/catalog.js';
 import { loadChecks } from './model-check.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
+import { agentrelayHome } from './config.js';
+import { markExhausted } from './free-ranking.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -199,6 +201,9 @@ async function continueCycle(ctx, result) {
           ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
           : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
         if (errorKind === 'quota') {
+          if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
+            try { markExhausted(ctx.config.executor.model, { home: agentrelayHome() }); } catch {}
+          }
           try {
             const installed = {
               opencode: await isInstalled('opencode'),

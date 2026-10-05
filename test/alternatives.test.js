@@ -19,28 +19,79 @@ test('propone añadir OpenCode si no está instalado y omite el ejecutor actual'
   ]);
 });
 
-test('incluye hasta tres modelos gratuitos aprobados, más recientes primero', () => {
+test('incluye hasta tres modelos según el ranquing guardado', () => {
   const hint = alternativesHint({
     current: { type: 'codex', model: 'gpt-6-luna' },
-    checks: { models: {
-      'vendor/old-free': { status: 'approved', checkedAt: '2026-01-01T00:00:00Z' },
-      'vendor/newest-free': { status: 'approved', checkedAt: '2026-03-01T00:00:00Z' },
-      'vendor/middle-free': { status: 'approved', checkedAt: '2026-02-01T00:00:00Z' },
-      'vendor/fourth-free': { status: 'approved', checkedAt: '2026-02-15T00:00:00Z' },
-      'vendor/failed-free': { status: 'failed', checkedAt: '2026-04-01T00:00:00Z' },
-      'vendor/paid': { status: 'approved', checkedAt: '2026-05-01T00:00:00Z' },
+    checks: { ranking: {
+      at: new Date().toISOString(),
+      entries: [
+        { id: 'vendor/newest-free', score: 2 },
+        { id: 'vendor/fourth-free', score: 2 },
+        { id: 'vendor/middle-free', score: 1 },
+        { id: 'vendor/old-free', score: 1 },
+        { id: 'vendor/failed-free', score: 0 },
+      ],
     } },
     installed: { opencode: true, cline: true },
   });
 
   assert.deepEqual(hint.split('\n'), [
     'Alternativas (no se cambia nada solo; elige una):',
-    '- OpenCode gratis, probado: agentrelay use opencode vendor/newest-free',
-    '- OpenCode gratis, probado: agentrelay use opencode vendor/fourth-free',
-    '- OpenCode gratis, probado: agentrelay use opencode vendor/middle-free',
+    '- OpenCode gratis (nº 1 del ranquing): agentrelay use opencode vendor/newest-free',
+    '- OpenCode gratis (nº 2 del ranquing): agentrelay use opencode vendor/fourth-free',
+    '- OpenCode gratis (nº 3 del ranquing): agentrelay use opencode vendor/middle-free',
     '- DeepSeek de pago (Flash): agentrelay use cline deepseek-v4-flash (necesita su clave de API)',
     lastLine,
   ]);
+});
+
+test('el ranquing omite el modelo actual y los agotados conservando su posición', () => {
+  const hint = alternativesHint({
+    current: { type: 'codex', model: 'vendor/current-free' },
+    checks: {
+      models: { 'vendor/exhausted-free': { status: 'approved', checkedAt: new Date().toISOString() } },
+      exhausted: { 'vendor/exhausted-free': { until: new Date(Date.now() + 60_000).toISOString() } },
+      ranking: {
+        at: new Date().toISOString(),
+        entries: [
+          { id: 'vendor/current-free', score: 2 },
+          { id: 'vendor/exhausted-free', score: 2 },
+          { id: 'vendor/remaining-free', score: 2 },
+        ],
+      },
+    },
+    installed: { opencode: true, cline: true },
+  });
+
+  assert.match(hint, /OpenCode gratis \(nº 3 del ranquing\): agentrelay use opencode vendor\/remaining-free/);
+  assert.doesNotMatch(hint, /vendor\/current-free|vendor\/exhausted-free/);
+});
+
+test('propone otro modelo de OpenCode tras agotar el actual', () => {
+  const hint = alternativesHint({
+    current: { type: 'opencode', model: 'vendor/current-free' },
+    checks: { ranking: {
+      at: new Date().toISOString(),
+      entries: [
+        { id: 'vendor/current-free', score: 2 },
+        { id: 'vendor/alternative-free', score: 1 },
+      ],
+    } },
+    installed: { opencode: true, cline: true },
+  });
+
+  assert.match(hint, /OpenCode gratis \(nº 2 del ranquing\): agentrelay use opencode vendor\/alternative-free/);
+  assert.doesNotMatch(hint, /agentrelay use opencode vendor\/current-free/);
+});
+
+test('sin ranquing mantiene las sugerencias de modelos aprobados', () => {
+  const hint = alternativesHint({
+    current: { type: 'codex', model: 'gpt-6-luna' },
+    checks: { models: { 'vendor/approved-free': { status: 'approved', checkedAt: new Date().toISOString() } } },
+    installed: { opencode: true, cline: true },
+  });
+
+  assert.match(hint, /OpenCode gratis, probado: agentrelay use opencode vendor\/approved-free/);
 });
 
 test('sin modelos aprobados ofrece probar modelos nuevos y omite OpenCode actual', () => {
