@@ -19,12 +19,13 @@ import { configTemplate } from './config-template.js';
 import { CATALOG, executorsDir, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
 import { loadChecks } from './model-check.js';
+import { isExhausted, rankPosition, rankedFree } from './free-ranking.js';
 import { parseSettingValue } from './settings.js';
 
 export const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
 const effortLabel = (effort) => (effort ? EFFORT_ES[effort] || effort : 'por defecto');
 
-function modelMark(id, checks) {
+function legacyModelMark(id, checks) {
   if (!id.endsWith('-free')) return '';
   const record = checks.models[id];
   if (record?.status === 'approved') {
@@ -34,6 +35,32 @@ function modelMark(id, checks) {
   }
   if (record?.status === 'failed') return '  ✘ no pasó la prueba';
   return '  · sin probar';
+}
+
+function hasRanking(checks) {
+  return Array.isArray(checks?.ranking?.entries) && checks.ranking.entries.length > 0;
+}
+
+function rankedModels(models, checks) {
+  const available = new Map(models.map((model) => [model.id, model]));
+  const ranked = rankedFree(checks);
+  const result = ranked.filter((entry) => available.has(entry.id))
+    .map((entry) => ({ ...available.get(entry.id), ranking: entry }));
+  Object.defineProperty(result, 'stale', { value: ranked.stale });
+  return result;
+}
+
+function rankingMark(id, checks, now = new Date()) {
+  const entry = rankedFree(checks, { now }).find((item) => item.id === id);
+  if (entry) {
+    const position = rankPosition(checks, id);
+    const score = entry.score >= 2 ? '✔✔' : '✔';
+    const seconds = Number.isFinite(entry.seconds) ? entry.seconds : '—';
+    return `#${position} ${score} ${seconds} s`;
+  }
+  if (isExhausted(checks, id, now)) return 'agotado hoy';
+  if (checks.models[id]?.status === 'failed') return '✘';
+  return '';
 }
 
 /** Devuelve el esfuerzo normalizado si el texto es un esfuerzo (alto, high…), o null. */
@@ -150,10 +177,26 @@ async function interactive(current, ask, helpers) {
   const checks = entry.name === 'opencode' ? loadChecks() : null;
   let model = null;
   if (models.length) {
-    const items = [...models.map((item) => `${item.id}${item.id === executor.model ? '  ← en uso' : ''}${checks ? modelMark(item.id, checks) : ''}`), 'Otro (escribirlo)'];
-    const index = await pick(ask, '¿Qué modelo?', items, models.findIndex((item) => item.id === executor.model) >= 0 ? models.findIndex((item) => item.id === executor.model) : 0);
-    if (index === models.length) choice.model = (await ask('Modelo: ')).trim() || undefined;
-    else { model = models[index]; choice.model = model.id; }
+    let choices = models;
+    if (checks && hasRanking(checks)) {
+      choices = rankedModels(models, checks);
+      if (executor.model && !choices.some((item) => item.id === executor.model)) {
+        choices = [{ id: executor.model, currentOnly: true }, ...choices];
+      }
+    }
+    const items = [...choices.map((item) => {
+      const mark = checks && hasRanking(checks)
+        ? rankingMark(item.id, checks)
+        : checks ? legacyModelMark(item.id, checks) : '';
+      const shortMark = item.ranking
+        ? `  #${rankPosition(checks, item.id)}  ${item.ranking.score >= 2 ? '✔✔' : '✔'} ${Number.isFinite(item.ranking.seconds) ? item.ranking.seconds : '—'} s`
+        : mark ? `  ${mark}` : '';
+      return `${item.id}${item.id === executor.model ? '  ← en uso' : ''}${shortMark}`;
+    }), 'Otro (escribirlo)'];
+    const currentIndex = choices.findIndex((item) => item.id === executor.model);
+    const index = await pick(ask, '¿Qué modelo?', items, currentIndex >= 0 ? currentIndex : 0);
+    if (index === choices.length) choice.model = (await ask('Modelo: ')).trim() || undefined;
+    else { model = choices[index]; choice.model = model.id; }
   } else {
     const typed = (await ask(`Modelo (Enter = ${executor.model || 'por defecto'}): `)).trim();
     if (typed) choice.model = typed;
@@ -177,7 +220,7 @@ async function modelsOf(type, executor, timeoutMs = 20_000) {
 }
 
 /** agentrelay use --list: todos los ejecutores y sus modelos en un solo sitio. */
-async function listAll(current, out) {
+async function listAll(current, out, values = {}) {
   const dir = executorsDir();
   for (const entry of CATALOG) {
     const installed = entry.bundled || await isInstalled(entry.name, { dir });
@@ -188,10 +231,29 @@ async function listAll(current, out) {
     const checks = entry.name === 'opencode' ? loadChecks() : null;
     if (error) out(`    (no se pudo leer la lista: ${error})`);
     else if (!models.length) out(`    modelo por defecto: ${EXECUTOR_DEFAULTS[entry.name].model || '—'} (este ejecutor no ofrece lista)`);
+    if (entry.name === 'opencode' && !values.all && hasRanking(checks)) {
+      const ranked = rankedModels(models, checks);
+      const rankedIds = new Set(ranked.map((model) => model.id));
+      for (const model of ranked) {
+        const currentMark = entry.name === current.type && model.id === current.model ? '●' : ' ';
+        const position = rankPosition(checks, model.id);
+        const score = model.ranking.score >= 2 ? '✔✔' : '✔';
+        const seconds = Number.isFinite(model.ranking.seconds) ? model.ranking.seconds : '—';
+        out(`  ${currentMark} ${model.id}  #${position}  ${score} ${seconds} s`);
+      }
+      const exhausted = models.map((model) => model.id).filter((id) => isExhausted(checks, id));
+      const additional = models.filter((model) => !rankedIds.has(model.id) && !exhausted.includes(model.id)).length;
+      if (additional > 0) out(`  (+${additional} modelos más de OpenCode sin probar o que no pasaron las pruebas: agentrelay use --list --all)`);
+      if (exhausted.length) out(`  Agotados hoy (vuelven mañana): ${exhausted.join(', ')}`);
+      if (ranked.stale) out('  (ranquing de hace más de 36 h; se actualiza el primer uso de cada día, o a mano con: agentrelay rank --run)');
+      continue;
+    }
     for (const model of models) {
       const efforts = model.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
-      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}${checks ? modelMark(model.id, checks) : ''}`);
+      const mark = checks ? (values.all && hasRanking(checks) ? rankingMark(model.id, checks) : legacyModelMark(model.id, checks)) : '';
+      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}${mark ? `  ${mark}` : ''}`);
     }
+    if (entry.name === 'opencode' && !values.all && !hasRanking(checks)) out('  Aún no hay ranquing de modelos gratuitos: agentrelay rank --run');
   }
   out('Cambia con: agentrelay use <ejecutor> <modelo> [esfuerzo]   (* = esfuerzo por defecto)');
 }
@@ -206,7 +268,7 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
   const profiles = loaded.config.profiles || {};
   const out = (text) => process.stdout.write(`${text}\n`);
 
-  if (values.list) { await listAll(current, out); return 0; }
+  if (values.list) { await listAll(current, out, values); return 0; }
 
   // Guardar el ajuste actual como perfil.
   if (values.save !== undefined) {

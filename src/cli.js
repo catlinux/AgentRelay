@@ -135,6 +135,7 @@ const OPTIONS = {
   feedback: { type: 'string' },
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
+  all: { type: 'boolean' },
   background: { type: 'boolean' },
   max: { type: 'string' },
   detach: { type: 'boolean' },
