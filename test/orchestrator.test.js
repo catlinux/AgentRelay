@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyReview, startRun } from '../src/orchestrator.js';
 import { readEvents } from '../src/events.js';
-import { runDir } from '../src/store.js';
+import { listRunIds, runDir } from '../src/store.js';
 import { normalizeTask } from '../src/task.js';
 import { baseTask, fakePlan, git, makeRepo, testConfig } from './helpers.js';
 
@@ -267,6 +267,27 @@ test('falla pronto si el ejecutor no está disponible', async () => {
       /no está disponible/,
     );
     assert.equal(existsSync(path.join(repo.dir, '.agentrelay')), false);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('falla antes de crear una ejecución si el modelo no está disponible', async () => {
+  const repo = makeRepo();
+  try {
+    await assert.rejects(
+      run(repo, { config: { executor: { provider: 'deepseek', model: 'deepseek-v4-imposible' } }, plan: { implement: GOOD } }),
+      /deepseek-v4-imposible.*agentrelay use cline/,
+    );
+    assert.deepEqual(listRunIds(repo.dir), []);
+    assert.equal(existsSync(path.join(repo.dir, '.agentrelay')), false);
+
+    const state = await run(repo, {
+      config: { executor: { provider: 'deepseek', model: 'deepseek-v4-flash' } },
+      plan: { implement: GOOD },
+    });
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(listRunIds(repo.dir).length, 1);
   } finally {
     repo.cleanup();
   }

@@ -11,6 +11,7 @@ import { migrateConfig } from './config-migrate.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
 import { getExecutor } from './executors/index.js';
+import { checkExecutorModel } from './executor-check.js';
 import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatus, listCommands, removeCommands, removeLegacyCommands } from './claude-commands.js';
 import { canonicalSetting, parseSettingValue } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
@@ -412,18 +413,29 @@ async function cmdDoctor(values, rerun = false) {
     const executor = config.executor;
     const model = [executor.provider, executor.model].filter(Boolean).join('/') || 'modelo por defecto del ejecutor';
     let adapter = null;
+    let modelCheckAllowed = false;
     try {
       adapter = getExecutor(executor.type);
       const version = await adapter.version(executor);
+      modelCheckAllowed = true;
       line(true, `Ejecutor ${executor.type} ${version} · ${model}`);
       if (values.verbose) process.stdout.write(`        ${adapter.commandParts(executor.command).join(' ')}\n`);
       if (adapter.authStatus) {
         const auth = await adapter.authStatus(executor);
         line(auth.ok, auth.ok ? `Sesión: ${auth.message}` : auth.message);
+        modelCheckAllowed = auth.ok;
       }
     } catch (error) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
       line(false, `Ejecutor ${executor.type} no disponible (${error.message})${error.message.includes(hint) ? '' : `. ${hint}`}`);
+    }
+    if (modelCheckAllowed) {
+      const modelCheck = await checkExecutorModel(executor, { adapter });
+      if (!modelCheck.unknown) {
+        line(modelCheck.ok, modelCheck.ok
+          ? `Modelo ${executor.model || 'por defecto'} disponible para ${executor.type}`
+          : modelCheck.message);
+      }
     }
   }
 

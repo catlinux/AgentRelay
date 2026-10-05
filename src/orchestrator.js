@@ -24,6 +24,7 @@ import { classifyExecutorError, maskSecrets } from './executors/common.js';
 import { isInstalled } from './executors/catalog.js';
 import { loadChecks } from './model-check.js';
 import { alternativesHint } from './alternatives.js';
+import { checkExecutorModel } from './executor-check.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -303,6 +304,8 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
     const auth = await adapter.authStatus(config.executor);
     if (!auth.ok) throw new Error(`El ejecutor ${config.executor.type} no tiene sesión iniciada. ${auth.message}`);
   }
+  const modelCheck = await checkExecutorModel(config.executor);
+  if (!modelCheck.ok) throw new Error(modelCheck.message);
 
   ensureWorkspace(root);
   const policy = resolvePolicy(config);
