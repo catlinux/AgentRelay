@@ -44,6 +44,8 @@ import { isExhausted } from './free-ranking.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 import { commandParts as opencodeCommandParts } from './executors/opencode.js';
+import { apiProfileDir, commandParts as codexCommandParts, hasApiProfile } from './executors/codex.js';
+import { maskSecrets } from './executors/common.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -66,7 +68,7 @@ Uso:
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
-  agentrelay login [opencode] [--device] Conecta la cuenta del ejecutor o de OpenCode
+  agentrelay login [opencode | --api [--remove]] [--device] Conecta la cuenta del ejecutor o configura el respaldo por API
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
@@ -108,6 +110,8 @@ Opciones de setup:
 Opciones de login:
   --device                Usa el código de dispositivo
   --browser               Fuerza el inicio de sesión con navegador
+  --api                   Configura el respaldo con una clave de API de pago (se lee desde stdin o el terminal)
+  --remove                Con --api, elimina el perfil de respaldo por API
 
 Opciones de init:
   --yes                   Aplica sin pedir confirmación (git init, primer commit, commit de instrucciones)
@@ -154,6 +158,8 @@ const OPTIONS = {
   local: { type: 'boolean' },
   device: { type: 'boolean' },
   browser: { type: 'boolean' },
+  api: { type: 'boolean' },
+  remove: { type: 'boolean' },
   login: { type: 'boolean' },
   executors: { type: 'string' },
   save: { type: 'string' },
@@ -431,6 +437,15 @@ async function cmdDoctor(values, rerun = false) {
     } catch (error) {
       const hint = adapter?.installHint || 'Ejecuta "npm install" en la carpeta de AgentRelay.';
       line(false, `Ejecutor ${executor.type} no disponible (${error.message})${error.message.includes(hint) ? '' : `. ${hint}`}`);
+    }
+    if (executor.type === 'codex') {
+      const configured = hasApiProfile();
+      const fallbackEnabled = executor.apiFallback !== false;
+      line(true, configured
+        ? fallbackEnabled
+          ? 'Respaldo por API de pago: configurado (solo se usa si se agota la cuota gratuita de ChatGPT)'
+          : 'Respaldo por API de pago: desactivado (executor.apiFallback = false)'
+        : 'Respaldo por API de pago: no configurado (para tenerlo: agentrelay login --api)');
     }
     if (modelCheckAllowed) {
       const modelCheck = await checkExecutorModel(executor, { adapter });
@@ -872,7 +887,168 @@ async function signIn(adapter, executor, { device = false, browser = false, show
   return 1;
 }
 
+async function readApiKey() {
+  if (!process.stdin.isTTY) {
+    const chunks = [];
+    for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks).toString('utf8').trim();
+  }
+
+  if (typeof process.stdin.setRawMode !== 'function') throw new Error('No se puede leer una clave sin eco en este terminal.');
+  process.stderr.write('Pega tu clave de API de OpenAI (no se mostrará): ');
+  const wasRaw = process.stdin.isRaw;
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  return new Promise((resolve) => {
+    let value = '';
+    let finished = false;
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+      process.stdin.removeListener('data', onData);
+      process.stdin.setRawMode(Boolean(wasRaw));
+      process.stdin.pause();
+      process.stderr.write('\n');
+      resolve(result);
+    };
+    const onData = (chunk) => {
+      for (const byte of chunk) {
+        if (byte === 3) return finish(null);
+        if (byte === 10 || byte === 13) return finish(value.trim());
+        if (byte === 8 || byte === 127) value = [...value].slice(0, -1).join('');
+        else if (byte >= 32) value += Buffer.from([byte]).toString('utf8');
+      }
+    };
+    process.stdin.on('data', onData);
+  });
+}
+
+function safeProfilePath() {
+  const home = path.resolve(agentrelayHome());
+  const profile = path.resolve(apiProfileDir());
+  if (path.basename(profile) !== 'codex-api' || path.dirname(profile) !== home) {
+    throw new Error('La ruta del perfil de API no está dentro de AGENTRELAY_HOME.');
+  }
+  return profile;
+}
+
+function invokeCodex(executor, args, env, input = '') {
+  const [command, ...prefix] = codexCommandParts(executor.command);
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let error = null;
+    let settled = false;
+    const finish = (code) => {
+      if (settled) return;
+      settled = true;
+      resolve({ code, stdout, stderr, error });
+    };
+    let child;
+    try {
+      child = spawn(command, [...prefix, ...args], {
+        env,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        ...(process.platform === 'win32' && /\.cmd$/i.test(command) ? { shell: true } : {}),
+      });
+    } catch (spawnError) {
+      error = spawnError;
+      finish(null);
+      return;
+    }
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.once('error', (spawnError) => { error = spawnError; finish(null); });
+    child.once('close', (code) => finish(code));
+    child.stdin.on('error', () => {});
+    child.stdin.end(input);
+  });
+}
+
+function writeMaskedCodexOutput(result, key) {
+  const redact = (text) => {
+    const masked = maskSecrets(text);
+    return key ? masked.split(key).join('clave de API') : masked;
+  };
+  const stdout = redact(result.stdout);
+  const stderr = redact(result.stderr);
+  if (stdout) process.stdout.write(stdout + (stdout.endsWith('\n') ? '' : '\n'));
+  if (stderr) process.stderr.write(stderr + (stderr.endsWith('\n') ? '' : '\n'));
+}
+
+async function configureApiLogin(executor, { remove = false } = {}) {
+  const profile = safeProfilePath();
+  if (remove) {
+    if (existsSync(profile)) {
+      rmSync(profile, { recursive: true, force: true });
+      process.stdout.write('Respaldo por API eliminado. Tu sesión de ChatGPT no se ha tocado.\n');
+    } else process.stdout.write('No había respaldo por API configurado.\n');
+    return 0;
+  }
+
+  const key = await readApiKey();
+  if (key === null) {
+    process.stderr.write('Inicio de sesión cancelado.\n');
+    return 1;
+  }
+  if (!key) {
+    process.stderr.write('La clave de API está vacía.\n');
+    return 1;
+  }
+  if (!key.startsWith('sk-')) process.stderr.write('Aviso: la clave no empieza por "sk-"; se enviará a Codex igualmente.\n');
+
+  mkdirSync(profile, { recursive: true });
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'openai_api_key'));
+  env.CODEX_HOME = profile;
+  let login;
+  try {
+    login = await invokeCodex(executor, ['login', '--with-api-key'], env, `${key}\n`);
+  } catch (error) {
+    login = { code: null, stdout: '', stderr: '', error };
+  }
+  writeMaskedCodexOutput(login, key);
+  if (login.code !== 0 || login.error || !hasApiProfile()) {
+    try { rmSync(path.join(profile, 'auth.json'), { force: true }); } catch {}
+    process.stderr.write(`No se pudo configurar el respaldo por API${login.error ? `: ${maskSecrets(String(login.error.message).split(key).join('clave de API'))}` : '.'}\n`);
+    return 1;
+  }
+
+  let status;
+  try { status = await invokeCodex(executor, ['login', 'status'], env); }
+  catch (error) { status = { code: null, stdout: '', stderr: '', error }; }
+  writeMaskedCodexOutput(status, key);
+  if (status.code !== 0 || status.error) {
+    try { rmSync(path.join(profile, 'auth.json'), { force: true }); } catch {}
+    process.stderr.write(`No se pudo comprobar el respaldo por API${status.error ? `: ${maskSecrets(String(status.error.message).split(key).join('clave de API'))}` : '.'}\n`);
+    return 1;
+  }
+  const message = (status.stdout || status.stderr).split(/\r?\n/).find((line) => line.trim())?.trim() || 'Logged in using an API key';
+  process.stdout.write(`✔ Respaldo por API de pago configurado (${maskSecrets(message).split(key).join('clave de API')}).\n`);
+  process.stdout.write('Se usará solo si se agota la cuota gratuita de ChatGPT; tu sesión de ChatGPT no se ha tocado. Para desactivarlo: agentrelay set executor.apiFallback false --local, o quítalo con: agentrelay login --api --remove\n');
+  return 0;
+}
+
 async function cmdLogin(positionals, values) {
+  if (values.api) {
+    if (positionals.length || values.device) {
+      process.stderr.write('Uso no válido: --api no se puede combinar con un ejecutor ni con --device.\n');
+      return 1;
+    }
+    if (values.remove) return configureApiLogin(null, { remove: true });
+    const cwd = path.resolve(values.cwd || process.cwd());
+    const { config } = loadConfig({ cwd, configPath: values.config });
+    if (config.executor.type !== 'codex') {
+      process.stderr.write('login --api solo está disponible con el ejecutor codex.\n');
+      return 1;
+    }
+    return configureApiLogin(config.executor);
+  }
+  if (values.remove) {
+    process.stderr.write('Uso no válido: --remove requiere --api.\n');
+    return 1;
+  }
   if (positionals.length) {
     if (positionals.length !== 1 || positionals[0] !== 'opencode') {
       const executorName = positionals[0] === 'opencode' ? positionals.slice(1).join(' ') : positionals[0];

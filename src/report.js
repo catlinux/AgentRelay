@@ -83,13 +83,19 @@ function nextSteps(state) {
 export function renderReport(state, patch = '', { maxDiffChars = 60000 } = {}) {
   const { task, policy, lastCheck: check } = state;
   const lastAttempt = state.attempts[state.attempts.length - 1];
+  const usedApiFallback = state.attempts.some((attempt) => attempt.fellBackFromQuota || attempt.billing === 'api');
+  const billingNotice = usedApiFallback
+    ? state.attempts.some((attempt) => attempt.fellBackFromQuota)
+      ? '**Aviso:** la cuota gratuita de ChatGPT se agotó y este trabajo se hizo con tu clave de API (de pago).'
+      : '**Facturación:** este trabajo se hizo con tu clave de API (de pago), porque la cuota gratuita de ChatGPT sigue agotada.'
+    : '';
   const truncated = patch.length > maxDiffChars;
   const diff = truncated ? `${patch.slice(0, maxDiffChars)}\n... (diff truncado: ver diff.patch)` : patch;
   const executor = state.config.executor;
 
   return `# AgentRelay · ejecución ${state.id}
 
-**Estado:** ${STATUS_LABELS[state.status] ?? state.status}
+${billingNotice ? `${billingNotice}\n\n` : ''}**Estado:** ${STATUS_LABELS[state.status] ?? state.status}
 ${state.statusReasons?.length ? `\n**Motivos:**\n${list(state.statusReasons)}\n` : ''}
 ## Tarea
 

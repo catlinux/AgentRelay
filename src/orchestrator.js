@@ -114,6 +114,8 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     iterations: result.iterations,
     toolCalls: result.toolCalls,
     usage: result.usage,
+    ...(result.billing !== undefined ? { billing: result.billing } : {}),
+    ...(result.fellBackFromQuota !== undefined ? { fellBackFromQuota: result.fellBackFromQuota } : {}),
     report: result.report,
     finalText: result.report ? null : result.text.slice(0, 4000),
     feedback: feedback || null,

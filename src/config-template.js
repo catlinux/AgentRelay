@@ -46,6 +46,7 @@ export function configTemplate({ scope } = {}) {
     lines.push('  // codex (por defecto) usa tu cuenta de ChatGPT: conéctala una vez con "agentrelay login".');
     lines.push('  // cline se instala con "agentrelay executors add cline" y usa el proveedor que configures.');
     lines.push('  // "executor": {');
+    lines.push(...option('apiFallback', DEFAULT_CONFIG.executor.apiFallback, 'Permite usar el perfil de API de pago si se agota la cuota gratuita de ChatGPT.', 'booleano', 'desactívalo con agentrelay set executor.apiFallback false si no quieres este respaldo.', '    '));
     lines.push(...option('type', DEFAULT_CONFIG.executor.type, 'Tipo de ejecutor: codex usa la cuenta ChatGPT; cline permite configurar proveedor y modelo.', 'codex o cline', 'usa codex para iniciar sesión con agentrelay login.', '    '));
     lines.push(...option('command', DEFAULT_CONFIG.executor.command, 'Comando ejecutable del proveedor seleccionado.', 'texto o lista de textos', 'usa una lista cuando el ejecutable requiera argumentos.', '    '));
     lines.push(...option('provider', DEFAULT_CONFIG.executor.provider, 'Proveedor del modelo, principalmente para Cline.', 'texto o null', 'elige el proveedor configurado en Cline.', '    '));
