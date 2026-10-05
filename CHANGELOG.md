@@ -8,7 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
-- `agentrelay executors rank`: busca los modelos gratuitos de OpenCode (por los precios de models.dev, así que incluye los gratuitos sin `-free` en el nombre; con caché de 24 h y recurso al sufijo sin conexión), los prueba con una tarea sencilla y otra más difícil, detecta los que fallan por cuota o límite, y los ordena de mejor a peor como ejecutor, mostrando el comando para usar el primero. Opciones `--max N`, `--all`, `--show` (último ranquing guardado), `--detach` (segundo plano) y `--json`; en el chat, `/ar:ranquing` y `/ar:ranquing-nuevo`. La cuota restante no se puede consultar: se deduce de las pruebas.
+- `agentrelay executors rank`: busca los modelos gratuitos de OpenCode (por los precios de models.dev, así que incluye los gratuitos sin `-free` en el nombre; con caché de 24 h y recurso al sufijo sin conexión), los prueba con una tarea sencilla y otra más difícil, detecta los que fallan por cuota o límite, y los ordena de mejor a peor como ejecutor, mostrando el comando para usar el primero. Rastrea todos los modelos sospechosos de ser gratuitos: con coste cero, con `-free`, de precio desconocido y los que models.dev da por gratuitos aunque la cuenta no los liste (si no existen salen como «no disponible»). Opciones `--max N`, `--show` (último ranquing guardado), `--detach` (segundo plano) y `--json`; en el chat, `/ar:ranquing` y `/ar:ranquing-nuevo`. La cuota restante no se puede consultar: se deduce de las pruebas.
 - `agentrelay setup` avisa de que las instrucciones de delegación solo se cargan en sesiones nuevas de Claude Code (también los instaladores de Windows y Debian y `INSTALL.md`), y, si no puede escribir el archivo global de instrucciones, lo dice con claridad (qué archivo, por qué y cómo cambiar de carpeta con `--claude-dir`) en lugar de mostrar el error técnico.
 - Instalador de Debian/Ubuntu en `installer/debian/`: `install.sh` (Git y Node.js con apt si se pide con `--install-deps`, clon o actualización del repositorio, `npm ci`, comando en `~/.local/bin`, `setup` con los ejecutores elegidos y `doctor`; admite `--dry-run`), `install-gui.sh` (asistente con Zenity que lo llama y pide la contraseña de sudo con una ventana) y `build-deb.sh` (genera el paquete `.deb` del asistente). Sin probar todavía en un equipo Debian real.
 - Instalador de Windows en `installer/windows/`: `install.ps1` (instala Node.js y Git con winget si faltan, clona o actualiza el repositorio, `npm ci`, `npm link`, `agentrelay setup` con los ejecutores elegidos y `doctor`; admite `-DryRun`) y `agentrelay.iss`, el asistente de Inno Setup que lo presenta con ventanas. El `.exe` no se publica en el repositorio y aún no está compilado ni probado en un equipo real.
@@ -17,6 +17,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ### Cambiado
 
 - El informe diario `.agentrelay/EJECUTORES.md` es ahora un resumen del estado de las IA: saldos, ejecutor en uso, una línea por ejecutor y solo los modelos gratuitos de OpenCode con su marca (sin listas largas de modelos).
+
+### Corregido
+
+- El adaptador de OpenCode leía mal los errores: el mensaje viene en `error.message` y se perdía («error desconocido»), con lo que no se detectaban bien los errores de cuota o de modelo no disponible. Ahora se lee el mensaje real.
 
 ## [0.2.0] - 2026-10-04
 

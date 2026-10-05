@@ -632,3 +632,10 @@ test('relativize: acorta la ruta aunque el ejecutor informe de la ruta real (enl
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test('opencode: el mensaje de error se lee de event.error.message', () => {
+  const line = JSON.stringify({ type: 'error', error: { type: 'provider.no-route', message: 'Model unavailable: opencode/x-free' } });
+  assert.deepEqual(opencodeParseOutput(line).errors, ['Model unavailable: opencode/x-free']);
+  assert.deepEqual(opencodeToActivity({ type: 'error', error: { message: 'boom' } }, '.'), { kind: 'error', message: 'boom' });
+  assert.deepEqual(opencodeParseOutput('{"type":"error"}').errors, ['error desconocido']);
+});
