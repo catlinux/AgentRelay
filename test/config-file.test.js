@@ -150,3 +150,11 @@ test('set y unset conservan los saltos de línea CRLF', () => {
   assert.equal(parseJsonc(after).executor.model, 'mi-modelo');
   assert.equal(unsetConfigValue(after, 'executor.model'), crlf);
 });
+
+test('setConfigValue añade la coma que falta cuando el JSON se escribió a mano y no cambia el texto de la propiedad anterior', () => {
+  const text = ['{', '  "executor": {', '    "type": "codex",', '    "model": "tests"', '  }', '}', ''].join(String.fromCharCode(10));
+  const result = setConfigValue(text, 'executor.thinking', 'low');
+  assert.match(result, /"model": "tests",/);
+  assert.match(result, /"thinking": "low"/);
+  assert.doesNotThrow(() => parseJsonc(result, 'x'));
+});

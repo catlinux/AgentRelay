@@ -183,12 +183,14 @@ const COMMANDS = {
     ],
   },
   login: {
-    summary: 'Conecta una cuenta del ejecutor configurado o de OpenCode.',
-    usage: ['agentrelay login [opencode] [--device]'],
-    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con opencode, abre el asistente de autenticación de OpenCode.',
+    summary: 'Conecta una cuenta del ejecutor o configura el respaldo por API de pago.',
+    usage: ['agentrelay login [opencode | --api [--remove]] [--device]'],
+    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
     options: [
       ['--device', 'Usa el código de dispositivo.'],
       ['--browser', 'Fuerza el inicio de sesión con navegador.'],
+      ['--api', 'Configura el respaldo por API leyendo la clave desde stdin o el terminal.'],
+      ['--remove', 'Con --api, elimina el perfil de respaldo sin tocar la sesión de ChatGPT.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],
@@ -196,6 +198,8 @@ const COMMANDS = {
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
       ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],
+      ['agentrelay login --api', 'Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.'],
+      ['printenv OPENAI_API_KEY | agentrelay login --api', 'Lee la clave de API desde la entrada estándar sin mostrarla.'],
     ],
   },
   setup: {

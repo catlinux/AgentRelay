@@ -128,6 +128,16 @@ function buildCreated(components, valueText, baseIndent) {
   return out;
 }
 
+// Un JSON escrito a mano puede no llevar coma tras su última propiedad: se añade antes de insertar otra.
+function ensureCommaBefore(lines, index) {
+  for (let i = index - 1; i >= 0; i--) {
+    const text = lines[i].trim();
+    if (!text || text.startsWith('//')) continue;
+    if (!/[,{[]$/.test(text)) lines[i] = lines[i].replace(/\s*$/, '') + ',';
+    return;
+  }
+}
+
 // --- API pública ----------------------------------------------------------
 
 export function setConfigValue(text, dottedKey, value) {
@@ -153,6 +163,7 @@ export function setConfigValue(text, dottedKey, value) {
     uncommentAncestors(lines, blocks, parts);
     const block = blocks.get(parentPath);
     const indent = `${indentOf(lines[block.open])}  `;
+    ensureCommaBefore(lines, block.close);
     lines.splice(block.close, 0, leafLine(indent, false, parts.at(-1), valueText));
     return lines.join(eol);
   }
@@ -165,6 +176,7 @@ export function setConfigValue(text, dottedKey, value) {
 
   if (depth === 0) {
     const created = buildCreated(parts, valueText, '  ');
+    ensureCommaBefore(lines, rootClose >= 0 ? rootClose : lines.length);
     lines.splice(rootClose >= 0 ? rootClose : lines.length, 0, ...created);
     return lines.join(eol);
   }
@@ -173,6 +185,7 @@ export function setConfigValue(text, dottedKey, value) {
   const block = blocks.get(ancestors.slice(0, depth).join('.'));
   const baseIndent = `${indentOf(lines[block.open])}  `;
   const created = buildCreated(parts.slice(depth), valueText, baseIndent);
+  ensureCommaBefore(lines, block.close);
   lines.splice(block.close, 0, ...created);
   return lines.join(eol);
 }
