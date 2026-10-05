@@ -296,7 +296,7 @@ export function renderRanking(result, { date, unlisted = [], total } = {}) {
   const totalCount = total ?? tested + (result?.skipped?.length ?? 0);
   const untested = Math.max(result?.skipped?.length ?? 0, totalCount - tested);
   if ((result?.skipped?.length ?? 0) > 0 || totalCount > tested) {
-    lines.push(`Sin probar: ${untested} de ${totalCount} (usa --all para probarlos todos).`);
+    lines.push(`Sin probar: ${untested} de ${totalCount} (vuelve a lanzar sin --max para probarlos todos).`);
   }
   if (unlisted.length) {
     const shown = unlisted.slice(0, 5);

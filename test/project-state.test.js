@@ -31,6 +31,8 @@ function addRun(root, id, status, objective = `Objetivo ${id}`) {
 
 test('collectProjectState resume git, configuración, instrucciones, ejecuciones y TODO', async () => {
   const repo = makeRepo();
+  const originalHome = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = path.join(repo.dir, 'home');
   try {
     writeFileSync(path.join(repo.dir, 'AGENTS.md'), PROJECT_BLOCK);
     writeFileSync(path.join(repo.dir, 'CLAUDE.md'), '@AGENTS.md\n');
@@ -54,7 +56,11 @@ test('collectProjectState resume git, configuración, instrucciones, ejecuciones
     assert.equal(written, path.join(repo.dir, '.agentrelay', 'ESTADO.md'));
     assert.ok(existsSync(written));
     assert.match(readFileSync(written, 'utf8'), /^# Estado de /);
-  } finally { repo.cleanup(); }
+  } finally {
+    if (originalHome === undefined) delete process.env.AGENTRELAY_HOME;
+    else process.env.AGENTRELAY_HOME = originalHome;
+    repo.cleanup();
+  }
 });
 
 test('collectProjectState aplica las recomendaciones en orden de prioridad', async () => {

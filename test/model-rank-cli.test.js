@@ -26,14 +26,14 @@ function setup() {
 }
 
 function cli(context, args) {
-  return spawnSync(process.execPath, [BIN, '--cwd', context.root, 'executors', 'rank', ...args], {
+  return spawnSync(process.execPath, [BIN, '--cwd', context.root, 'rank', ...args], {
     cwd: context.root,
     encoding: 'utf8',
     env: context.env,
   });
 }
 
-function saveRanking(home) {
+function saveRanking(home, at = '2000-01-01T10:00:00.000Z') {
   const good = (id, score) => ({
     id, name: id, source: 'metadatos', context: 128000, reasoning: true,
     basic: { status: 'approved', seconds: 1, reason: 'correcto' },
@@ -43,66 +43,81 @@ function saveRanking(home) {
   writeFileSync(path.join(home, 'model-checks.json'), `${JSON.stringify({
     lastRun: null,
     models: {},
-    ranking: { at: '2026-10-05T10:00:00.000Z', stoppedBy: null, entries: [good('opencode/mejor-free', 2), good('opencode/otro-free', 1)] },
+    ranking: { at, stoppedBy: null, entries: [good('opencode/mejor-free', 2), good('opencode/otro-free', 1)] },
   })}\n`);
 }
 
-test('executors rank sin OpenCode instalado explica cómo instalarlo y devuelve 1', () => {
+test('rank --run sin OpenCode instalado explica cómo instalarlo y devuelve 1', () => {
   const context = setup();
   try {
-    const result = cli(context, []);
+    const result = cli(context, ['--run']);
     assert.equal(result.status, 1);
     assert.match(result.stderr, /OpenCode no está instalado/);
     assert.match(result.stderr, /agentrelay executors add opencode/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
-test('executors rank --background sin OpenCode sale en silencio con 0', () => {
+test('rank --run --background sin OpenCode sale en silencio con 0', () => {
   const context = setup();
   try {
-    const result = cli(context, ['--background']);
+    const result = cli(context, ['--run', '--background']);
     assert.equal(result.status, 0);
     assert.equal(result.stdout, '');
     assert.equal(result.stderr, '');
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
-test('executors rank --show sin ranquing guardado informa y devuelve 0', () => {
+test('rank sin ranquing guardado explica cómo calcularlo y devuelve 0', () => {
   const context = setup();
   try {
-    const result = cli(context, ['--show']);
+    const result = cli(context, []);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Aún no hay ranquing/);
+    assert.match(result.stdout, /agentrelay rank --run/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
-test('executors rank --show presenta la tabla y el mejor modelo guardado', () => {
+test('rank muestra la tabla guardada y avisa si tiene más de 24 horas', () => {
   const context = setup();
   try {
     saveRanking(context.home);
-    const result = cli(context, ['--show']);
+    const result = cli(context, []);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Último ranquing guardado \(/);
     assert.match(result.stdout, /Modelo/);
     assert.match(result.stdout, /Mejor: opencode\/mejor-free/);
+    assert.match(result.stdout, /Tiene más de 24 horas; para recalcularlo: agentrelay rank --run/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
-test('executors rank rechaza --max 0', () => {
+test('rank --run rechaza --max 0', () => {
   const context = setup();
   try {
-    const result = cli(context, ['--max', '0']);
+    const result = cli(context, ['--run', '--max', '0']);
     assert.equal(result.status, 1);
     assert.match(result.stderr, /--max debe ser un entero mayor o igual que 1/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
-test('executors rank --show --json imprime JSON válido', () => {
+test('rank --json imprime el ranquing guardado como JSON', () => {
   const context = setup();
   try {
     saveRanking(context.home);
-    const result = cli(context, ['--show', '--json']);
+    const result = cli(context, ['--json']);
     assert.equal(result.status, 0);
     assert.equal(JSON.parse(result.stdout).entries[0].id, 'opencode/mejor-free');
+  } finally { rmSync(context.root, { recursive: true, force: true }); }
+});
+
+test('executors rank ya no es un comando válido', () => {
+  const context = setup();
+  try {
+    const result = spawnSync(process.execPath, [BIN, '--cwd', context.root, 'executors', 'rank'], {
+      cwd: context.root,
+      encoding: 'utf8',
+      env: context.env,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Uso: agentrelay executors \[add <nombre> \| check \[--force\]\]/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });

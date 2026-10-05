@@ -162,7 +162,7 @@ test('renderRanking alinea columnas y añade mejor, detención, sin probar y mod
   assert.match(output, /✔\s+—\s+1\.3 s\s+contexto 128k, razona, detectado por metadatos/);
   assert.match(output, /Mejor: opencode\/model-free  →  agentrelay use opencode opencode\/model-free/);
   assert.match(output, /Pruebas detenidas: varios modelos seguidos devolvieron límite o cuota agotada; vuelve a intentarlo más tarde\./);
-  assert.match(output, /Sin probar: 1 de 2 \(usa --all para probarlos todos\)\./);
+  assert.match(output, /Sin probar: 1 de 2 \(vuelve a lanzar sin --max para probarlos todos\)\./);
   assert.match(output, /Gratuitos según models\.dev que tu cuenta no lista: opencode\/a, opencode\/b, opencode\/c, opencode\/d, opencode\/e, …\./);
 });
 
