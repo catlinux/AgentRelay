@@ -221,3 +221,11 @@ test('classifyProbeFailure reconoce «Model unavailable» de OpenCode, también 
   const raw = { error: 'error desconocido', rawError: esc + '[91m' + esc + '[1mError: ' + esc + '[0mModel unavailable: opencode/glm-5-free' };
   assert.equal(classifyProbeFailure(raw, { status: 'failed', reason: 'El ejecutor no terminó correctamente' }), 'unavailable');
 });
+
+test('el detalle del fallo conserva las letras y quita los colores ANSI', async () => {
+  const esc = String.fromCharCode(27);
+  const adapter = { run: async () => ({ ok: false, error: 'error desconocido', rawError: esc + '[91mError:' + esc + '[0m registry does   not support tools' }) };
+  const probe = async () => ({ status: 'failed', checkedAt: new Date().toISOString(), seconds: 1, reason: 'x', raw: { error: 'e', rawError: esc + '[91mError:' + esc + '[0m registry does   not support tools' } });
+  const result = await rankModels({ candidates: [{ id: 'm', reason: 'sufijo', listed: true }], executor: {}, adapter, probes: { basic: probe, hard: probe } });
+  assert.equal(result.entries[0].detail, 'Error: registry does not support tools');
+});
