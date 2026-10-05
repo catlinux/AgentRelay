@@ -43,9 +43,9 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.ok(r1.stdout.includes(claude));
     assert.match(r1.stdout, /agentrelay setup --uninstall/);
     const commandDir = path.join(dir, 'commands', 'ar');
-    assert.ok(existsSync(path.join(commandDir, 'estado.md')));
-    assert.match(r1.stdout, /comandos creados: 10/);
-    assert.match(r1.stdout, /Comandos de Claude Code: .*\/ar:estado/);
+    assert.ok(existsSync(path.join(commandDir, 'status.md')));
+    assert.match(r1.stdout, /comandos creados: 20/);
+    assert.match(r1.stdout, /Comandos de Claude Code: .*\/ar:status/);
     assert.equal(readFileSync(claude, 'utf8'), GLOBAL_BLOCK + '\n');
 
     // Repetirlo no cambia nada.
@@ -107,7 +107,7 @@ test('setup migra comandos gestionados antiguos y conserva archivos propios', ()
     const result = run(['setup', '--yes', '--claude-dir', dir], dir);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Comandos antiguos retirados \(ahora son \/ar:/);
-    assert.ok(existsSync(path.join(newDir, 'estado.md')));
+    assert.ok(existsSync(path.join(newDir, 'status.md')));
     assert.equal(existsSync(path.join(oldDir, 'estado.md')), false);
     assert.equal(readFileSync(path.join(oldDir, 'nota.md'), 'utf8'), 'archivo propio');
   } finally { rmSync(dir, { recursive: true, force: true }); }

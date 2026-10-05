@@ -915,7 +915,7 @@ async function cmdSetup(values) {
     if (!values['no-commands']) {
       if (!values.quiet) process.stdout.write(`Comandos de Claude Code: ${listCommands().map(({ name }) => `/ar:${name.replace(/\.md$/, '')}`).join(', ')}, en ${commandsTargetDir(values['claude-dir'])}\n`);
       const result = installCommands(values['claude-dir']);
-      if (result.retired.length && !values.quiet) process.stdout.write(`Comandos retirados (ahora es /ar:usar): ${result.retired.join(', ')}\n`);
+      if (result.retired.length && !values.quiet) process.stdout.write(`Comandos retirados (ahora se llaman como en el terminal, p. ej. /ar:use): ${result.retired.join(', ')}\n`);
       const legacy = removeLegacyCommands(values['claude-dir']);
       if (legacy.removed.length && !values.quiet) process.stdout.write(`Comandos antiguos retirados (ahora son /ar:...): ${legacy.removed.join(', ')}\n`);
       const counts = [];

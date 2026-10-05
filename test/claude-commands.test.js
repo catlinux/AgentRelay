@@ -11,16 +11,15 @@ const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 test('listCommands lee los comandos reales y su metadato', () => {
   assert.match(commandsSourceDir(), /claude-commands[\\/]ar[\\/]?$/);
   const commands = listCommands();
-  assert.deepEqual(commands.map(({ name }) => name), ['actualizar.md', 'ayuda.md', 'doctor.md', 'estado.md', 'iniciar.md', 'lista.md', 'ranquing-nuevo.md', 'ranquing.md', 'usar.md', 'ver.md']);
+  assert.deepEqual(commands.map(({ name }) => name), ['check.md', 'config.md', 'doctor.md', 'executors.md', 'help.md', 'init.md', 'list.md', 'login.md', 'rank.md', 'recover.md', 'review.md', 'run.md', 'set.md', 'setup.md', 'show.md', 'start.md', 'status.md', 'unset.md', 'update.md', 'use.md']);
   for (const { content } of commands) {
     const frontmatter = content.split('---')[1];
     assert.ok(content.includes(MANAGED_MARK));
     assert.match(frontmatter, /description:/);
     assert.match(frontmatter, /model: haiku/);
   }
-  const status = commands.find(({ name }) => name === 'estado.md').content;
-  assert.match(status, /agentrelay doctor -q 2>&1 \| grep -vE/);
-  assert.match(status, /agentrelay \(setup\|init\|login\)/);
+  const status = commands.find(({ name }) => name === 'status.md').content;
+  assert.ok(status.includes('agentrelay status $ARGUMENTS'));
 });
 
 test('removeLegacyCommands retira solo comandos gestionados conocidos', () => {
@@ -44,7 +43,7 @@ test('removeLegacyCommands retira solo comandos gestionados conocidos', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('install, estado, normalización CRLF, protección de archivos propios y remove', () => {
+test('install, status, normalización CRLF, protección de archivos propios y remove', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-commands-'));
   const source = path.join(dir, 'source');
   const emptySource = path.join(dir, 'empty');
@@ -63,30 +62,30 @@ test('install, estado, normalización CRLF, protección de archivos propios y re
     assert.equal(installCommands(claude, source).unchanged.length, original.length);
     assert.equal(commandsStatus(claude, source).status, 'current');
 
-    const target = path.join(commandsTargetDir(claude), 'estado.md');
-    writeFileSync(target, readFileSync(target, 'utf8').replace('Estado de AgentRelay:', 'Estado anterior:'));
+    const target = path.join(commandsTargetDir(claude), 'status.md');
+    writeFileSync(target, readFileSync(target, 'utf8').replace('Resultado:', 'Resultado anterior:'));
     assert.equal(commandsStatus(claude, source).status, 'outdated');
     assert.equal(installCommands(claude, source).updated.length, 1);
 
     writeFileSync(target, readFileSync(target, 'utf8').replace(/\n/g, '\r\n'));
     assert.equal(commandsStatus(claude, source).status, 'current');
 
-    const ownFile = path.join(commandsTargetDir(claude), 'usar.md');
+    const ownFile = path.join(commandsTargetDir(claude), 'use.md');
     writeFileSync(ownFile, 'archivo propio\r\n');
     const skipped = installCommands(claude, source);
-    assert.deepEqual(skipped.skipped, ['usar.md']);
+    assert.deepEqual(skipped.skipped, ['use.md']);
     assert.equal(readFileSync(ownFile, 'utf8'), 'archivo propio\r\n');
-    assert.equal(commandsStatus(claude, source).details.find(({ name }) => name === 'usar.md').state, 'foreign');
+    assert.equal(commandsStatus(claude, source).details.find(({ name }) => name === 'use.md').state, 'foreign');
 
     writeFileSync(path.join(commandsTargetDir(claude), 'nota.txt'), 'mía');
     const removed = removeCommands(claude, source);
     assert.equal(removed.removed.length, original.length - 1);
-    assert.deepEqual(removed.kept, ['usar.md']);
+    assert.deepEqual(removed.kept, ['use.md']);
     assert.ok(existsSync(commandsTargetDir(claude)));
     assert.equal(readFileSync(ownFile, 'utf8'), 'archivo propio\r\n');
     rmSync(path.join(commandsTargetDir(claude), 'nota.txt'));
     rmSync(ownFile);
-    writeFileSync(path.join(commandsTargetDir(claude), 'estado.md'), original.find(({ name }) => name === 'estado.md').content);
+    writeFileSync(path.join(commandsTargetDir(claude), 'status.md'), original.find(({ name }) => name === 'status.md').content);
     assert.equal(removeCommands(claude, source).removed.length, 1);
     assert.equal(existsSync(commandsTargetDir(claude)), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -97,7 +96,8 @@ test('los comandos retirados se borran del equipo solo si llevan la marca de Age
   try {
     const target = commandsTargetDir(dir);
     mkdirSync(target, { recursive: true });
-    assert.deepEqual(RETIRED_COMMANDS, ['modelo.md', 'esfuerzo.md', 'ejecutor.md', 'nivel.md', 'triaje.md']);
+    assert.deepEqual(RETIRED_COMMANDS.slice(0, 5), ['modelo.md', 'esfuerzo.md', 'ejecutor.md', 'nivel.md', 'triaje.md']);
+    assert.ok(RETIRED_COMMANDS.includes('estado.md') && RETIRED_COMMANDS.includes('usar.md') && RETIRED_COMMANDS.includes('ranquing.md'));
     writeFileSync(path.join(target, 'modelo.md'), `viejo ${MANAGED_MARK}`);
     writeFileSync(path.join(target, 'nivel.md'), `viejo ${MANAGED_MARK}`);
     writeFileSync(path.join(target, 'triaje.md'), 'comando propio del usuario');
