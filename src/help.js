@@ -8,6 +8,7 @@ const COMMANDS = {
     options: [
       ['--save <nombre>', 'Guarda la configuración actual como perfil.'],
       ['--list', 'Lista los ejecutores instalados y sus modelos disponibles.'],
+      ['--all', 'Con --list, muestra todos los modelos de OpenCode, no solo los del ranquing de hoy.'],
       ['--local, --project', 'Guarda el cambio en la configuración de este proyecto.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],
@@ -17,6 +18,7 @@ const COMMANDS = {
       ['agentrelay use barato', 'Aplica el perfil guardado llamado barato.'],
       ['agentrelay use --save barato', 'Guarda la selección actual como perfil barato.'],
       ['agentrelay use --list', 'Lista ejecutores y modelos.'],
+      ['agentrelay use --list --all', 'Muestra todos los modelos de OpenCode.'],
     ],
   },
   run: {
