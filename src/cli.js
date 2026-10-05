@@ -43,6 +43,7 @@ import { rankModels, renderRanking } from './model-rank.js';
 import { isExhausted } from './free-ranking.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
+import { commandParts as opencodeCommandParts } from './executors/opencode.js';
 
 const HELP = `AgentRelay ${VERSION} — delega tareas de desarrollo a un agente ejecutor y devuelve el resultado validado.
 
@@ -65,7 +66,7 @@ Uso:
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
-  agentrelay login [--device]       Inicia sesión de ChatGPT con Codex
+  agentrelay login [opencode] [--device] Conecta la cuenta del ejecutor o de OpenCode
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
@@ -721,7 +722,7 @@ async function cmdRank(positionals, values) {
   }
   const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
   if (!auth.ok) {
-    if (!values.background) process.stderr.write(`OpenCode no tiene sesión. Inicia sesión con: opencode auth login${auth.message ? ` (${auth.message})` : ''}\n`);
+    if (!values.background) process.stderr.write(`OpenCode no tiene sesión. Conéctala con: agentrelay login opencode${auth.message ? ` (${auth.message})` : ''}\n`);
     return values.background ? 0 : 1;
   }
   if (values.detach) {
@@ -802,7 +803,7 @@ async function cmdExecutors(positionals, values) {
           log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/2 (${item.seconds} s)\n`),
         });
         if (!values.background) process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: available.length })}\n`);
-      } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (opencode auth login); se omite la prueba de modelos.\n');
+      } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (agentrelay login opencode); se omite la prueba de modelos.\n');
     } else if (!values.background) process.stdout.write('OpenCode no está instalado (agentrelay executors add opencode); se omite la prueba de modelos.\n');
     let written;
     try { written = await writeReport({ current: config.executor, home, root: process.env.AGENTRELAY_REPORT_ROOT || undefined }); }
@@ -871,7 +872,45 @@ async function signIn(adapter, executor, { device = false, browser = false, show
   return 1;
 }
 
-async function cmdLogin(values) {
+async function cmdLogin(positionals, values) {
+  if (positionals.length) {
+    if (positionals.length !== 1 || positionals[0] !== 'opencode') {
+      const executorName = positionals[0] === 'opencode' ? positionals.slice(1).join(' ') : positionals[0];
+      process.stderr.write(`Ejecutor no admitido para login: ${executorName}. Usa: agentrelay login [opencode]\n`);
+      return 1;
+    }
+    const cwd = path.resolve(values.cwd || process.cwd());
+    const { config } = loadConfig({ cwd, configPath: values.config });
+    const executor = config.executor.type === 'opencode'
+      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+    const dir = executorsDir();
+    if (!await isInstalled('opencode', { dir })) {
+      process.stderr.write('OpenCode no está instalado. Instálalo con: agentrelay executors add opencode\n');
+      return 1;
+    }
+    process.stdout.write('Se abre el asistente de OpenCode. Elige OpenCode Zen (o el proveedor que uses) y pega tu clave de API.\n');
+    const [command, ...prefix] = opencodeCommandParts(executor.command, { executorsDir: dir });
+    try {
+      await new Promise((resolve, reject) => {
+        const options = { stdio: 'inherit' };
+        if (process.platform === 'win32' && /\.cmd$/i.test(command)) options.shell = true;
+        const child = spawn(command, [...prefix, 'auth', 'login'], options);
+        child.once('error', reject);
+        child.once('close', resolve);
+      });
+    } catch (error) {
+      process.stderr.write(`No se pudo iniciar el asistente de OpenCode: ${error.message}\n`);
+      return 1;
+    }
+    const adapter = getExecutor('opencode');
+    const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false, message: '' };
+    if (auth.ok) {
+      process.stdout.write(`✔ Sesión de OpenCode: ${auth.message}\n`);
+      return 0;
+    }
+    process.stderr.write(`No se pudo conectar la sesión de OpenCode: ${auth.message || 'OpenCode no confirmó la cuenta guardada.'}\n`);
+    return 1;
+  }
   const cwd = path.resolve(values.cwd || process.cwd());
   const { config } = loadConfig({ cwd, configPath: values.config });
   const executor = config.executor;
@@ -1393,7 +1432,7 @@ export async function main(argv, runtime = {}) {
       case 'unset': return await cmdUnset(rest, values);
       case 'rank': return await cmdRank(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
-      case 'login': return await cmdLogin(values);
+      case 'login': return await cmdLogin(rest, values);
       case 'setup': return await cmdSetup(values);
       case 'init': return await cmdInit(values);
       case 'start': return await cmdStart(values);

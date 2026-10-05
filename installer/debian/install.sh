@@ -8,6 +8,7 @@ BRANCH="main"
 LOGIN=false
 INSTALL_DEPS=false
 DRY_RUN=false
+NO_PATH=false
 NODE_SETUP_FILE=""
 SUDO=(sudo)
 if [[ -n "${SUDO_ASKPASS:-}" ]]; then SUDO=(sudo -A); fi
@@ -23,6 +24,7 @@ Opciones:
   --branch <rama>       Rama que se clonará (por defecto: main)
   --install-deps        Instalar Git y Node.js 22 con sudo si hacen falta
   --dry-run             Mostrar los pasos sin cambiar el sistema
+  --no-path             No añadir ~/.local/bin a los archivos de inicio del shell
   --help                Mostrar esta ayuda
 EOF
 }
@@ -71,6 +73,30 @@ run_in_dir() {
   fi
 }
 
+persist_local_bin_path() {
+  [[ "$NO_PATH" == true ]] && return 0
+
+  local path_comment='# agentrelay: comando en el PATH'
+  local path_export='export PATH="$HOME/.local/bin:$PATH"'
+  local startup_file
+  local startup_files=("$HOME/.profile")
+  [[ -f "$HOME/.bashrc" ]] && startup_files+=("$HOME/.bashrc")
+  [[ -f "$HOME/.zshrc" ]] && startup_files+=("$HOME/.zshrc")
+
+  for startup_file in "${startup_files[@]}"; do
+    if [[ -f "$startup_file" ]] && grep -Fq "$path_comment" "$startup_file"; then
+      continue
+    fi
+    if [[ "$DRY_RUN" == true ]]; then
+      printf '[simulación] añadir al final de %s:\n' "$startup_file"
+      printf '[simulación] %s\n' "$path_comment"
+      printf '[simulación] %s\n' "$path_export"
+    else
+      printf '\n%s\n%s\n' "$path_comment" "$path_export" >> "$startup_file"
+    fi
+  done
+}
+
 cleanup() {
   if [[ -n "$NODE_SETUP_FILE" && -f "$NODE_SETUP_FILE" ]]; then
     rm -f -- "$NODE_SETUP_FILE"
@@ -95,6 +121,7 @@ while (($#)); do
     --login) LOGIN=true; shift ;;
     --install-deps) INSTALL_DEPS=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
+    --no-path) NO_PATH=true; shift ;;
     --help) usage; exit 0 ;;
     *) fail "opción desconocida: $1 (usa --help para ver las opciones)." ;;
   esac
@@ -230,10 +257,7 @@ printf '[4/6] Instalando dependencias npm y enlazando agentrelay...\n'
 run_in_dir "$INSTALL_DIR" npm ci
 run_in_dir "$INSTALL_DIR" env "npm_config_prefix=$HOME/.local" npm link
 LOCAL_BIN="$HOME/.local/bin"
-case ":${PATH:-}:" in
-  *":$LOCAL_BIN:"*) ;;
-  *) printf 'Aviso: %s no está en PATH. Añade esta línea a ~/.profile: export PATH="$HOME/.local/bin:$PATH"\n' "$LOCAL_BIN" >&2 ;;
-esac
+persist_local_bin_path
 
 printf '[5/6] Ejecutando la configuración inicial...\n'
 AGENTRELAY="$HOME/.local/bin/agentrelay"
@@ -247,7 +271,11 @@ run "$AGENTRELAY" doctor
 
 printf 'Instalación preparada en %s.\n' "$INSTALL_DIR"
 printf 'Comando: %s/agentrelay.\n' "$HOME/.local/bin"
+printf 'Abre una terminal nueva (o ejecuta: export PATH="$HOME/.local/bin:$PATH") para que agentrelay esté disponible.\n'
 printf 'Las instrucciones de delegación solo se cargan en sesiones nuevas: cierra y abre de nuevo Claude Code.\n'
+if [[ ",$EXECUTORS," == *,opencode,* ]]; then
+  printf 'Para conectar OpenCode: agentrelay login opencode\n'
+fi
 if [[ "$DRY_RUN" == true ]]; then
   printf 'La simulación no cambió el sistema; ejecuta el script sin --dry-run para instalar.\n'
 elif [[ "$LOGIN" != true ]]; then

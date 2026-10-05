@@ -183,9 +183,9 @@ const COMMANDS = {
     ],
   },
   login: {
-    summary: 'Inicia sesión de ChatGPT con Codex.',
-    usage: ['agentrelay login [--device]'],
-    description: 'Inicia sesión con el ejecutor configurado cuando este admite el acceso de AgentRelay. Codex puede usar el navegador o el código de dispositivo.',
+    summary: 'Conecta una cuenta del ejecutor configurado o de OpenCode.',
+    usage: ['agentrelay login [opencode] [--device]'],
+    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con opencode, abre el asistente de autenticación de OpenCode.',
     options: [
       ['--device', 'Usa el código de dispositivo.'],
       ['--browser', 'Fuerza el inicio de sesión con navegador.'],
@@ -194,6 +194,7 @@ const COMMANDS = {
     ],
     examples: [
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
+      ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],
     ],
   },

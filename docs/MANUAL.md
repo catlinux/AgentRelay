@@ -23,7 +23,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `run <tarea.json>` | Delega una tarea a mano. |
 | `check [id]` · `recover [id]` | Repite las validaciones · recupera tareas interrumpidas. |
 | `doctor [--fix]` | Diagnostica el entorno y arregla lo seguro. |
-| `login` | Conecta tu cuenta de ChatGPT. |
+| `login [opencode]` | Conecta tu cuenta de ChatGPT, o la de OpenCode con `login opencode`. |
 | `config` · `set` · `unset` | Ver o cambiar ajustes sueltos. |
 | `executors add\|check` | Instala un ejecutor opcional · actualiza el ranquing y el informe diario. |
 | `update [--yes]` | Actualiza AgentRelay. |
@@ -68,7 +68,7 @@ Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `hi
 | Ejecutor | Qué necesita | Cómo se conecta |
 |---|---|---|
 | `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita) o clave de API de OpenAI. Viene incluido. | `agentrelay login` |
-| `opencode` | Modelos gratuitos y de pago de OpenCode. Se instala con `agentrelay executors add opencode`. | `opencode auth login` |
+| `opencode` | Modelos gratuitos y de pago de OpenCode. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre su asistente; elige OpenCode Zen y pega tu clave; no hace falta tener `opencode` en el PATH) |
 | `cline` | Una clave de API, por ejemplo de DeepSeek. Se instala con `agentrelay executors add cline`. | El comando que muestra al instalarlo |
 
 AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
