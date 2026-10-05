@@ -23,7 +23,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `run <tarea.json>` | Delega una tarea a mano. |
 | `check [id]` · `recover [id]` | Repite las validaciones · recupera tareas interrumpidas. |
 | `doctor [--fix]` | Diagnostica el entorno y arregla lo seguro. |
-| `login [opencode | --api]` | Conecta tu cuenta de ChatGPT; `login opencode` conecta OpenCode; `login --api` guarda el respaldo por API de pago de Luna. |
+| `login` · `login opencode` · `login --api` | Conecta tu cuenta de ChatGPT; `login opencode` conecta OpenCode; `login --api` guarda el respaldo por API de pago de Luna. |
 | `config` · `set` · `unset` | Ver o cambiar ajustes sueltos. |
 | `executors add\|check` | Instala un ejecutor opcional · actualiza el ranquing y el informe diario. |
 | `update [--yes]` | Actualiza AgentRelay. |
