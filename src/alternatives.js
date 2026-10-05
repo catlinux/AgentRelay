@@ -1,4 +1,5 @@
 import { isFreeModel } from './model-check.js';
+import { rankedFree, rankPosition } from './free-ranking.js';
 
 /** Describe opciones disponibles sin cambiar la configuración del ejecutor. */
 export function alternativesHint({ current, checks, installed }) {
@@ -8,8 +9,16 @@ export function alternativesHint({ current, checks, installed }) {
     lines.push('- Codex (cuenta de ChatGPT, cuota gratuita por cuenta): agentrelay use codex');
   }
 
-  if (current?.type !== 'opencode') {
-    if (installed?.opencode) {
+  if (installed?.opencode) {
+    const rankingExists = Array.isArray(checks?.ranking?.entries);
+    const ranked = rankedFree(checks)
+      .filter(({ id }) => id !== current?.model)
+      .slice(0, 3);
+    if (rankingExists) {
+      for (const { id } of ranked) {
+        lines.push(`- OpenCode gratis (nº ${rankPosition(checks, id)} del ranquing): agentrelay use opencode ${id}`);
+      }
+    } else if (current?.type !== 'opencode') {
       const approved = Object.entries(checks?.models || {})
         .filter(([id, record]) => isFreeModel(id) && record?.status === 'approved')
         .sort((a, b) => (Date.parse(b[1].checkedAt) || 0) - (Date.parse(a[1].checkedAt) || 0))
@@ -19,9 +28,9 @@ export function alternativesHint({ current, checks, installed }) {
       } else {
         lines.push('- OpenCode gratis: agentrelay executors check (prueba los modelos nuevos) y luego agentrelay use opencode');
       }
-    } else {
-      lines.push('- OpenCode gratis: agentrelay executors add opencode');
     }
+  } else if (current?.type !== 'opencode') {
+    lines.push('- OpenCode gratis: agentrelay executors add opencode');
   }
 
   if (current?.type !== 'cline') {
