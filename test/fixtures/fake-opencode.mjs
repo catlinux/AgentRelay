@@ -13,12 +13,15 @@ if (args.includes('--version')) {
   process.exit(0);
 }
 if (args[0] === 'auth' && args[1] === 'list') {
-  if (process.env.FAKE_OPENCODE_STORED === '1') {
-    process.stdout.write('OpenCode Console  Personal  stored\n');
-    process.exit(0);
-  }
-  process.stderr.write('No accounts found\n');
-  process.exit(1);
+  const output = process.env.FAKE_OPENCODE_AUTH_OUTPUT
+    ?? (process.env.FAKE_OPENCODE_STORED === '1' ? 'OpenCode Console  Personal  stored\n' : 'No authenticated integrations\n');
+  const stream = process.env.FAKE_OPENCODE_AUTH_STREAM === 'stderr' ? process.stderr : process.stdout;
+  stream.write(output);
+  process.exit(Number(process.env.FAKE_OPENCODE_AUTH_CODE ?? 0));
+}
+if (args[0] === 'auth' && args[1] === 'login') {
+  process.stdout.write('OpenCode login assistant completed\n');
+  process.exit(0);
 }
 if (args[0] === 'models') {
   process.stdout.write('opencode/nemotron-3-ultra-free\nopencode/gpt-oss-120b-free\n');

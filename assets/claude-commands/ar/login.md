@@ -1,6 +1,6 @@
 ---
-description: Inicia sesión de ChatGPT con Codex
-argument-hint: [--device]
+description: Conecta una cuenta del ejecutor configurado o de OpenCode
+argument-hint: [opencode] [--device]
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku

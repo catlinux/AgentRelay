@@ -244,6 +244,9 @@ run_installation() {
   if [[ "$LOGIN" == true ]]; then
     success_text+="\n\nSi no se abrió el navegador para iniciar sesión en ChatGPT, ejecuta:  <b>agentrelay login</b>"
   fi
+  if [[ ",$EXECUTORS," == *,opencode,* ]]; then
+    success_text+="\n\nConecta OpenCode con: <b>agentrelay login opencode</b>"
+  fi
   success_text+="\n\nRegistro: $escaped_log"
   zen --info --text="$success_text" || true
 }

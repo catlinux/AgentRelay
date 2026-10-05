@@ -7,9 +7,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { executorsDir, installExecutor, isInstalled } from '../src/executors/catalog.js';
 import { findBundledCline } from '../src/executors/cline.js';
-import { commandParts as opencodeCommandParts } from '../src/executors/opencode.js';
+import { authStatus as opencodeAuthStatus, commandParts as opencodeCommandParts } from '../src/executors/opencode.js';
+import { runProcess } from '../src/proc.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
+const FAKE_OPENCODE = fileURLToPath(new URL('./fixtures/fake-opencode.mjs', import.meta.url));
 
 function temporary(prefix) {
   return mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -90,6 +92,50 @@ test('OpenCode commandParts prioriza el enlace gestionado y conserva los comando
   assert.deepEqual(opencodeCommandParts('opencode', { executorsDir: dir, exists: (file) => file === link }), [link]);
   assert.deepEqual(opencodeCommandParts('opencode', { executorsDir: dir, exists: () => false }), ['opencode']);
   assert.deepEqual(opencodeCommandParts('/custom/opencode', { executorsDir: dir, exists: () => true }), ['/custom/opencode']);
+});
+
+test('OpenCode authStatus reconoce cuentas guardadas y conserva el motivo cuando falla', async () => {
+  const executor = { command: [process.execPath, FAKE_OPENCODE] };
+  const check = (env) => opencodeAuthStatus(executor, {
+    run: (command, args, options) => runProcess(command, args, {
+      ...options,
+      env: { ...process.env, ...env },
+    }),
+  });
+
+  assert.deepEqual(await check({ FAKE_OPENCODE_AUTH_OUTPUT: 'stored\n' }), { ok: true, message: 'stored' });
+  assert.deepEqual(await check({ FAKE_OPENCODE_AUTH_OUTPUT: 'OpenCode Console  Personal  stored\nOpenCode Zen  API key  active\n' }), {
+    ok: true, message: 'OpenCode Console  Personal  stored',
+  });
+  const empty = await check({ FAKE_OPENCODE_AUTH_OUTPUT: 'No authenticated integrations\n' });
+  assert.equal(empty.ok, false);
+  assert.match(empty.message, /agentrelay login opencode/);
+  assert.deepEqual(await check({ FAKE_OPENCODE_AUTH_OUTPUT: 'OpenCode Zen  API key  active\n' }), {
+    ok: true, message: 'OpenCode Zen  API key  active',
+  });
+  const failed = await check({ FAKE_OPENCODE_AUTH_OUTPUT: 'credential store unavailable\n', FAKE_OPENCODE_AUTH_CODE: '2' });
+  assert.equal(failed.ok, false);
+  assert.match(failed.message, /credential store unavailable/);
+});
+
+test('login opencode sin instalar su ejecutor y login con un nombre desconocido muestran un error', () => {
+  const cwd = temporary('agentrelay-login-opencode-');
+  try {
+    const env = {
+      AGENTRELAY_HOME: path.join(cwd, 'home'),
+      AGENTRELAY_EXECUTORS_DIR: path.join(cwd, 'executors'),
+      AGENTRELAY_NO_MIGRATE: '1',
+      PATH: '',
+    };
+    const missing = cli(cwd, ['login', 'opencode'], env);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /Instálalo con: agentrelay executors add opencode/);
+    const unknown = cli(cwd, ['login', 'xyz'], env);
+    assert.equal(unknown.status, 1);
+    assert.match(unknown.stderr, /Ejecutor no admitido para login: xyz/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('findBundledCline prioriza AgentRelay y encuentra la carpeta de ejecutores', () => {

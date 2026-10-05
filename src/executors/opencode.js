@@ -17,7 +17,7 @@ export const name = 'opencode';
 
 // Qué hacer si el ejecutor no está disponible (lo muestra `agentrelay doctor`).
 export const installHint = 'Instálalo con: agentrelay executors add opencode';
-export const loginHint = 'Ejecuta "opencode auth login" para conectar tu cuenta.';
+export const loginHint = 'Ejecuta "agentrelay login opencode" para conectar tu cuenta.';
 
 /**
  * Modelos que ofrece la cuenta de OpenCode (`opencode models` los lista uno por
@@ -200,15 +200,23 @@ export async function version(executor) {
 }
 
 /** Comprueba si OpenCode tiene una cuenta guardada (`opencode auth list`). */
-export async function authStatus(executor) {
+export async function authStatus(executor, { run = runProcess } = {}) {
   try {
     const [command, ...prefix] = commandParts(executor.command);
-    const res = await runProcess(command, [...prefix, 'auth', 'list'], { timeoutMs: 60_000 });
-    const line = `${res.stdout}\n${res.stderr}`.split(/\r?\n/).find((l) => l.trim())?.trim();
-    if (res.code === 0 && line && /\bstored\b/i.test(line)) return { ok: true, message: line };
-    return { ok: false, message: res.error?.message || `No hay cuenta guardada. ${loginHint}` };
+    const res = await run(command, [...prefix, 'auth', 'list'], { timeoutMs: 60_000 });
+    const lines = `${res.stdout || ''}\n${res.stderr || ''}`.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const noCredentials = /no authenticated integrations|no credentials|not logged in|no accounts?/i;
+    const credentialLines = lines.filter((line) => !noCredentials.test(line));
+    if (res.code === 0 && !res.error && !res.timedOut && credentialLines.length) {
+      return { ok: true, message: credentialLines[0] };
+    }
+    if (res.error || res.timedOut || res.code !== 0) {
+      const detail = (res.error?.message || (res.timedOut ? 'se agotó el tiempo de espera' : '') || lines[0] || `código ${res.code}`).slice(0, 160);
+      return { ok: false, message: `No se pudo comprobar la sesión de OpenCode: ${detail}. Prueba: agentrelay login opencode` };
+    }
+    return { ok: false, message: 'OpenCode no tiene ninguna cuenta guardada. Conéctala con: agentrelay login opencode' };
   } catch (error) {
-    return { ok: false, message: error.message };
+    const detail = String(error?.message || error).slice(0, 160);
+    return { ok: false, message: `No se pudo comprobar la sesión de OpenCode: ${detail}. Prueba: agentrelay login opencode` };
   }
 }
-

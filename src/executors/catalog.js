@@ -43,7 +43,7 @@ export const CATALOG = [
     cost: 'gratis',
     // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).
     npmPackage: 'opencode-ai@1',
-    connect: 'opencode auth login',
+    connect: 'agentrelay login opencode',
   },
 ];
 
