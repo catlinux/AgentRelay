@@ -214,3 +214,13 @@ test('ordena listados gratuitos, listados desconocidos y no listados en ese orde
     { id: 'opencode/unknown-price-anchor', reason: 'metadatos, no listado' },
   ]);
 });
+
+test('discoverFreeModels ignora los modelos de otros proveedores aunque no tengan precio conocido', () => {
+  const metadata = { 'big-pickle': { name: 'Big Pickle', cost: { input: 0, output: 0 } }, 'gpt-5': { cost: { input: 1, output: 2 } } };
+  const found = discoverFreeModels({ listed: ['opencode/big-pickle', 'opencode/gpt-5', 'ollama/gpt-oss:120b-cloud', 'ollama/qwen3:8b', 'opencode/modelo-nuevo'], metadata, source: 'red' });
+  const ids = found.map((candidate) => candidate.id);
+  assert.ok(ids.includes('opencode/big-pickle'));
+  assert.ok(ids.includes('opencode/modelo-nuevo'));
+  assert.ok(!ids.some((id) => id.startsWith('ollama/')));
+  assert.ok(!ids.includes('opencode/gpt-5'));
+});

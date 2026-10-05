@@ -116,7 +116,10 @@ function releaseTimestamp(value) {
 /** Cruza los modelos de la cuenta con metadatos y devuelve los candidatos gratuitos. */
 export function discoverFreeModels({ listed = [], metadata = {}, source = 'sufijo', includeUnlisted = true } = {}) {
   const models = metadata instanceof Map ? Object.fromEntries(metadata) : metadata;
-  const ids = Array.isArray(listed) ? listed.map(listedId).filter((id) => typeof id === 'string') : [];
+  // Solo el proveedor opencode: los de otros proveedores (ollama, etc.) no son los gratuitos de OpenCode Zen.
+  const ids = Array.isArray(listed)
+    ? listed.map(listedId).filter((id) => typeof id === 'string' && (!id.includes('/') || id.startsWith('opencode/')))
+    : [];
   const listedMetadataIds = new Set(ids.map(metadataId));
   const candidates = [];
   const hasMetadata = Object.keys(models || {}).length > 0;
