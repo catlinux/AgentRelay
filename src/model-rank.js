@@ -110,10 +110,10 @@ export function classifyProbeFailure(raw, record) {
   return 'fail';
 }
 
-const ANSI = new RegExp(String.fromCharCode(27) + '\[[0-9;]*m', 'g');
+const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g');
 
 function failureDetail(raw) {
-  const clean = (value) => String(value ?? '').replace(ANSI, '').replace(/s+/g, ' ').trim();
+  const clean = (value) => String(value ?? '').replace(ANSI, '').replace(/\s+/g, ' ').trim();
   const text = clean(raw?.rawError) || clean(raw?.error);
   return text ? text.slice(0, 100) : null;
 }
