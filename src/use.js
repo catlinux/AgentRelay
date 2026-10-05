@@ -77,6 +77,24 @@ function writeChanges(file, scope, edits, { cwd, configPath }) {
   }
 }
 
+/** Ajustes que se acaban de cambiar pero que otro archivo con más prioridad (el del proyecto) vuelve a fijar. */
+export function overriddenSettings(edits, saved, file) {
+  const pinned = new Map();
+  for (const [key] of edits) {
+    const origin = saved.origins?.[key];
+    if (origin && path.isAbsolute(origin) && path.resolve(origin) !== path.resolve(file)) {
+      pinned.set(key.replace(/^executor\./, ''), origin);
+    }
+  }
+  return pinned;
+}
+
+function warnOverridden(pinned, out) {
+  if (!pinned.size) return;
+  const files = [...new Set(pinned.values())];
+  out(`Ojo: este cambio NO tiene efecto en este proyecto: ${files.join(', ')} fija ${[...pinned.keys()].join(', ')}. Para cambiarlo aquí: agentrelay use --local ... (o quita ese ajuste del archivo del proyecto).`);
+}
+
 /** Ediciones de configuración para aplicar una elección { type, model, thinking }. */
 export function choiceEdits(choice, current) {
   const edits = [];
@@ -223,8 +241,10 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
       out(`En uso: ${describe(current)}\n`);
       choice = await interactive(current, question, helpers);
       if (!choice) return 0;
-      const saved = writeChanges(file, scope, choiceEdits(choice, current), { cwd: root, configPath: values.config });
+      const interactiveEdits = choiceEdits(choice, current);
+      const saved = writeChanges(file, scope, interactiveEdits, { cwd: root, configPath: values.config });
       out(`✔ Ahora: ${describe(saved.config.executor)}${scope === 'project' ? ` (solo en este proyecto: ${CONFIG_FILE})` : ''}`);
+      warnOverridden(overriddenSettings(interactiveEdits, saved, file), out);
       const name = (await question('¿Guardarlo como perfil? Escribe un nombre (Enter = no): ')).trim();
       if (name) await cmdUse([], { ...values, save: name }, helpers, runtime);
       await offerLogin(saved.config.executor, helpers);
@@ -236,11 +256,10 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
     const entry = CATALOG.find((item) => item.name === choice.type);
     out(`Aviso: ${entry.title} no está instalado. ${entry.npmPackage ? `Instálalo con: agentrelay executors add ${entry.name}` : `Instálalo aparte y conéctalo con: ${entry.connect}`}`);
   }
-  const saved = writeChanges(file, scope, choiceEdits(choice, current), { cwd: root, configPath: values.config });
+  const edits = choiceEdits(choice, current);
+  const saved = writeChanges(file, scope, edits, { cwd: root, configPath: values.config });
   out(`✔ Ahora: ${describe(saved.config.executor)}${scope === 'project' ? ` (solo en este proyecto: ${CONFIG_FILE})` : ''}`);
-  if (scope === 'user' && existsSync(path.join(root, CONFIG_FILE)) && saved.origins['executor.type'] !== file) {
-    out(`Ojo: ${CONFIG_FILE} de este proyecto fija otro ejecutor; cámbialo con: agentrelay use --local ...`);
-  }
+  warnOverridden(overriddenSettings(edits, saved, file), out);
   return 0;
 }
 
