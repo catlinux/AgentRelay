@@ -107,7 +107,10 @@ test('use --list muestra el estado, el ejecutor activo y una instalación del di
   const cwd = temporary('agentrelay-list-');
   const dir = path.join(cwd, 'user-executors');
   try {
-    const env = { AGENTRELAY_EXECUTORS_DIR: dir };
+    const env = {
+      AGENTRELAY_EXECUTORS_DIR: dir,
+      AGENTRELAY_HOME: path.join(cwd, 'home'),
+    };
     let listed = cli(cwd, ['use', '--list'], env);
     assert.equal(listed.status, 0, listed.stderr);
     assert.match(listed.stdout, /Codex \(OpenAI\) \(codex\) · instalado · cuenta de ChatGPT · en uso/);
