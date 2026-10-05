@@ -2,102 +2,50 @@
 
 [Español](INSTALL.md) · **English** · [Back to the README](README.en.md)
 
-Pick your system: [Windows](#windows) · [Linux](#linux) · [macOS](#macos).
+You need **Node.js 20 or later**, **Git** and a **ChatGPT account** (the free one works; create it at [chatgpt.com](https://chatgpt.com)). AgentRelay ships with **Codex**, the agent that does the work; GPT-6 Luna is in the free plan.
 
-Before you start you need a **ChatGPT account** (the free one is enough; if you do not have one, you can create it at [chatgpt.com](https://chatgpt.com)). AgentRelay includes **Codex**, the agent that does the work, and uses the **GPT-6 Luna** model, which is included in the free plan. You do not need any API key.
+> **macOS is untested: we do not have a Mac.** It is supported by design; if you use it, please tell us whether it worked in an [issue](https://github.com/catlinux/AgentRelay/issues) (macOS version, Node version and the output of `agentrelay doctor`).
 
----
+## Option A: installer (in preparation)
 
-## Windows
+They do the steps of option B for you: Node.js and Git if missing, repository clone, dependencies, the `agentrelay` command, `setup` and `doctor`. **They have not been tested on a real machine yet**; when in doubt, use option B.
 
-Open **PowerShell**.
+| System | What is there | How |
+|---|---|---|
+| Windows | `installer\windows\install.ps1` and an Inno Setup wizard (`agentrelay.iss`) | `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install (`-InstallDir`, `-Executors cline,opencode`, `-Login`). The `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installer\windows\agentrelay.iss` (output in `.agentrelay\installer\`). |
+| Debian / Ubuntu | `installer/debian/install.sh`, a windowed wizard (`install-gui.sh`, needs Zenity) and `build-deb.sh` | `bash installer/debian/install.sh --dry-run` shows the steps; `--install-deps` allows installing Git and Node.js with `sudo`; also `--executors` and `--login`. `build-deb.sh` builds the wizard's `.deb` package. |
 
-**1. Install Node.js and Git** (if you already have them, skip this step; check with `node --version` and `git --version`):
+AgentRelay is always installed as a git clone in your home folder, so `agentrelay update` keeps working.
 
-```powershell
-winget install OpenJS.NodeJS.LTS
-winget install Git.Git
-```
+## Option B: manual
 
-Close and reopen PowerShell.
+**1. Install Node.js and Git** (check with `node --version` and `git --version`):
+
+| System | Commands |
+|---|---|
+| Windows (PowerShell) | `winget install OpenJS.NodeJS.LTS` and `winget install Git.Git`; close and reopen PowerShell |
+| Debian / Ubuntu | `sudo apt install git`; for Node.js use [nvm](https://github.com/nvm-sh/nvm) (no `sudo`) and `nvm install 22`, because the distribution package is usually too old |
+| macOS | `brew install git node` |
 
 **2. Download and install AgentRelay:**
 
-```powershell
-cd $HOME\Documents
+```sh
+cd ~          # on Windows: cd $HOME\Documents
 git clone https://github.com/catlinux/AgentRelay.git
 cd AgentRelay
 npm install
 npm link
 ```
 
-**3. Connect your ChatGPT account** (once; the browser opens to sign in):
+If `npm link` gives a permission error, do not use `sudo`: create an alias (`alias agentrelay='node ~/AgentRelay/bin/agentrelay.js'` in `~/.bashrc` or `~/.zshrc`). On Windows the command is `agentrelay.cmd` from PowerShell or cmd.
 
-```powershell
-agentrelay login
-```
-
-If you already use Codex in VS Code with your account, the session is shared and this step is already done.
-
-**4. Check that everything is fine:**
-
-```powershell
-agentrelay doctor
-```
-
-The Node.js, Git, executor and session checks should show `[ok]`. Since `setup` comes next, `doctor` may still warn that the global instructions and Claude Code commands are not installed; it may also report that this project does not yet have the AgentRelay block.
-
-**5. Set up your orchestrator** (once; it asks for confirmation to install the global block and Claude Code commands, offers to install Cline, and offers sign-in only if there is no active session. Since you signed in in step 3, it will normally report that the session is active. If you decline the Cline installation, you can install it later with `agentrelay executors add cline`):
-
-```powershell
-agentrelay setup
-```
-
-Done. Go to [Getting started](#getting-started).
-
-**Alternative: installer wizard (in preparation).** `installer/windows/` contains a script that does steps 1 to 3 for you and an Inno Setup wizard that presents it with windows. Not compiled yet and not tested on a real machine: for now use the steps above. To try the script on its own, `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install for real (options: `-InstallDir`, `-Executors cline,opencode`, `-Login`). To build the `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installer\windows\agentrelay.iss` (output goes to `.agentrelay\installer\`). To uninstall: run `agentrelay setup --uninstall`, `npm unlink -g agentrelay` and delete the folder.
-
----
-
-## Linux
-
-Open a terminal. The example commands are for Debian and Ubuntu.
-
-**1. Install Git and Node.js 20 or later** (check with `node --version` and `git --version`):
-
-```sh
-sudo apt install git
-```
-
-For Node.js, many distributions ship a version that is too old. The easiest way is [nvm](https://github.com/nvm-sh/nvm) (installed for your user, no `sudo`). Follow its installation instructions and then:
-
-```sh
-nvm install 22
-```
-
-**2. Download and install AgentRelay:**
-
-```sh
-cd ~
-git clone https://github.com/catlinux/AgentRelay.git
-cd AgentRelay
-npm install
-npm link
-```
-
-If `npm link` fails with a permissions error, do not use `sudo`: create an alias instead (add it to `~/.bashrc`):
-
-```sh
-alias agentrelay='node ~/AgentRelay/bin/agentrelay.js'
-```
-
-**3. Connect your ChatGPT account** (once; the browser opens to sign in):
+**3. Connect your ChatGPT account** (once; the browser opens):
 
 ```sh
 agentrelay login
 ```
 
-If the machine has no browser (for example over SSH), use `agentrelay login --device`: it shows a code you enter from another device. If you already use Codex in VS Code with your account, the session is shared and this step is already done.
+Without a browser (for example over SSH): `agentrelay login --device`. If you already use Codex in VS Code with your account, the session is shared and this step is already done.
 
 **4. Check that everything is fine:**
 
@@ -105,130 +53,52 @@ If the machine has no browser (for example over SSH), use `agentrelay login --de
 agentrelay doctor
 ```
 
-**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
+**5. Set up your orchestrator** (once per machine; it asks for confirmation and offers optional executors such as Cline or OpenCode, which you can also add later with `agentrelay executors add <name>`):
 
 ```sh
 agentrelay setup
 ```
 
-Done. Go to [Getting started](#getting-started).
-
-**Alternative: graphical installer (in preparation).** `installer/debian/` contains `install.sh` (does the steps above for you; `--dry-run` shows what it would do without installing anything, `--install-deps` allows installing Git and Node.js with sudo, `--executors cline,opencode`, `--login`), `install-gui.sh` (a Zenity wizard that calls it) and `build-deb.sh` (builds the `agentrelay-installer_<version>_all.deb` package, which installs the wizard and an "Instalar AgentRelay" launcher; AgentRelay is then installed in your home folder as a git clone, so `agentrelay update` keeps working). Not yet tested on a real Debian machine: for now use the steps above.
-
----
-
-## macOS
-
-> **macOS is untested: we do not have a Mac.** It is supported by design, and if you use it we would really appreciate your feedback: open an [issue on GitHub](https://github.com/catlinux/AgentRelay/issues) telling us whether it worked or what failed, with your macOS version, your Node version (`node --version`) and the output of `agentrelay doctor`.
-
-Open **Terminal**.
-
-**1. Install Git and Node.js 20 or later** (check with `node --version` and `git --version`). With [Homebrew](https://brew.sh):
-
-```sh
-brew install git node
-```
-
-**2. Download and install AgentRelay:**
-
-```sh
-cd ~
-git clone https://github.com/catlinux/AgentRelay.git
-cd AgentRelay
-npm install
-npm link
-```
-
-If `npm link` fails with a permissions error, create an alias (add it to `~/.zshrc`):
-
-```sh
-alias agentrelay='node ~/AgentRelay/bin/agentrelay.js'
-```
-
-**3. Connect your ChatGPT account** (once; the browser opens to sign in):
-
-```sh
-agentrelay login
-```
-
-If the machine has no browser (for example over SSH), use `agentrelay login --device`: it shows a code you enter from another device. If you already use Codex in VS Code with your account, the session is shared and this step is already done.
-
-**4. Check that everything is fine:**
-
-```sh
-agentrelay doctor
-```
-
-**5. Set up your orchestrator** (once; it asks for confirmation and offers to install optional executors such as Cline; you can say no and add them later with `agentrelay executors add <name>`):
-
-```sh
-agentrelay setup
-```
-
-Done. Go to [Getting started](#getting-started).
-
----
+`setup` writes the delegation instructions to `~/.claude/CLAUDE.md` and the `/ar:` commands to `~/.claude/commands/ar/`. **They are only loaded in new Claude Code sessions**: close and reopen it. If it cannot write the file, it says so clearly and exits with an error.
 
 ## Getting started
 
-1. Open your project in VS Code with the **Claude Code** extension installed and signed in.
-2. In that project's terminal run `agentrelay start`. It prepares the project (and the git repository if it does not exist yet), leaves the repository clean and checks everything works; it asks for confirmation before changing anything.
-3. Open a second terminal and keep `agentrelay watch` running to see live what the agent does.
-4. Ask Claude for the work in the chat, in your own words. For example: *"Add a function that validates emails and delegate the implementation with AgentRelay."*
+1. Open your project in VS Code with the **Claude Code** extension signed in.
+2. In the project terminal: `agentrelay start` (prepares the project and checks that everything works; asks before changing anything).
+3. In another terminal: `agentrelay watch`, to watch the executor work.
+4. In the Claude chat, ask for the work in your own words: *"Add a function that validates emails and delegate the implementation with AgentRelay."*
 
-**Important:** the instructions that make Claude triage and delegate are installed by `agentrelay setup` (the installers run it for you; in the manual installation it is step 5) and are only loaded in **new** Claude Code sessions: after installing, close and reopen Claude Code (or start a new chat). They only apply where the `agentrelay` command is available, so they do not affect projects that do not use it.
+Want to try it first? See ["Delegar a mano"](docs/MANUAL.md#6-delegar-a-mano-sin-orquestador) in the manual (Spanish).
 
-Want to try it first on a demo project? Follow the ["Delegar a mano"](docs/MANUAL.md#8-delegar-a-mano-sin-orquestador) section of the user manual (in Spanish).
+## If something fails
 
----
-
-## If something goes wrong
+Always start with `agentrelay doctor`: it says what is wrong and which command fixes it.
 
 | Symptom | What to do |
 |---|---|
-| `agentrelay: command not found` | Repeat `npm link` in the AgentRelay folder, or open a new terminal. On Linux and macOS you can use the alias shown above. |
-| `agentrelay doctor` reports a failure for the executor | Run `npm install` again in the AgentRelay folder and repeat `doctor`. |
-| `EBADENGINE` warnings during `npm install` | They are warnings: some dependencies prefer Node 22. It works with Node 20. To avoid them, upgrade to Node 22. |
-| "Authentication Fails" when delegating (Cline only) | The provider key is not configured or is wrong: repeat the Cline setup command shown when it was installed (`npx cline auth …`). |
-| `doctor` says Cline or OpenCode is not available | Run `agentrelay use` and pick it: it tells you how to install it. |
-| `doctor` or `run` say there is no session | Run `agentrelay login` and sign in with your ChatGPT account. On a machine without a browser (for example over SSH), use `agentrelay login --device`. |
-| "no es un repositorio git" (not a git repository) | Run `agentrelay start` in the project folder. |
+| `agentrelay: command not found` | Repeat `npm link` in the AgentRelay folder, open a new terminal, or use the alias. |
+| Executor failure | `npm install` again in the AgentRelay folder and repeat `doctor`. |
+| "No session" | `agentrelay login` (or `login --device`). |
+| `EBADENGINE` warnings in `npm install` | Just warnings: it works with Node 20; Node 22 avoids them. |
+| Cline or OpenCode unavailable | `agentrelay executors add cline` or `opencode`. |
+| "not a git repository" | `agentrelay start` in the project folder. |
 
-## Updating and uninstalling
+## Updating
 
-**Update:** `agentrelay update` does everything (download, dependencies, `setup` and `doctor`). By hand, inside the AgentRelay folder:
+`agentrelay update` does it all (download, dependencies, `setup` and `doctor`). By hand, inside the AgentRelay folder: `git pull` and `npm ci` (not `npm install`, which can rewrite `package-lock.json` and make the next `git pull` fail). Then `agentrelay doctor`:
 
-```sh
-git pull
-npm ci
-```
+- If it warns about outdated global instructions: `agentrelay setup` (once per machine).
+- If it warns about outdated project instructions: `agentrelay init` inside the project.
+- Close and reopen `agentrelay watch` and Claude Code so they use the new code.
 
-Use `npm ci` rather than `npm install`: it installs exactly the versions in `package-lock.json` without changing it, while `npm install` may rewrite it and make the next `git pull` fail.
+## Uninstalling
 
-If `git pull` answers *"Your local changes to the following files would be overwritten by merge: package-lock.json"*, first review them with `git diff -- package-lock.json`. If you confirm they were generated by npm and do not need them, discard them and repeat:
+Before deleting the folder, from inside it:
 
 ```sh
-git checkout -- package-lock.json
-git pull
-npm ci
+agentrelay setup --uninstall --yes     # removes the block, the /ar: commands and the Claude Code hook
+npm unlink -g agentrelay               # removes the command link (Linux installer: rm ~/.local/bin/agentrelay)
+rm -rf ~/.agentrelay                   # optional: settings, profiles and optional executors
 ```
 
-Then check that everything is in order:
-
-```sh
-agentrelay doctor
-```
-
-- If you see `[aviso] Las instrucciones globales del orquestador están desactualizadas` (the orchestrator's global instructions are out of date), run `agentrelay setup`: a new version has changed those instructions (for example, the triage). Do it once per machine.
-- If you see `[aviso] Las instrucciones de AgentRelay de este proyecto están desactualizadas` (the project's instructions are out of date), run `agentrelay init` inside that project. Do it once per project.
-- If you had `agentrelay watch` open, stop it (Ctrl+C) and start it again so it uses the new code.
-- There is no need to repeat `agentrelay login` or recreate your configuration. The CHANGELOG lists the changes of each version.
-
-**Uninstall:**
-
-```sh
-agentrelay setup --uninstall
-npm unlink -g agentrelay
-```
-
-Then delete the AgentRelay folder. Projects where you ran `agentrelay init` keep their block in `CLAUDE.md`, delimited by the `<!-- agentrelay:start -->` and `<!-- agentrelay:end -->` markers: you can delete it by hand.
+Then delete the AgentRelay folder. Git, Node and your ChatGPT session (`~/.codex/`) are not touched. Projects where you ran `agentrelay init` keep the block in `AGENTS.md`/`CLAUDE.md` (between `<!-- agentrelay:start -->` and `<!-- agentrelay:end -->`) and the `.agentrelay/` folder; delete them by hand if you want.

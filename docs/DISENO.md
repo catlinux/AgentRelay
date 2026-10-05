@@ -1,68 +1,38 @@
-# AgentRelay — Contexto de diseño
+# AgentRelay — Diseño
 
-Contexto de fondo del proyecto (propósito, objetivo económico, política de orquestación, configuración, compatibilidad, fases, versionado). Las reglas de actuación del orquestador están en `AGENTS.md`. La numeración es la original.
+Contexto de fondo del proyecto. Las reglas de actuación del orquestador están en `AGENTS.md`; lo pendiente, en `TODO.md`; lo hecho, en `CHANGELOG.md`.
 
-## 1. Propósito
+## Propósito y objetivo económico
 
-AgentRelay es un orquestador de agentes de IA para desarrollo de software. Su objetivo principal es reducir al mínimo el consumo de modelos premium manteniendo un modelo de alta capacidad como autoridad de planificación, supervisión y validación.
+AgentRelay reduce el consumo del modelo premium: un modelo de alta capacidad (el **orquestador**, por defecto el que habla con el usuario, p. ej. Claude Code) planifica, revisa y decide, y un agente más barato (el **ejecutor**) escribe el código. Por defecto el ejecutor es Codex con GPT-6 Luna; Cline (DeepSeek u otros proveedores) y OpenCode (modelos gratuitos y de pago) son opcionales. El orquestador interviene donde aporta valor: planificar, decidir, supervisar y resolver bloqueos. Debe ser sencillo de instalar, entender, mantener y ampliar: nada de arquitecturas innecesarias.
 
-Por defecto, el orquestador es el modelo que hable con el usuario (por ejemplo, Claude Code) y el ejecutor es Codex con GPT-6 Luna. Cline (con DeepSeek u otros proveedores) es un ejecutor opcional. Debe poder escalarse una tarea concreta al orquestador cuando el ejecutor no pueda resolverla.
+## Política de orquestación
 
-El proyecto debe ser sencillo de instalar, entender, ejecutar, mantener y ampliar. No convertirlo en una arquitectura innecesariamente compleja.
-
-## 3. Objetivo económico
-
-La prioridad estratégica es ahorrar consumo del modelo premium del orquestador.
-
-Por defecto, AgentRelay favorece la delegación al ejecutor siempre que sea razonablemente segura. El orquestador interviene cuando aporta valor real: planificación, decisiones complejas, supervisión, resolución de bloqueos y validación final. El sistema permite configurar cuánto se sacrifica en consumo para obtener más supervisión.
-
-## 4. Política de orquestación
-
-Hasta la 0.1.0 había 5 niveles configurables (de «máximo ahorro» a «máxima supervisión»). Se sustituyeron el 2026-10-03 por **una sola política** más sencilla de entender, que se puede ajustar con la sección `policy` de la configuración:
+Una sola política, ajustable con la sección `policy` de la configuración (código en `src/policy.js`):
 
 - el orquestador revisa siempre (`review: "always"`; también `selective` o `on-failure`);
 - hasta 2 correcciones automáticas del ejecutor antes de escalar (`maxRetries`, `autoFix`);
-- autorrevisión del ejecutor según la complejidad de la tarea: ninguna (trivial), en el propio prompt (normal) o en una segunda pasada (compleja) (`selfReview`);
-- `requireValidation` exige que la tarea tenga validaciones objetivas.
+- autorrevisión según la complejidad de la tarea: ninguna (trivial), en el propio prompt (normal) o en una segunda pasada (compleja) (`selfReview`);
+- `requireValidation` exige validaciones objetivas.
 
-Para más ahorro o más supervisión se ajustan esos valores, no un número de nivel. El código está en `src/policy.js`.
+Más ahorro o más supervisión se consiguen ajustando esos valores. El ejecutor devuelve un informe estructurado (estado, resumen, archivos, pruebas, problemas, dudas, escalado) en lugar de depender de texto libre; si falta, el informe lo avisa.
 
-## 5. Configuración
+## Comandos
 
-Debe ser fácil cambiar sin modificar el motor: proveedor, modelo, agente/CLI, política de orquestación, máximo de reintentos, condiciones de escalado, nivel de revisión, timeouts, comandos de validación y opciones específicas de proveedor. La configuración está separada del código. El motor no debe quedar acoplado permanentemente a Claude, Cline, Codex o DeepSeek.
+Cada comando se llama igual en el terminal (`agentrelay <comando>`) y en el chat de Claude Code (`/ar:<comando>`), con los mismos argumentos. Los archivos de `assets/claude-commands/ar/` se generan a partir de la ayuda (`src/help.js`), una por comando, salvo `watch` (no se puede seguir en directo en el chat) y `hook` (interno).
 
-## 6. Compatibilidad futura
+## Modelos gratuitos
 
-Las interfaces deben permitir futuros adaptadores para otros agentes y proveedores (Continue, OpenAI, Anthropic, Qwen, Gemini…). No implementarlos salvo que sean necesarios para una arquitectura correcta.
+La revisión diaria (`executors check`, lanzada en segundo plano el primer uso de cada día) calcula con `src/model-rank.js` el ranquing de los modelos gratuitos que la cuenta de OpenCode lista (dos pruebas sintéticas por modelo, clasificación de fallos por cuota o no disponible). Los gratuitos se detectan por los precios de models.dev (`src/free-models.js`), no solo por el sufijo `-free`. `src/free-ranking.js` ordena los utilizables y marca los agotados hasta el día siguiente. Nunca se cambia de ejecutor ni de modelo sin que lo decida el usuario, y nunca se envía código del usuario a un modelo gratuito: solo tareas de ejemplo.
 
-## 7. Multiplataforma
+## Configuración, plataformas y versiones
 
-Debe funcionar en Windows, Linux y macOS. No asumir Bash, PowerShell, rutas POSIX ni comandos exclusivos de un sistema. Las diferencias de plataforma quedan aisladas en una capa pequeña y clara.
+- **Configuración:** se cambia sin tocar el motor (ejecutor, modelo, esfuerzo, política, reintentos, tiempos, validaciones). Dos archivos con comentarios: `~/.agentrelay/config.json` (personal y perfiles) y `agentrelay.config.json` (proyecto, tiene prioridad).
+- **Plataformas:** Windows, Linux y macOS; las diferencias se aíslan en una capa pequeña (`src/platform.js`, `src/proc.js`). macOS sin probar.
+- **Compatibilidad futura:** las interfaces permiten adaptadores para otros agentes y proveedores; no se implementan hasta que hagan falta.
+- **Versionado:** Semantic Versioning. Una versión nueva se acuerda con el usuario. Repositorio: `catlinux/AgentRelay`.
+- **Costes:** se registran agente, modelo, intentos, duración y coste solo cuando el proveedor los informa; nunca se inventan.
 
-## 8. Desarrollo incremental
+## Regla de oro
 
-Cada etapa deja una versión funcional y utilizable. No construir primero una gran arquitectura para usarla solo al final. El estado actual y lo pendiente están en `TODO.md` y `CHANGELOG.md`.
-
-## 9. Versionado
-
-Semantic Versioning (`MAJOR.MINOR.PATCH`): `0.1.0` MVP, `0.2.0` nueva capacidad, `0.2.1` corrección, `1.0.0` primera versión estable completa. No inventar números de versión: una versión nueva se acuerda con el usuario y se refleja en `package.json`, `CHANGELOG.md` y la etiqueta.
-
-## 11. GitHub
-
-Repositorio: `catlinux/AgentRelay`.
-
-## 15. Resultados estructurados
-
-Los agentes devuelven, cuando sea posible: estado, resumen, archivos modificados, tests ejecutados y resultado, problemas encontrados, dudas y necesidad de escalado. Evitar depender solo de texto libre.
-
-## 17. Coste y uso
-
-Cuando sea posible sin complicar el núcleo, registrar agente, modelo, tarea, intentos, escalados, duración y coste conocido. No inventar costes cuando el proveedor no los proporcione.
-
-## 20. Criterio de finalización de una fase
-
-Una fase está terminada cuando: la funcionalidad prevista funciona, existen tests adecuados, pasan los tests relevantes, la documentación afectada está actualizada, la versión está actualizada, existe un commit coherente, no quedan cambios accidentales sin explicar y el resultado se ha probado en el entorno disponible.
-
-## 21. Regla de oro
-
-El usuario dice qué quiere hacer y AgentRelay determina de forma eficiente quién debe hacerlo. El usuario no debería decidir manualmente en cada tarea qué modelo usar.
+El usuario dice qué quiere hacer y AgentRelay determina de forma eficiente quién debe hacerlo. El usuario no debería decidir a mano, tarea a tarea, qué modelo usar.

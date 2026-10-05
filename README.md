@@ -45,7 +45,7 @@ AgentRelay nunca hace commits ni push: los cambios quedan en tu carpeta para que
 | **OpenCode** (opcional) | Modelos gratuitos de OpenCode | Gratis |
 | **Cline** (opcional) | Cualquier proveedor con clave de API (p. ej. DeepSeek) | Lo que cobre el proveedor |
 
-Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`.
+Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. El primer uso de cada día, AgentRelay prueba y ordena por ti los modelos gratuitos de OpenCode (`agentrelay rank`) y `use` te ofrece los mejores de hoy.
 
 ## Requisitos
 
@@ -55,7 +55,7 @@ Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `age
 
 ## Instalación
 
-Guía paso a paso para cada sistema: **[INSTALL.md](INSTALL.md)**. En resumen:
+Guía para cada sistema, con instaladores para Windows y Debian: **[INSTALL.md](INSTALL.md)**. En resumen:
 
 ```sh
 git clone https://github.com/catlinux/AgentRelay.git
@@ -76,6 +76,8 @@ agentrelay watch    # 2. (en otro terminal) mira trabajar al ejecutor
 3. En el chat de tu orquestador, pide lo que quieras en lenguaje normal. Él delega, revisa y te informa.
 
 Para cambiar de IA: `agentrelay use`. Para ver dónde estás: `agentrelay status`. Si algo falla: `agentrelay doctor`.
+
+**Los mismos comandos en el terminal y en el chat de Claude Code:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay rank` ↔ `/ar:rank`… (todos menos `watch`). `agentrelay help` los lista.
 
 **Todo lo demás, con ejemplos: [Manual de uso](docs/MANUAL.md).**
 

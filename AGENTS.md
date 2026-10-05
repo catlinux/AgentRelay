@@ -98,7 +98,7 @@ Sigue estos pasos en orden, sin saltarte ninguno. Si un paso falla o no estás s
 
 ### Reglas de comunicación con el usuario
 - Respuestas cortas y en español.
-- Los comandos del chat de Claude Code (`/ar:usar alto`) y los de terminal (`agentrelay use alto`) nunca se mezclan en un mismo texto.
+- Los comandos del chat de Claude Code (`/ar:use alto`) y los de terminal (`agentrelay use alto`) nunca se mezclan en un mismo texto.
 - No inventes costes, versiones ni resultados. Si no lo sabes, dilo.
 
 ### Problemas conocidos del ejecutor (Codex con GPT-6 Luna en Windows)
