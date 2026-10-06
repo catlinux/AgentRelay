@@ -20,6 +20,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Cambiado
 
+- **Triaje en un solo sitio.** El triaje sale del bloque de proyecto y queda solo en el bloque global: una vez por orden, recomienda modelo y esfuerzo para el orquestador; si es el actual sigue, y si hay que cambiarlo espera la confirmación del usuario. El esfuerzo del ejecutor lo fija el orquestador sin esperar. Ningún bloque supone un ejecutor concreto, y `init` se pregunta siempre antes de ejecutarlo.
 - Documentación revisada y reducida: manual, instalación, README, diseño y TODO (solo lo pendiente).
 - Los tests ya no dependen de la configuración personal del usuario.
 
