@@ -20,7 +20,7 @@ test('bloques: GLOBAL_BLOCK y PROJECT_BLOCK tienen las marcas y el contenido', (
   assert.ok(PROJECT_BLOCK.startsWith(`${START_MARK}\n`));
   assert.ok(PROJECT_BLOCK.endsWith(`\n${END_MARK}`));
   assert.ok(PROJECT_BLOCK.includes('## Delegación con AgentRelay'));
-  assert.ok(PROJECT_BLOCK.includes('por defecto, Codex con GPT-6 Luna'));
+  assert.ok(PROJECT_BLOCK.includes('el configurado en AgentRelay'));
   assert.ok(PROJECT_BLOCK.includes('agentrelay run -'));
 });
 
