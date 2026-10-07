@@ -10,6 +10,7 @@ Necesitan al usuario en casa o una clave:
 - [ ] Probar con una clave real el respaldo de Luna por API (`agentrelay login --api`) y, cuando se agote la cuota gratuita, el cambio automático y la vuelta a la gratuita; confirmar el texto real del error de Codex para afinar `parseQuotaReset`.
 - [ ] Probar los instaladores en equipos reales: compilar el `.exe` de Windows con Inno Setup y probarlo; probar `install-gui.sh` y el `.deb` en Debian/Ubuntu con pantalla. Después, decidir si se publican en una release de GitHub.
 - [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración previa) y dejarlo documentado. Windows y Linux (Debian) probados en la 0.0.2; falta rehacerlo con la 0.2.
+- [ ] Comprobar en Linux (Debian y VPS) que `executor.network` abre la red del sandbox de Codex; en Windows ya está probado.
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe diario).
 - [ ] Probar el informe diario y el ranquing automático en un uso real de varios días; ajustar lo que moleste.
 

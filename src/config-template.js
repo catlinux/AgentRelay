@@ -53,6 +53,7 @@ export function configTemplate({ scope } = {}) {
     lines.push(...option('model', DEFAULT_CONFIG.executor.model, 'Identificador del modelo; Codex usa gpt-6-luna por defecto.', 'texto o null', 'ajústalo solo si quieres otro modelo disponible.', '    '));
     lines.push(...option('thinking', DEFAULT_CONFIG.executor.thinking, 'Esfuerzo de razonamiento enviado al ejecutor.', 'null, low, medium, high, xhigh o max; none (Cline; Codex lo ignora)', 'bajo = low, medio = medium, alto = high, extremo = xhigh; max es el máximo. null conserva el esfuerzo predeterminado del ejecutor. Usa low en tareas sencillas y high en tareas difíciles.', '    '));
     lines.push(...option('timeoutSeconds', DEFAULT_CONFIG.executor.timeoutSeconds, 'Tiempo máximo de ejecución del agente, en segundos.', 'número positivo', 'auméntalo para tareas largas.', '    '));
+    lines.push(...option('network', DEFAULT_CONFIG.executor.network, 'Permite al ejecutor Codex acceder a internet desde su sandbox (consultar páginas y APIs).', 'booleano', 'desactívalo con agentrelay set executor.network false si no quieres que el ejecutor use la red. Cline no tiene sandbox y no lo necesita.', '    '));
     lines.push(...option('extraArgs', DEFAULT_CONFIG.executor.extraArgs, 'Argumentos adicionales enviados al comando del ejecutor.', 'lista de textos', 'añade solo opciones que admita el ejecutor.', '    '));
     lines.push('  // },');
   }

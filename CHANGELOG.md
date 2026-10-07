@@ -18,6 +18,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `agentrelay setup` avisa de que las instrucciones solo se cargan en sesiones nuevas de Claude Code y, si no puede escribir el archivo global, lo explica con claridad.
 - **Instaladores** en `installer/` (sin probar en equipos reales): `install.ps1` y un asistente de Inno Setup para Windows; `install.sh`, un asistente con Zenity y `build-deb.sh` para Debian/Ubuntu.
 
+- **Acceso a internet para los ejecutores.** Codex corre en un sandbox sin red por defecto; ahora AgentRelay añade `sandbox_workspace_write.network_access=true` (nuevo ajuste `executor.network`, activo por defecto; `false` lo desactiva) y el prompt del ejecutor indica que use Node (`fetch`) en lugar de `curl`/`Invoke-WebRequest`, que fallan por TLS dentro del sandbox de Windows. Probado en Windows con Luna y con Cline/DeepSeek extrayendo datos reales de Wowhead.
+
 ### Cambiado
 
 - **Triaje en un solo sitio.** El triaje sale del bloque de proyecto y queda solo en el bloque global: una vez por orden, recomienda modelo y esfuerzo para el orquestador; si es el actual sigue, y si hay que cambiarlo espera la confirmación del usuario. El esfuerzo del ejecutor lo fija el orquestador sin esperar. Ningún bloque supone un ejecutor concreto, y `init` se pregunta siempre antes de ejecutarlo.

@@ -82,17 +82,20 @@ test('codex: recoge los errores (turn.failed, error suelto y líneas no válidas
 test('codex: argumentos de línea de comandos', () => {
   assert.deepEqual(
     codexBuildArgs({ provider: null, model: null, thinking: null, extraArgs: [] }, 'instr', 'run/codex-report.schema.json'),
-    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 'run/codex-report.schema.json', 'instr'],
+    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 'run/codex-report.schema.json', '-c', 'sandbox_workspace_write.network_access=true', 'instr'],
   );
   assert.deepEqual(
     codexBuildArgs({ provider: 'openai', model: 'gpt-6-luna', thinking: 'high', extraArgs: ['--skip-git-repo-check'] }, 'instr', 's.json'),
-    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 's.json', '-m', 'gpt-6-luna', '-c', 'model_reasoning_effort=high', '--skip-git-repo-check', 'instr'],
+    ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 's.json', '-m', 'gpt-6-luna', '-c', 'model_reasoning_effort=high', '-c', 'sandbox_workspace_write.network_access=true', '--skip-git-repo-check', 'instr'],
   );
-  // Sin modelo, sin thinking y sin extraArgs: solo el esquema y la instrucción.
+  // Sin modelo, sin thinking y sin extraArgs: solo el esquema, la red y la instrucción.
   const args = codexBuildArgs({}, 'hola', 's.json');
-  assert.deepEqual(args.slice(-2), ['s.json', 'hola']);
+  assert.deepEqual(args.slice(-4), ['s.json', '-c', 'sandbox_workspace_write.network_access=true', 'hola']);
   assert.equal(args.includes('-m'), false);
-  assert.equal(args.includes('-c'), false);
+  assert.equal(args.includes('model_reasoning_effort=high'), false);
+  // La red se permite por defecto y solo se omite con network: false.
+  assert.equal(args.includes('sandbox_workspace_write.network_access=true'), true);
+  assert.equal(codexBuildArgs({ network: false }, 'i', 's.json').includes('-c'), false);
   // El proveedor se ignora: Codex usa la sesión de ChatGPT.
   assert.equal(codexBuildArgs({ provider: 'deepseek' }, 'i', 's.json').includes('-P'), false);
 

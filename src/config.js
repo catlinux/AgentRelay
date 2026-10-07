@@ -27,6 +27,8 @@ export const DEFAULT_CONFIG = Object.freeze({
     thinking: null,
     timeoutSeconds: 1200,
     extraArgs: [],
+    // Codex: permite la red dentro de su sandbox (por defecto la tiene cerrada).
+    network: true,
     apiFallback: true,
   },
   validation: {
@@ -131,7 +133,7 @@ function readConfig(file) {
 }
 const KNOWN = {
   '': ['executor', 'validation', 'policy', 'report', 'profiles'],
-  executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs', 'apiFallback'],
+  executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs', 'network', 'apiFallback'],
   validation: ['commands', 'timeoutSeconds'],
   policy: ['review', 'maxRetries', 'autoFix', 'requireValidation', 'selfReview', 'skipPassMaxFiles'],
   'policy.selfReview': COMPLEXITIES,
@@ -210,6 +212,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (!(config.executor.thinking === null || ['none', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.executor.thinking))) invalid('executor.thinking', 'debe ser null, none, low, medium, high, xhigh o max');
   for (const key of ['executor.timeoutSeconds', 'validation.timeoutSeconds']) { const n = config[key.split('.')[0]][key.split('.')[1]]; if (typeof n !== 'number' || !(n > 0)) invalid(key, 'debe ser un número positivo'); }
   if (!Array.isArray(config.executor.extraArgs) || !config.executor.extraArgs.every((v) => typeof v === 'string')) invalid('executor.extraArgs', 'debe ser una lista de textos');
+  if (typeof config.executor.network !== 'boolean') invalid('executor.network', 'debe ser booleano');
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }
