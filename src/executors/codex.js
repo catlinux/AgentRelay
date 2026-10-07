@@ -155,6 +155,8 @@ export function buildArgs(executor, instruction, schemaFile) {
   // (Windows) por seguridad. Codex parsea el valor como TOML y, si falla, usa la
   // cadena tal cual, así que `model_reasoning_effort=high` equivale a "high".
   if (executor.thinking && executor.thinking !== 'none') args.push('-c', `model_reasoning_effort=${executor.thinking}`);
+  // El sandbox de Codex corta la red por defecto; sin esto el ejecutor no puede consultar páginas ni APIs.
+  if (executor.network !== false) args.push('-c', 'sandbox_workspace_write.network_access=true');
   args.push(...(executor.extraArgs || []), instruction);
   return args;
 }

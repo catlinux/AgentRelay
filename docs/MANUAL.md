@@ -89,6 +89,13 @@ La clave se guarda en un perfil propio de AgentRelay (`~/.agentrelay/codex-api/`
 - `agentrelay doctor` muestra si el respaldo está configurado y, si la cuota está agotada, hasta cuándo. Sin respaldo no cambia nada: el aviso de cuota te propone alternativas.
 - Se desactiva con `agentrelay set executor.apiFallback false --local`. Solo se gasta dinero si tú has guardado la clave.
 
+### Acceso a internet del ejecutor
+Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de Wowhead). Codex corre en un sandbox que por defecto tiene la red cerrada: AgentRelay la abre con `sandbox_workspace_write.network_access=true`. Cline no tiene sandbox y no necesita nada. Se desactiva con `agentrelay set executor.network false`.
+
+- En Windows, dentro del sandbox de Codex fallan `curl`, `curl.exe` e `Invoke-WebRequest` (error TLS de schannel): el ejecutor recibe la regla de usar Node (`fetch`). Si escribes la tarea a mano, indícale el script en Node y los campos que quieres.
+- Wowhead: `https://nether.wowhead.com/tooltip/item/<id>` devuelve JSON (también `spell`, `npc`, `quest`…). Las páginas normales responden a peticiones simples, pero un navegador automatizado (Playwright) recibe un 403: no hace falta navegador.
+- Comprobado con Luna y con Cline/DeepSeek en Windows. En Linux no está comprobado todavía.
+
 ### Modelos gratuitos de OpenCode
 Cambian a menudo, así que AgentRelay los vigila por ti. **El primer uso de cada día** (`run` o `start`), en segundo plano, prueba con dos tareas de ejemplo los modelos gratuitos que tu cuenta lista, los ordena de mejor a peor y escribe `.agentrelay/EJECUTORES.md` (saldos, estado de cada IA y los mejores gratuitos de hoy). Solo se envía una tarea de ejemplo, nunca tu código.
 
@@ -130,6 +137,7 @@ AgentRelay **nunca** hace commits ni push: los cambios quedan en tu carpeta. Si 
 | Instrucciones desactualizadas tras actualizar | `agentrelay setup` y, en el proyecto, `agentrelay init` |
 | En Windows, errores de `sed`, `dirname` o `uname` | Usa `agentrelay.cmd` |
 | Ejecutor no instalado | `agentrelay executors add <nombre>` |
+| El ejecutor no puede acceder a internet | Comprueba `executor.network` (debe ser `true`); en Windows pídele Node `fetch`, no `curl` |
 | Codex falla en Windows con «apply deny-read ACLs» | Añade `-c windows.sandbox=unelevated` a `executor.extraArgs` |
 
 Con una clave de API en Codex se **sustituye la sesión de ChatGPT**: para volver a la cuenta, `agentrelay login`.
