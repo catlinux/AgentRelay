@@ -1,6 +1,6 @@
 # AgentRelay — Instrucciones del proyecto
 
-Este archivo es neutral: lo lee cualquier orquestador (Claude Code, opencode, Codex u otro). `CLAUDE.md` solo lo importa. Las reglas generales (git y commits, idioma de las respuestas, simplicidad, sin atribución a IA) están en el `CLAUDE.md` global de cada equipo y no se repiten aquí. El contexto de diseño (propósito, política de orquestación, configuración, fases, versionado, costes) está en `docs/DISENO.md`: léelo solo cuando haga falta. Versionado: Semantic Versioning; una versión nueva se acuerda con el usuario, no se inventa. Estado y pendientes: `TODO.md` y `CHANGELOG.md`.
+Este archivo es neutral: lo lee cualquier orquestador (Claude Code, opencode, Codex u otro). `CLAUDE.md` solo lo importa. Las reglas generales (git y commits, idioma de las respuestas, simplicidad, sin atribución a IA) están en el `CLAUDE.md` global de cada equipo y no se repiten aquí. El contexto de diseño (propósito, política de orquestación, configuración, fases, versionado, costes) está en `docs/DISENO.md`: léelo solo cuando haga falta. Versionado: SemVer como en todos los proyectos, con la excepción de abajo (la versión se acuerda con el usuario, no se sube sola). Estado y pendientes: `TODO.md` y `CHANGELOG.md`.
 
 **Si eres el ejecutor** (te han dado una tarea con `agentrelay run`): haz solo esa tarea y sigue sus restricciones; ignora el «Protocolo del orquestador» y el bloque de AgentRelay. No ejecutes `agentrelay` salvo que la tarea lo pida y no hagas commits ni push.
 
@@ -17,7 +17,7 @@ La comunicación debe ser estructurada y orientada a tareas, no una conversació
 
 ## Idioma y documentación
 
-El repositorio está en español: README, comentarios, documentación, ayuda, ejemplos, CHANGELOG y TODO; el código puede conservar nombres técnicos/API en inglés. Existe además `README.en.md`; ambos README se enlazan en la cabecera. Existen como mínimo `README.md`, `README.en.md`, `CHANGELOG.md` y `TODO.md`: actualiza en cada modificación todos los afectados, sin documentación redundante. Cada mejora, corrección o decisión acordada se anota en `TODO.md` en ese momento y se marca `[x]` al completarla.
+Propio de este repositorio (la documentación mínima y el castellano ya son globales): el código puede conservar nombres técnicos/API en inglés; existe además `README.en.md` y ambos README se enlazan en la cabecera. Cada mejora, corrección o decisión acordada se anota en `TODO.md` en ese momento y se marca `[x]` al completarla.
 
 ## Producto: seguridad y simplicidad
 
@@ -34,7 +34,7 @@ Complementa el bloque de AgentRelay del final; no lo repite.
 - No añadas con `git add -f` un archivo ignorado (`git check-ignore -v`). No crees archivos no pedidos.
 - Al delegar: una tarea de documentación = un archivo. En `constraints` incluye siempre: no cambiar la versión, no escribir secuencias `\u` sueltas y usar la herramienta de edición, no scripts de PowerShell (hay archivos CRLF). Pon en `doNotModify` todo lo que no deba tocar.
 - Al revisar: ejecuta `npm test` tú mismo (si falla, no aceptes); busca escapes `\u00` en los `.js` modificados y restáuralos a caracteres reales; comprueba que el cambio no deshace trabajo anterior (`git log -p` del archivo).
-- Sin permiso explícito: no subir la versión ni crear secciones de versión en `CHANGELOG.md` (todo va a «Sin publicar»); no cambiar `.gitignore`, `package.json` ni la licencia.
+- **Excepción deliberada a la regla global de SemVer** (que pide subir la versión en cada trabajo acabado): en este repositorio, sin permiso explícito no se sube la versión ni se crean secciones de versión en `CHANGELOG.md` —todo va a «Sin publicar»— porque las versiones de la herramienta se liberan a mano. Tampoco se cambian `.gitignore`, `package.json` ni la licencia.
 - Informe al usuario: qué hiciste tú, qué hizo el ejecutor, qué decidiste y qué queda; máximo 6 líneas, tras volver a ejecutar `git status --short` y `agentrelay list`. Los comandos del chat (`/ar:use alto`) y los del terminal (`agentrelay use alto`) nunca se mezclan en un mismo texto.
 
 ### Problemas conocidos de los ejecutores (cualquiera)
