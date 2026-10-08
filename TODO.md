@@ -16,6 +16,8 @@ Necesitan al usuario en casa o una clave:
 
 Mejoras acordadas:
 
+- [ ] Proveedores con cuota gratuita vía OpenCode (NVIDIA, Groq, Gemini, Mistral, OpenRouter, Z AI): catálogo, `agentrelay providers`, ranquing multiproveedor, cadena opt-in `executor.freeChain` y aviso de privacidad (no bloqueo). Se prueban todos y se quitan los que fallen. Plan: [.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md](.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md).
+
 - [ ] Cadena de ejecutores: cuando se agota Luna (cuota gratuita por cuenta) el aviso ya propone alternativas (y, con respaldo `login --api`, Luna continúa con la API de pago y vuelve a la gratuita al restablecerse); con otros ejecutores nunca se cambia solo; falta afinar con el texto real del error de cuota de Codex y OpenCode (hoy se detecta con patrones genéricos).
 - [ ] Ranquing: más pruebas (hoy son dos) para distinguir mejor entre modelos que pasan ambas.
 - [ ] `doctor`: comprobar proveedor y credencial de Cline (hoy solo comprueba la sesión de Codex).
@@ -29,7 +31,7 @@ Mejoras acordadas:
 - Reanudar la sesión del ejecutor en la autorrevisión y en las correcciones.
 - Instrucciones de delegación para otros orquestadores (Codex, Cline…), no solo Claude Code.
 - Integración para que el orquestador reciba el informe sin pasar por el terminal; usar AgentRelay desde el móvil.
-- Más proveedores con nivel gratuito a través de los ejecutores (por ejemplo NVIDIA con Qwen3-Coder y Cline) y registro de saldos cuando el proveedor lo ofrezca.
+- Registro de saldos de los proveedores cuando lo ofrezcan.
 - Revisar las decisiones de autorrevisión según tamaño del diff y tipo de tarea.
 - Descartados por ahora (riesgo y complejidad; reabrir si el usuario los pide): subir a un remoto en `init` y plantillas de tareas por tipo.
 
