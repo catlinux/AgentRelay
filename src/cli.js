@@ -41,9 +41,10 @@ import { isDue, loadChecks, markDay, startDailyCheck } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels } from './free-models.js';
 import { rankModels, renderRanking } from './model-rank.js';
 import { isExhausted, lastQuotaEvent } from './free-ranking.js';
+import { connectedProviders, PROVIDERS } from './free-providers.js';
 import { reportPath, writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
-import { commandParts as opencodeCommandParts } from './executors/opencode.js';
+import { commandParts as opencodeCommandParts, connectedProviderIds } from './executors/opencode.js';
 import { apiProfileDir, commandParts as codexCommandParts, hasApiProfile } from './executors/codex.js';
 import { maskSecrets } from './executors/common.js';
 
@@ -65,6 +66,7 @@ Uso:
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay rank [--run] [--detach] [--max <N>] [--json]  Muestra o calcula el ranquing de modelos gratuitos
+  agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
@@ -464,6 +466,11 @@ async function cmdDoctor(values, rerun = false) {
         line(true, `Cuota gratuita de ChatGPT: restablecida (${recoveredAt.toLocaleString()})`);
       }
     }
+    if (executor.type === 'opencode') {
+      const opencodeAuth = await connectedProviderIds(executor);
+      const providers = connectedProviders({ env: process.env, opencodeAuth });
+      line(true, `Proveedores conectados: ${providers.length ? providers.map(({ name }) => name).join(', ') : 'ninguno'}`);
+    }
     if (modelCheckAllowed) {
       const modelCheck = await checkExecutorModel(executor, { adapter });
       if (!modelCheck.unknown) {
@@ -799,6 +806,51 @@ async function cmdRank(positionals, values) {
   if (!values.background) {
     if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     else process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: candidates.length })}\n`);
+  }
+  return 0;
+}
+
+async function cmdProviders(positionals, values) {
+  if (positionals.length) {
+    process.stderr.write('Uso: agentrelay providers [--json]\n');
+    return 1;
+  }
+  const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
+  const executor = config.executor.type === 'opencode'
+    ? config.executor : { ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
+  const opencodeAuth = await connectedProviderIds(executor);
+  const connected = new Set(connectedProviders({ env: process.env, opencodeAuth }).map(({ id }) => id));
+  const providers = PROVIDERS.map((provider) => {
+    const isConnected = connected.has(provider.id);
+    const dataNotice = provider.trainsOnData === false ? null
+      : provider.trainsOnData === true
+        ? 'puede usar tus prompts para entrenar'
+        : 'política de datos sin verificar';
+    const connection = isConnected ? null : provider.id === 'opencode'
+      ? { command: 'agentrelay login opencode' }
+      : { env: provider.env, signupUrl: provider.signupUrl };
+    return {
+      id: provider.id,
+      name: provider.name,
+      connected: isConnected,
+      status: isConnected ? 'conectado' : 'no conectado',
+      tier: provider.tier === 'free' ? 'gratuito' : 'de pago',
+      limits: provider.limits,
+      dataNotice,
+      connection,
+    };
+  });
+  if (values.json) {
+    process.stdout.write(`${JSON.stringify(providers, null, 2)}\n`);
+    return 0;
+  }
+  for (const provider of providers) {
+    const details = [provider.status, provider.tier];
+    if (provider.limits) details.push(`Límites: ${provider.limits}`);
+    if (provider.dataNotice) details.push(provider.dataNotice);
+    if (provider.connection?.command) details.push(`Conecta con: ${provider.connection.command}`);
+    else if (provider.connection) details.push(`Configura ${provider.connection.env.join(' o ')} y crea una cuenta: ${provider.connection.signupUrl}`);
+    process.stdout.write(`${provider.name}: ${details.join(' · ')}\n`);
   }
   return 0;
 }
@@ -1624,6 +1676,7 @@ export async function main(argv, runtime = {}) {
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
       case 'rank': return await cmdRank(rest, values);
+      case 'providers': return await cmdProviders(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(rest, values);
       case 'setup': return await cmdSetup(values);

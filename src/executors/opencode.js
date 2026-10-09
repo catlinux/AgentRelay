@@ -12,6 +12,7 @@ import path from 'node:path';
 import { runProcess } from '../proc.js';
 import { executorsDir as defaultExecutorsDir } from './catalog.js';
 import { clip, extractAgentReport, instructionFor, makeLineHandler, relativize, tail } from './common.js';
+import { PROVIDERS } from '../free-providers.js';
 
 export const name = 'opencode';
 
@@ -218,5 +219,27 @@ export async function authStatus(executor, { run = runProcess } = {}) {
   } catch (error) {
     const detail = String(error?.message || error).slice(0, 160);
     return { ok: false, message: `No se pudo comprobar la sesión de OpenCode: ${detail}. Prueba: agentrelay login opencode` };
+  }
+}
+
+/** Lista los proveedores con credenciales guardadas en OpenCode, sin exponerlas. */
+export async function connectedProviderIds(executor, { run = runProcess } = {}) {
+  try {
+    const [command, ...prefix] = commandParts(executor.command);
+    const res = await run(command, [...prefix, 'auth', 'list'], { timeoutMs: 60_000 });
+    if (res.code !== 0 || res.error || res.timedOut) return [];
+    const names = new Set();
+    for (const line of (res.stdout || '').split(/\r?\n/)) {
+      const name = line.trim().split(/\s{2,}/, 1)[0]?.trim();
+      if (!name) continue;
+      const normalized = name.toLowerCase().replace(/\s+/g, '');
+      if (normalized === 'opencodeconsole') names.add('opencode');
+      for (const provider of PROVIDERS) {
+        if (normalized === provider.name.toLowerCase().replace(/\s+/g, '')) names.add(provider.id);
+      }
+    }
+    return [...names];
+  } catch {
+    return [];
   }
 }
