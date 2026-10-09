@@ -720,8 +720,8 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
-export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [] } = {}) {
-  const zenCandidates = discoverFreeModels({ listed, metadata: metadata.models, source });
+export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [], includeUnlisted = true } = {}) {
+  const zenCandidates = discoverFreeModels({ listed, metadata: metadata.models, source, includeUnlisted });
   const live = Object.fromEntries(connected.map((provider) => [provider, []]));
   for (const model of listed) {
     const id = typeof model === 'string' ? model : model?.id;
@@ -735,6 +735,14 @@ export function discoverRankCandidates({ listed = [], metadata = {}, source = 's
       id, free: true, listed: true, reason: 'metadatos', name, context, reasoning, toolCall: true, releaseDate,
     }));
   return [...zenCandidates, ...providerCandidates];
+}
+
+/** Proveedores gratuitos conectados además de OpenCode Zen (que se descubre aparte). */
+async function freeProvidersConnected(executor) {
+  const opencodeAuth = await connectedProviderIds(executor);
+  return connectedProviders({ env: process.env, opencodeAuth })
+    .filter(({ id, tier }) => id !== 'opencode' && tier === 'free')
+    .map(({ id }) => id);
 }
 
 async function cmdRank(positionals, values) {
@@ -793,10 +801,7 @@ async function cmdRank(positionals, values) {
   }
   const listed = await adapter.listModels(executor);
   const metadata = await loadFreeMetadata({ home });
-  const opencodeAuth = await connectedProviderIds(executor);
-  const connected = connectedProviders({ env: process.env, opencodeAuth })
-    .filter(({ id, tier }) => id !== 'opencode' && tier === 'free')
-    .map(({ id }) => id);
+  const connected = await freeProvidersConnected(executor);
   const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected });
   if (!candidates.length) {
     if (!values.background) {
@@ -906,7 +911,8 @@ async function cmdExecutors(positionals, values) {
       if (auth.ok) {
         const listed = await adapter.listModels(executor);
         const metadata = await loadFreeMetadata({ home });
-        const candidates = discoverFreeModels({ listed, metadata: metadata.models, source: metadata.source, includeUnlisted: false });
+        const connected = await freeProvidersConnected(executor);
+        const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, includeUnlisted: false });
         const checks = loadChecks(home);
         const available = candidates.filter(({ id }) => !isExhausted(checks, id));
         const now = new Date();
