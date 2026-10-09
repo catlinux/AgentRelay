@@ -63,15 +63,20 @@ export function makeRepo() {
 
 export function testConfig(overrides = {}) {
   return merge(merge({}, DEFAULT_CONFIG), merge({
-    executor: { type: 'cline', command: [process.execPath, FAKE_CLINE], provider: 'fake', model: 'fake-model', timeoutSeconds: 60 },
+    executor: { type: 'opencode', command: [process.execPath, FAKE_OPENCODE], provider: null, model: 'fake-model', timeoutSeconds: 60 },
     validation: { commands: [], timeoutSeconds: 60 },
   }, overrides));
 }
 
-/** Define el comportamiento del Cline simulado para el siguiente test. */
+/** Define el comportamiento del OpenCode simulado para el siguiente test. */
 export function fakePlan(repo, plan) {
-  process.env.FAKE_CLINE_PLAN = JSON.stringify(plan);
-  process.env.FAKE_CLINE_LOG = repo.logFile;
+  process.env.FAKE_OPENCODE_PLAN = JSON.stringify(plan);
+  process.env.FAKE_OPENCODE_LOG = repo.logFile;
+  process.env.FAKE_OPENCODE_MODELS = [...new Set([
+    'opencode/nemotron-3-ultra-free', 'opencode/gpt-oss-120b-free', 'fake-model',
+    ...Object.keys(plan.byModel || {}),
+  ])].join(',');
+  process.env.FAKE_OPENCODE_STORED = '1';
 }
 
 export function baseTask(overrides = {}) {

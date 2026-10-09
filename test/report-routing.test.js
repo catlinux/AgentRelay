@@ -30,12 +30,12 @@ test('renderReport incluye cambios, entradas descartadas y uso de pago al enruta
   const route = {
     first: 'codex:gpt-6-luna', current: { key: 'opencode:groq/modelo' },
     switches: [{ at: '2026-10-09T19:00:00.000Z', from: 'codex:gpt-6-luna', to: 'opencode:groq/modelo', reason: 'cuota agotada', paid: true, trainsOnData: true }],
-    skipped: [{ key: 'cline:modelo', reason: 'no disponible' }, { key: 'cline:modelo', reason: 'duplicada' }],
+    skipped: [{ key: 'opencode:fake/modelo', reason: 'no disponible' }, { key: 'opencode:fake/modelo', reason: 'duplicada' }],
   };
   const report = renderReport(state(route));
   assert.match(report, /Ejecutor: enrutado automático · empezó con codex:gpt-6-luna · ahora opencode:groq\/modelo/);
   assert.match(report, /## Enrutado[\s\S]*\d{2}:\d{2} codex:gpt-6-luna → opencode:groq\/modelo \(cuota agotada\) · de pago · aviso: puede usar tus prompts para entrenar/);
-  assert.equal((report.match(/cline:modelo: /g) ?? []).length, 1);
+  assert.equal((report.match(/opencode:fake\/modelo: /g) ?? []).length, 1);
   assert.match(report, /\*\*Se ha usado un ejecutor de pago en esta ejecución\.\*\*/);
   assert.ok(report.includes('| 1 | implement · codex:gpt-6-luna |'));
 });

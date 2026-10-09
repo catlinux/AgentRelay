@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createOutput } from '../src/output.js';
-import { FAKE_CLINE, git, makeRepo, fakePlan, baseTask } from './helpers.js';
+import { FAKE_CLINE, FAKE_OPENCODE, git, makeRepo, fakePlan, baseTask } from './helpers.js';
 import { GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js';
 import { commandsSourceDir, commandsTargetDir, listCommands, MANAGED_MARK } from '../src/claude-commands.js';
 
@@ -18,6 +18,13 @@ function streams() {
 }
 function cli(args, cwd, env = {}) {
   return spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
+}
+function fakeOpenCodeEnv(repo) {
+  return {
+    FAKE_OPENCODE_PLAN: process.env.FAKE_OPENCODE_PLAN,
+    FAKE_OPENCODE_MODELS: process.env.FAKE_OPENCODE_MODELS,
+    FAKE_OPENCODE_LOG: repo.logFile,
+  };
 }
 
 test('createOutput enruta info, detalle, resultado, avisos y errores', () => {
@@ -55,32 +62,34 @@ test('CLI conserva alias de versión y rechaza modos incompatibles', () => {
 test('run quieto imprime id y estado, verbose añade comando y rutas', () => {
   const repo = makeRepo();
   try {
-    writeFileSync(path.join(repo.dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline', command: [process.execPath, FAKE_CLINE], provider: 'fake', model: 'fake-model' }, validation: { commands: [] } }));
+    writeFileSync(path.join(repo.dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'opencode', command: [process.execPath, FAKE_OPENCODE], model: 'fake-model' }, validation: { commands: [] } }));
     writeFileSync(path.join(repo.dir, 'task.json'), JSON.stringify(baseTask()));
     git(repo.dir, 'add', '-A'); git(repo.dir, 'commit', '-q', '-m', 'fixture');
-    fakePlan(repo, [{ status: 'completed', write: { 'hello.txt': 'hi' } }]);
-    const quiet = cli(['run', 'task.json', '-q'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
-    assert.equal(quiet.status, 2, quiet.stderr);
+    fakePlan(repo, { implement: { write: { 'hello.txt': 'hi' } } });
+    const quiet = cli(['run', 'task.json', '-q'], repo.dir, fakeOpenCodeEnv(repo));
+    assert.equal(quiet.status, 0, quiet.stderr);
     assert.doesNotMatch(quiet.stderr, /archivo\(s\) cambiado\(s\) que el ejecutor no declaró/);
     const [summary, reportPath] = quiet.stdout.trim().split(/\r?\n/);
     assert.match(summary, /^[\w-]+  \w+$/); assert.match(reportPath, /report\.md$/); assert.equal(quiet.stdout.includes('# AgentRelay'), false);
-    fakePlan(repo, [{ status: 'completed', write: { 'hello.txt': 'hi' } }]);
-    const verbose = cli(['run', 'task.json', '-v'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
-    assert.equal(verbose.status, 2, verbose.stderr);
+    git(repo.dir, 'clean', '-fdq', '--', 'hello.txt');
+    fakePlan(repo, { implement: { write: { 'hello.txt': 'hi' } } });
+    const verbose = cli(['run', 'task.json', '-v'], repo.dir, fakeOpenCodeEnv(repo));
+    assert.equal(verbose.status, 0, verbose.stderr);
     assert.match(verbose.stdout, /Ejecutor:/); assert.match(verbose.stdout, /Archivos del intento/);
     assert.doesNotMatch(verbose.stdout, /AVISO: estos archivos han cambiado pero el ejecutor no los declaró/);
     assert.doesNotMatch(verbose.stderr, /archivo\(s\) cambiado\(s\) que el ejecutor no declaró/);
     assert.doesNotMatch(verbose.stdout, /AVISO: el ejecutor no devolvió el informe estructurado/);
 
+    git(repo.dir, 'clean', '-fdq', '--', 'hello.txt');
     fakePlan(repo, { implement: { write: { 'hello.txt': 'hi', 'extra.txt': 'sin declarar' }, report: { filesChanged: ['hello.txt'] } } });
-    const undeclared = cli(['run', 'task.json'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
+    const undeclared = cli(['run', 'task.json'], repo.dir, fakeOpenCodeEnv(repo));
     assert.equal(undeclared.status, 0, undeclared.stderr);
     assert.match(undeclared.stderr, /\[aviso\] Hay 1 archivo\(s\) cambiado\(s\) que el ejecutor no declaró: extra\.txt; revisa el diff\./);
     assert.match(undeclared.stdout, /AVISO: estos archivos han cambiado pero el ejecutor no los declaró \(¿los modificaste tú mientras trabajaba, o los tocó sin decirlo\?\): `extra\.txt`\. Revisa el diff antes de aceptar\./);
 
     git(repo.dir, 'clean', '-fdq', '--', 'hello.txt', 'extra.txt');
     fakePlan(repo, { implement: { report: null, text: 'Done without a structured report', write: { 'hello.txt': 'hi' } } });
-    const missingReport = cli(['run', 'task.json'], repo.dir, { FAKE_CLINE_LOG: repo.logFile });
+    const missingReport = cli(['run', 'task.json'], repo.dir, fakeOpenCodeEnv(repo));
     assert.equal(missingReport.status, 0, missingReport.stderr);
     assert.match(missingReport.stderr, /\[aviso\] El ejecutor no devolvió el informe estructurado; revisa el diff y las validaciones\./);
     assert.match(missingReport.stdout, /\*\*AVISO: el ejecutor no devolvió el informe estructurado \(estado, archivos, incidencias\)\./);

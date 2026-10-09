@@ -74,7 +74,7 @@ test('detiene errores de credenciales, cuota y modelo no disponible sin reintent
   ]) {
     const repo = makeRepo();
     try {
-      fakePlan(repo, { implement: { finishReason: error, text: error, report: null } });
+      fakePlan(repo, { implement: { error, report: null } });
       const oldHome = process.env.AGENTRELAY_HOME;
       const oldExecutors = process.env.AGENTRELAY_EXECUTORS_DIR;
       process.env.AGENTRELAY_HOME = repo.dir;
@@ -110,7 +110,7 @@ test('un error normal continúa reintentándose', async () => {
   const repo = makeRepo();
   try {
     fakePlan(repo, {
-      implement: { finishReason: 'error', text: 'network timeout', report: null },
+      implement: { error: 'network timeout', report: null },
       fix: {},
     });
     const state = await startRun({
@@ -131,15 +131,13 @@ test('marca agotado un modelo de OpenCode cuando la ejecución falla por cuota',
   const oldHome = process.env.AGENTRELAY_HOME;
   process.env.AGENTRELAY_HOME = home;
   try {
-    const model = 'vendor/model-free';
+    const model = 'opencode/nemotron-3-ultra-free';
+    fakePlan(repo, { implement: { error: 'insufficient_quota', report: null } });
     const state = await startRun({
       root: repo.dir,
       task: normalizeTask(baseTask()),
       config: testConfig({
-        executor: {
-          type: 'opencode', provider: 'fake', model,
-          command: [process.execPath, '-e', "const args=process.argv.slice(1); if (args[0] === 'auth') process.stdout.write('OpenCode account stored'); else if (args[0] === '--version') process.stdout.write('opencode test'); else { process.stderr.write('insufficient_quota'); process.exit(1); }"],
-        },
+        executor: { model },
       }),
     });
 
