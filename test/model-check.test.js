@@ -29,6 +29,9 @@ test('isFreeModel e isDue identifican modelos gratuitos y el día de revisión',
   const today = new Date(2026, 9, 4, 10);
   assert.equal(isFreeModel('vendor/model-free'), true);
   assert.equal(isFreeModel('vendor/model'), false);
+  assert.equal(isFreeModel('vendor/model', new Set(['vendor/model'])), true);
+  assert.equal(isFreeModel('vendor/other', new Set(['vendor/model'])), false);
+  assert.equal(isFreeModel('vendor/model-free', new Set()), true);
   assert.equal(isDue({ lastRun: '2026-10-03' }, today), true);
   assert.equal(isDue({ lastRun: '2026-10-04' }, today), false);
 });

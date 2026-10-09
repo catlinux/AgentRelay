@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 export const MAX_SECONDS = 300;
 const EMPTY_CHECKS = () => ({ lastRun: null, models: {} });
 
-export const isFreeModel = (id) => typeof id === 'string' && id.endsWith('-free');
+export const isFreeModel = (id, known) => typeof id === 'string'
+  && (id.endsWith('-free') || known?.has?.(id) === true);
 export const checksFile = (home = agentrelayHome()) => path.join(home, 'model-checks.json');
 
 export function loadChecks(home = agentrelayHome()) {

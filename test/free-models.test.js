@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   discoverFreeModels,
+  discoverProviderModels,
   fetchModelsDev,
   loadFreeMetadata,
   readCache,
@@ -72,18 +73,23 @@ test('sin metadatos solo considera candidatos con sufijo -free', () => {
   ]);
 });
 
-test('la caché reciente evita consultar la red y solo conserva opencode', async () => {
+test('la caché reciente evita consultar la red y conserva varios proveedores', async () => {
   const home = newHome();
   const now = new Date('2026-10-05T12:00:00.000Z');
   let calls = 0;
   try {
     writeCache(home, {
       fetchedAt: '2026-10-05T11:00:00.000Z',
-      ...fixture({ 'grok-code': zeroCost() }),
+      opencode: { models: { 'grok-code': zeroCost() } },
+      providers: {
+        opencode: { models: { 'grok-code': zeroCost() } },
+        groq: { models: { llama: zeroCost() } },
+        invalid: { models: null },
+      },
     });
     const stored = JSON.parse(readFileSync(path.join(home, 'models-dev.json'), 'utf8'));
-    assert.deepEqual(Object.keys(stored), ['fetchedAt', 'opencode']);
-    assert.deepEqual(readCache(home), { fetchedAt: stored.fetchedAt, opencode: stored.opencode });
+    assert.deepEqual(Object.keys(stored), ['fetchedAt', 'opencode', 'providers']);
+    assert.deepEqual(Object.keys(readCache(home).providers), ['opencode', 'groq']);
 
     const result = await loadFreeMetadata({
       home,
@@ -93,6 +99,7 @@ test('la caché reciente evita consultar la red y solo conserva opencode', async
     assert.equal(calls, 0);
     assert.equal(result.source, 'caché');
     assert.ok(result.models['grok-code']);
+    assert.ok(result.providers.groq.llama);
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
@@ -125,7 +132,7 @@ test('sin red ni caché degrada al sufijo y no lanza errores', async () => {
       home,
       fetchFn: async () => { throw new Error('sin red'); },
     });
-    assert.deepEqual(result, { models: {}, source: 'sufijo' });
+    assert.deepEqual(result, { models: {}, source: 'sufijo', providers: {} });
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
@@ -137,7 +144,7 @@ test('una caché corrupta se ignora', async () => {
     writeFileSync(path.join(home, 'models-dev.json'), '{ roto', 'utf8');
     assert.equal(readCache(home), null);
     const result = await loadFreeMetadata({ home, fetchFn: async () => { throw new Error('sin red'); } });
-    assert.deepEqual(result, { models: {}, source: 'sufijo' });
+    assert.deepEqual(result, { models: {}, source: 'sufijo', providers: {} });
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
@@ -154,6 +161,73 @@ test('descarga datos válidos y explica respuestas sin proveedor opencode', asyn
     fetchModelsDev({ fetchFn: async () => ({ ok: true, json: async () => { throw new Error('parse'); } }) }),
     /JSON válido/,
   );
+});
+
+test('lee cachés antiguas que solo contienen opencode', async () => {
+  const home = newHome();
+  const fetchedAt = '2026-10-05T11:00:00.000Z';
+  const opencode = { models: { 'grok-code': zeroCost() } };
+  try {
+    writeFileSync(path.join(home, 'models-dev.json'), JSON.stringify({ fetchedAt, opencode }), 'utf8');
+    assert.deepEqual(readCache(home), { fetchedAt, opencode, providers: { opencode } });
+    const result = await loadFreeMetadata({ home, now: new Date('2026-10-05T12:00:00.000Z') });
+    assert.deepEqual(result, { models: opencode.models, source: 'caché', providers: { opencode: opencode.models } });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('carga y guarda proveedores con modelos válidos desde models.dev', async () => {
+  const home = newHome();
+  const data = {
+    opencode: { models: { zen: zeroCost() } },
+    groq: { models: { llama: zeroCost() } },
+    invalid: { models: null },
+  };
+  try {
+    const result = await loadFreeMetadata({
+      home,
+      now: new Date('2026-10-05T12:00:00.000Z'),
+      fetchFn: async () => response(data),
+    });
+    assert.deepEqual(result, {
+      models: data.opencode.models,
+      source: 'red',
+      providers: { opencode: data.opencode.models, groq: data.groq.models },
+    });
+    assert.deepEqual(Object.keys(readCache(home).providers), ['opencode', 'groq']);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('descubre modelos gratuitos conectados con filtros de metadatos y modelos activos', () => {
+  const model = (extra = {}) => ({
+    cost: { input: 0, output: 0 }, tool_call: true, limit: { context: 64000 }, ...extra,
+  });
+  const found = discoverProviderModels({
+    connected: ['groq', 'google', 'mistral'],
+    providers: {
+      groq: {
+        newer: model({ name: 'New', release_date: '2026-01-01', reasoning: true }),
+        older: model({ name: 'Old', release_date: '2025-01-01' }),
+        undated: model(),
+        paid: model({ cost: { input: 1, output: 0 } }),
+        noTools: model({ tool_call: false }),
+        small: model({ limit: { context: 63999 } }),
+        retired: model(),
+      },
+      google: { gemini: model({ release_date: '2025-06-01' }) },
+      ignored: { model: model({ release_date: '2027-01-01' }) },
+    },
+    live: { groq: ['newer', 'older', 'undated', 'paid', 'noTools', 'small'] },
+  });
+  assert.deepEqual(found.map(({ id }) => id), [
+    'groq/newer', 'google/gemini', 'groq/older', 'groq/undated',
+  ]);
+  assert.deepEqual(found[0], {
+    id: 'groq/newer', provider: 'groq', name: 'New', context: 64000, reasoning: true, releaseDate: '2026-01-01',
+  });
 });
 
 test('ordena los candidatos por fecha de lanzamiento y deja los desconocidos al final', () => {
