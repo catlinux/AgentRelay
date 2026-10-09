@@ -71,7 +71,7 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 ### Paso 8 — Retirar Cline (solo si el paso 0 lo justifica) · AgentRelay, medio · [ ]
 - Quitar adaptador, dependencia (pedir permiso explícito para tocar `package.json`), entradas en `catalog.js`, `alternatives.js`, `doctor`, migración de configuración `cline` → `opencode deepseek/…` con aviso.
 
-### Paso 9 — Documentación · AgentRelay, bajo, **un archivo por tarea** · [ ]
+### Paso 9 — Documentación · AgentRelay, bajo, **un archivo por tarea** · [x]
 - `docs/DISENO.md` (enrutado y su política), `README.md`, `README.en.md`, manual en `docs/` (`providers`, `routing`).
 
 ## Cómo seguir en barato
