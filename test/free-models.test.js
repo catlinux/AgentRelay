@@ -224,7 +224,7 @@ test('descubre modelos gratuitos conectados con filtros de metadatos y modelos a
     live: { groq: ['newer', 'older', 'undated', 'paid', 'noTools', 'small'] },
   });
   assert.deepEqual(found.map(({ id }) => id), [
-    'groq/newer', 'google/gemini', 'groq/older', 'groq/undated', 'nvidia/audioFree',
+    'groq/newer', 'google/gemini', 'groq/older', 'groq/undated',
   ]);
   assert.deepEqual(found[0], {
     id: 'groq/newer', provider: 'groq', name: 'New', context: 64000, reasoning: true, releaseDate: '2026-01-01',
@@ -355,4 +355,14 @@ test('discoverFreeModels ignora los modelos de otros proveedores aunque no tenga
   assert.ok(ids.includes('opencode/modelo-nuevo'));
   assert.ok(!ids.some((id) => id.startsWith('ollama/')));
   assert.ok(!ids.includes('opencode/gpt-5'));
+});
+
+test('discoverProviderModels descarta los modelos que generan imágenes o audio', () => {
+  const model = (output) => ({ tool_call: true, limit: { context: 128000 }, cost: { input: 0.1, output: 0.2 }, modalities: { input: ['text'], output } });
+  const found = discoverProviderModels({
+    providers: { google: { texto: model(['text']), imagen: model(['text', 'image']), voz: model(['audio']) } },
+    connected: ['google'],
+    freeTierProviders: ['google'],
+  });
+  assert.deepEqual(found.map(({ id }) => id), ['google/texto']);
 });
