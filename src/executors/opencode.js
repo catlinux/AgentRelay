@@ -145,14 +145,37 @@ export function toActivity(event, cwd) {
   return null;
 }
 
+const standaloneSupport = new Map();
+
+/**
+ * Las versiones recientes de OpenCode envían `run` a un servicio en segundo plano que trabaja en
+ * su propia carpeta, no en la del proyecto: con `--standalone` usa un servidor propio y respeta
+ * `cwd`. Las versiones antiguas no tienen esa opción, así que se comprueba una vez por comando.
+ */
+async function supportsStandalone(command, prefix) {
+  const key = JSON.stringify([command, ...prefix]);
+  if (!standaloneSupport.has(key)) {
+    let supported = false;
+    try {
+      const res = await runProcess(command, [...prefix, 'run', '--help'], { timeoutMs: 30_000 });
+      supported = /--standalone\b/.test(`${res.stdout} ${res.stderr}`);
+    } catch { /* Sin respuesta: se trata como versión antigua. */ }
+    standaloneSupport.set(key, supported);
+  }
+  return standaloneSupport.get(key);
+}
+
 /** Ejecuta OpenCode sobre `cwd` con el prompt guardado en `promptFile` (ruta relativa). */
 export async function run({ executor, cwd, promptFile, onActivity }) {
   const [command, ...prefix] = commandParts(executor.command);
   const args = [...prefix, ...buildArgs(executor, instructionFor(promptFile))];
+  if (await supportsStandalone(command, prefix)) args.splice(prefix.length + 1, 0, '--standalone');
   const timeoutMs = executor.timeoutSeconds ? executor.timeoutSeconds * 1000 : undefined;
 
+  // OpenCode toma la carpeta de trabajo de $PWD, que el proceso hijo hereda del padre aunque cambie cwd.
   const res = await runProcess(command, args, {
     cwd,
+    env: { PWD: cwd },
     timeoutMs,
     onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
   });

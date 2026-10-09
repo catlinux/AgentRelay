@@ -10,6 +10,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const args = process.argv.slice(2);
 // `node --test` también ejecuta este archivo (sin argumentos): no hay nada que hacer.
 if (!args.length) process.exit(0);
+if (args[0] === 'run' && args.includes('--help')) {
+  process.stdout.write(process.env.FAKE_OPENCODE_STANDALONE === '1' ? 'FLAGS\n  --standalone  Run with a private server\n' : 'FLAGS\n  --auto\n');
+  process.exit(0);
+}
 if (args.includes('--version')) {
   process.stdout.write('opencode v2.0.21\n');
   process.exit(0);
@@ -33,6 +37,12 @@ if (args[0] === 'models') {
 }
 
 if (args[0] !== 'run') process.exit(0);
+
+// Para comprobar con qué carpeta de trabajo (PWD) y argumentos se lanza `run`.
+if (process.env.FAKE_OPENCODE_ECHO === '1') {
+  process.stdout.write(`${JSON.stringify({ type: 'text', part: { type: 'text', text: `${process.env.PWD}|${args.join(' ')}` } })}\n`);
+  process.exit(0);
+}
 
 if (process.env.FAKE_OPENCODE_PLAN !== undefined) {
   const instruction = args[args.length - 1];
