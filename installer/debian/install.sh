@@ -19,7 +19,7 @@ Uso: install.sh [opciones]
 
 Opciones:
   --install-dir <ruta>  Directorio del clon (por defecto: $HOME/AgentRelay)
-  --executors <lista>   Instalar cline y/o opencode, separados por comas
+  --executors <lista>   Instalar opencode (lista separada por comas)
   --login               Conectar la cuenta de ChatGPT durante la instalación
   --branch <rama>       Rama que se clonará (por defecto: main)
   --install-deps        Instalar Git y Node.js 22 con sudo si hacen falta
@@ -134,8 +134,8 @@ if [[ -n "$EXECUTORS" ]]; then
     executor="${executor#"${executor%%[![:space:]]*}"}"
     executor="${executor%"${executor##*[![:space:]]}"}"
     case "$executor" in
-      cline|opencode) ;;
-      *) fail "ejecutor no válido: '$executor'. Los permitidos son cline y opencode." ;;
+      opencode) ;;
+      *) fail "ejecutor no válido: '$executor'. El único permitido es opencode." ;;
     esac
     if [[ ",$normalized_executors," != *",$executor,"* ]]; then
       if [[ -n "$normalized_executors" ]]; then

@@ -121,9 +121,9 @@ try {
     }
     $requestedExecutors = @($Executors.Split(',') | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
     $requestedExecutors = @($requestedExecutors | Select-Object -Unique)
-    $unknownExecutors = @($requestedExecutors | Where-Object { $_ -notin @('cline', 'opencode') })
+    $unknownExecutors = @($requestedExecutors | Where-Object { $_ -notin @('opencode') })
     if ($unknownExecutors.Count -gt 0) {
-        throw "Ejecutores no válidos: $($unknownExecutors -join ', '). Opciones disponibles: cline, opencode."
+        throw "Ejecutores no válidos: $($unknownExecutors -join ', '). Opción disponible: opencode."
     }
 
     $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
