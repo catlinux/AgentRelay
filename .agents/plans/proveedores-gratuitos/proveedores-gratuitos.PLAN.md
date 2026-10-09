@@ -24,10 +24,14 @@ Creado 2026-10-08, rehecho 2026-10-09. Objetivo: descubrir las IA gratuitas que 
 
 Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En todas: `constraints` = no cambiar la versión, no tocar `package.json`, `.gitignore` ni la licencia, no escribir secuencias `\u` sueltas, no usar scripts de PowerShell (hay archivos CRLF); `validation` = `npm test`. Revisión según `AGENTS.md`. Cada paso añade su entrada en «Sin publicar» del `CHANGELOG.md` y marca aquí `[x]`.
 
-### Paso 0 — DeepSeek: OpenCode frente a Cline · la propia sesión (Sonnet, medio) + el usuario · [ ]
+### Paso 0 — DeepSeek: OpenCode frente a Cline · la propia sesión (Sonnet, medio) + el usuario · [x]
 - El usuario conecta DeepSeek en OpenCode (`agentrelay login opencode` → deepseek) y mira en platform.deepseek.com si tiene crédito de regalo.
 - 3-4 tareas reales pequeñas iguales con `agentrelay use cline deepseek-v4-flash` y `agentrelay use opencode deepseek/<id>` (y lo mismo con Pro). Comparar aceptación, intentos, tiempo y tokens.
 - Terminado: resultado anotado aquí y decisión (retirar Cline o no) en `TODO.md`.
+- **Resultado (2026-10-09):** repo de pruebas temporal con 3 tareas pequeñas (corregir bug, añadir función con tests, añadir función con validación), 4 configuraciones, esfuerzo bajo. Las 12 ejecuciones superaron `npm test` al primer intento.
+  - Tiempo: parecido, 8-44 s por tarea en las cuatro configuraciones.
+  - Tokens de entrada: OpenCode 1,5-2 mil por tarea; Cline 32-88 mil (el contador de Cline suma el contexto acumulado de cada paso; no es comparable tal cual). Coste estimado: Flash 0,0005-0,0012 USD y Pro 0,0024-0,0054 USD por OpenCode; Cline lo informa a 0 (Flash) o 0,0018-0,0023 USD (Pro).
+  - Decisión: rinden igual, así que **se retira Cline** (paso 8 desbloqueado). Ejecutor global sin cambiar (las pruebas usaron configuración local en el repo temporal).
 
 ### Paso 1 — Catálogo de proveedores · AgentRelay, medio · [ ]
 - Archivos: nuevo `src/free-providers.js` + test.
