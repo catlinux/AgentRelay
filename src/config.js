@@ -36,6 +36,11 @@ export const DEFAULT_CONFIG = Object.freeze({
     commands: [],
     timeoutSeconds: 600,
   },
+  routing: {
+    mode: 'off',
+    paidOrder: ['opencode:deepseek/deepseek-flash', 'codex-api:gpt-6-luna', 'opencode:deepseek/deepseek-v4-pro'],
+    maxSwitches: 5,
+  },
   // Ajustes que sustituyen a la política por defecto (ver src/policy.js).
   policy: {},
   report: { maxDiffChars: 60000, maxOutputChars: 4000 },
@@ -132,9 +137,10 @@ function readConfig(file) {
   }
 }
 const KNOWN = {
-  '': ['executor', 'validation', 'policy', 'report', 'profiles'],
+  '': ['executor', 'validation', 'routing', 'policy', 'report', 'profiles'],
   executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs', 'network', 'apiFallback'],
   validation: ['commands', 'timeoutSeconds'],
+  routing: ['mode', 'paidOrder', 'maxSwitches'],
   policy: ['review', 'maxRetries', 'autoFix', 'requireValidation', 'selfReview', 'skipPassMaxFiles'],
   'policy.selfReview': COMPLEXITIES,
   report: ['maxDiffChars', 'maxOutputChars'],
@@ -207,7 +213,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   }
   const originError = (key) => origins[key] || 'defecto';
   const invalid = (key, explanation) => { throw new Error(`Configuración no válida en ${originError(key)}: ${key} ${explanation}`); };
-  for (const key of ['executor', 'validation', 'policy', 'report']) if (!isObject(config[key])) invalid(key, 'debe ser un objeto');
+  for (const key of ['executor', 'validation', 'routing', 'policy', 'report']) if (!isObject(config[key])) invalid(key, 'debe ser un objeto');
   if (!Object.hasOwn(EXECUTOR_DEFAULTS, config.executor.type)) throw new Error(`Ejecutor no soportado: ${config.executor.type} (disponibles: ${Object.keys(EXECUTOR_DEFAULTS).join(', ')})`);
   if (!(config.executor.thinking === null || ['none', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.executor.thinking))) invalid('executor.thinking', 'debe ser null, none, low, medium, high, xhigh o max');
   for (const key of ['executor.timeoutSeconds', 'validation.timeoutSeconds']) { const n = config[key.split('.')[0]][key.split('.')[1]]; if (typeof n !== 'number' || !(n > 0)) invalid(key, 'debe ser un número positivo'); }
@@ -215,6 +221,9 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (typeof config.executor.network !== 'boolean') invalid('executor.network', 'debe ser booleano');
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
+  if (!['off', 'auto'].includes(config.routing.mode)) invalid('routing.mode', 'debe ser off o auto');
+  if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api|cline):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
+  if (!Number.isInteger(config.routing.maxSwitches) || config.routing.maxSwitches < 0 || config.routing.maxSwitches > 20) invalid('routing.maxSwitches', 'debe ser un entero entre 0 y 20');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }
   if (!Array.isArray(config.validation.commands) || !config.validation.commands.every((v) => typeof v === 'string')) invalid('validation.commands', 'debe ser una lista de textos');
   if (config.policy.review !== undefined && !POLICY_REVIEWS.includes(config.policy.review)) invalid('policy.review', `debe ser ${POLICY_REVIEWS.join(', ')}`);
