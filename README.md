@@ -116,5 +116,4 @@ Las copias y los forks deben conservar esta atribución y enlazar a https://gith
 
 | Componente | Autor | Licencia | Enlace |
 | --- | --- | --- | --- |
-| Cline CLI (ejecutor opcional; se instala desde `agentrelay use`) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |
 | Codex CLI (dependencia npm, no incluida en el repositorio) | OpenAI | Apache-2.0 | https://github.com/openai/codex |

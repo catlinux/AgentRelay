@@ -116,5 +116,4 @@ Copies and forks must keep this attribution and link to https://github.com/catli
 
 | Component | Author | License | Link |
 | --- | --- | --- | --- |
-| Cline CLI (optional executor; installed from `agentrelay use`) | Cline Bot Inc. | Apache-2.0 | https://github.com/cline/cline |
 | Codex CLI (npm dependency, not included in the repository) | OpenAI | Apache-2.0 | https://github.com/openai/codex |
