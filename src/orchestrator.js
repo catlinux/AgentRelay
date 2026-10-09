@@ -27,10 +27,17 @@ import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
 import { agentrelayHome } from './config.js';
 import { recordReview } from './free-ranking.js';
-import { markQuotaExhausted } from './quota-state.js';
+import { isAvailable as quotaAvailable, markQuotaAvailable, markQuotaExhausted } from './quota-state.js';
+import { executorFor, pickEntry, routeEntries } from './router.js';
+import { hasApiProfile } from './executors/codex.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
+
+/** Configuración del ejecutor que toca usar ahora: la entrada actual de la ruta o la configurada. */
+function currentExecutor(state) {
+  return state.route?.current ? executorFor(state.route.current, state.config.executor) : state.config.executor;
+}
 
 function context(root, state, onEvent) {
   const { config, task } = state;
@@ -45,7 +52,6 @@ function context(root, state, onEvent) {
     task,
     config,
     policy: state.policy,
-    executor: getExecutor(config.executor.type),
     validationCommands: [...config.validation.commands, ...task.validation],
     emit,
   };
@@ -85,16 +91,17 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
 
   const base = `attempt-${n}-${kind}`;
   writeRunFile(root, state.id, `${base}.prompt.md`, prompt);
+  const configured = currentExecutor(state);
   const executor = {
-    ...config.executor,
-    thinking: task.effort ?? config.executor.thinking,
-    model: task.model ?? config.executor.model,
+    ...configured,
+    thinking: task.effort ?? configured.thinking,
+    model: state.route ? configured.model : task.model ?? configured.model,
   };
   const { provider, model } = executor;
   ctx.emit({ type: 'attempt_start', attempt: n, kind, provider, model });
 
   const startedAt = new Date().toISOString();
-  const result = await ctx.executor.run({
+  const result = await getExecutor(executor.type).run({
     executor, cwd: root, promptFile: relativeRunFile(state.id, `${base}.prompt.md`),
     onActivity: (activity) => ctx.emit({ type: 'activity', attempt: n, ...activity }),
   });
@@ -112,6 +119,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     timedOut: result.timedOut,
     error: result.error ? maskSecrets(result.error) : result.error,
     model: result.model ?? (model ? { id: model, provider } : result.model),
+    ...(state.route ? { route: state.route.current.key, paid: state.route.current.paid } : {}),
     iterations: result.iterations,
     toolCalls: result.toolCalls,
     usage: result.usage,
@@ -124,6 +132,9 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
   });
   addUsage(state, result.usage);
   saveState(root, state);
+  if (result.ok && state.route) {
+    try { markQuotaAvailable(state.route.current.quotaId, { home: agentrelayHome() }); } catch {}
+  }
 
   ctx.emit({
     type: 'attempt_end',
@@ -200,13 +211,18 @@ async function continueCycle(ctx, result) {
 
     if (!result.ok) {
       const errorKind = classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`);
+      if (errorKind && state.route && await switchRoute(ctx, result, errorKind)) {
+        result = await attempt(ctx, 'fix', { feedback: SWITCH_FEEDBACK, check });
+        continue;
+      }
       if (errorKind) {
         let reason = errorKind === 'credentials'
           ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
           : errorKind === 'unavailable'
             ? 'el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use'
             : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
-        if (errorKind === 'quota') {
+        if (state.route) reason += '\nNo queda ninguna entrada de routing disponible (o se alcanzó routing.maxSwitches): mira la sección Enrutado del informe.';
+        if (errorKind === 'quota' && !state.route) {
           if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
             try {
               markQuotaExhausted(ctx.config.executor.model, {
@@ -251,6 +267,83 @@ async function continueCycle(ctx, result) {
     }
     return finalize(ctx, result, check);
   }
+}
+
+const SWITCH_FEEDBACK = 'The previous executor stopped before finishing (quota, credentials or model not available). '
+  + 'The working tree keeps its partial changes: review them and continue the task from there until it is complete.';
+
+const SWITCH_REASONS = { quota: 'cuota agotada', credentials: 'sin credenciales', unavailable: 'modelo no disponible' };
+
+const routeQuotaAvailable = (quotaId) => quotaAvailable(quotaId, new Date(), { home: agentrelayHome() });
+
+/**
+ * Marca la entrada actual de la ruta y pasa a la siguiente utilizable. No consume reintentos.
+ * Devuelve la nueva entrada, o null si no queda ninguna o se alcanzó routing.maxSwitches.
+ */
+async function switchRoute(ctx, result, errorKind) {
+  const { state, root } = ctx;
+  const route = state.route;
+  const from = route.current;
+  if (errorKind === 'quota') {
+    try {
+      markQuotaExhausted(from.quotaId, { home: agentrelayHome(), errorText: `${result.error ?? ''} ${result.rawError ?? ''}` });
+    } catch {}
+  }
+  // Credenciales o modelo no disponible: no es cuota, así que solo se descarta para esta ejecución.
+  route.failed.push(from.key);
+  if (route.switches.length >= (state.config.routing?.maxSwitches ?? 5)) { saveState(root, state); return null; }
+  const { entry, skipped } = await pickEntry(route.entries, {
+    isAvailable: routeQuotaAvailable,
+    isUsable: (candidate) => entryUsable(candidate, state.config.executor),
+    exclude: route.failed,
+  });
+  route.skipped.push(...skipped);
+  if (!entry) { saveState(root, state); return null; }
+  const change = {
+    at: new Date().toISOString(), from: from.key, to: entry.key, reason: SWITCH_REASONS[errorKind] ?? errorKind,
+    paid: entry.paid, trainsOnData: entry.trainsOnData,
+  };
+  route.switches.push(change);
+  route.current = entry;
+  saveState(root, state);
+  ctx.emit({ type: 'route_switch', ...change });
+  return entry;
+}
+
+/** Comprueba que una entrada de la ruta se puede usar: instalada, con sesión y con el modelo disponible. */
+async function entryUsable(entry, base) {
+  const executor = executorFor(entry, base);
+  const adapter = getExecutor(entry.type);
+  try { await adapter.version(executor); } catch { return { ok: false, reason: 'ejecutor no instalado' }; }
+  if (entry.type === 'codex' && entry.api) {
+    if (!hasApiProfile()) return { ok: false, reason: 'sin clave de API (agentrelay login --api)' };
+  } else if (adapter.authStatus) {
+    const auth = await adapter.authStatus(executor);
+    if (!auth.ok) return { ok: false, reason: 'sin sesión' };
+    // Con una clave de API, Codex factura por uso: no es la cuota gratuita de ChatGPT.
+    if (entry.type === 'codex' && !entry.paid && /api key/i.test(auth.message || '')) {
+      return { ok: false, reason: 'Codex usa una clave de API, no la cuenta de ChatGPT' };
+    }
+  }
+  try {
+    const modelCheck = await checkExecutorModel(executor, { adapter });
+    if (!modelCheck.ok && !modelCheck.unknown) return { ok: false, reason: 'modelo no disponible' };
+  } catch {}
+  return { ok: true };
+}
+
+/** Elige la primera entrada utilizable de una ejecución nueva con routing.mode = "auto". */
+async function startRoute(config, task) {
+  const entries = routeEntries({ config, checks: loadChecks(), effort: task.effort ?? config.executor.thinking });
+  const { entry, skipped } = await pickEntry(entries, {
+    isAvailable: routeQuotaAvailable,
+    isUsable: (candidate) => entryUsable(candidate, config.executor),
+  });
+  if (!entry) {
+    const detail = skipped.map(({ key, reason }) => `${key}: ${reason}`).join('; ');
+    throw new Error(`Ningún ejecutor de routing está disponible ahora (${detail || 'lista vacía'}). Revisa "agentrelay providers" y "agentrelay doctor", o vuelve a routing.mode "off".`);
+  }
+  return { mode: 'auto', entries, current: entry, first: entry.key, failed: [], skipped, switches: [] };
 }
 
 function finalize(ctx, result, check, forced = null) {
@@ -299,17 +392,8 @@ export function writeReport(root, state, patch) {
   writeRunFile(root, state.id, 'report.md', renderReport(state, patch, state.config.report));
 }
 
-/** Inicia una ejecución nueva para una tarea. */
-export async function startRun({ root, task, config, allowDirty = false, onEvent }) {
-  const pending = await pendingChanges(root);
-  if (pending.length && !allowDirty) {
-    throw new Error(
-      `El repositorio tiene ${pending.length} cambio(s) sin confirmar. Confírmalos o guárdalos antes de delegar,`
-      + ' o usa --allow-dirty (el diff incluirá esos cambios).',
-    );
-  }
-
-  // Comprobación previa: sin ejecutor no tiene sentido gastar reintentos.
+/** Comprobación previa del ejecutor configurado: sin ejecutor no tiene sentido gastar reintentos. */
+async function preflight(config) {
   const adapter = getExecutor(config.executor.type);
   try {
     await adapter.version(config.executor);
@@ -322,6 +406,21 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
   }
   const modelCheck = await checkExecutorModel(config.executor);
   if (!modelCheck.ok) throw new Error(modelCheck.message);
+}
+
+/** Inicia una ejecución nueva para una tarea. */
+export async function startRun({ root, task, config, allowDirty = false, onEvent }) {
+  const pending = await pendingChanges(root);
+  if (pending.length && !allowDirty) {
+    throw new Error(
+      `El repositorio tiene ${pending.length} cambio(s) sin confirmar. Confírmalos o guárdalos antes de delegar,`
+      + ' o usa --allow-dirty (el diff incluirá esos cambios).',
+    );
+  }
+
+  // Con routing auto el enrutador elige y comprueba el ejecutor; un modelo fijado en la tarea lo desactiva.
+  const route = config.routing?.mode === 'auto' && !task.model ? await startRoute(config, task) : null;
+  if (!route) await preflight(config);
 
   ensureWorkspace(root);
   const policy = resolvePolicy(config);
@@ -345,6 +444,7 @@ export async function startRun({ root, task, config, allowDirty = false, onEvent
     lastCheck: null,
     reviews: [],
     usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, estimatedCost: 0 },
+    ...(route ? { route } : {}),
   };
   writeRunFile(root, id, 'task.json', `${JSON.stringify(task, null, 2)}\n`);
   saveState(root, state);
@@ -381,11 +481,11 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
   const ctx = context(root, state, onEvent);
   const review = { at: new Date().toISOString(), decision, feedback: feedback || null };
   const recordModelReview = () => {
-    if (ctx.config.executor.type !== 'opencode') return;
+    if (currentExecutor(state).type !== 'opencode') return;
     const attemptModel = (Array.isArray(state.attempts) ? [...state.attempts] : []).reverse()
       .map((attempt) => typeof attempt?.model === 'string' ? attempt.model : attempt?.model?.id)
       .find((model) => typeof model === 'string' && model);
-    const model = attemptModel ?? state.task?.model ?? ctx.config.executor.model;
+    const model = attemptModel ?? state.task?.model ?? currentExecutor(state).model;
     if (typeof model !== 'string' || !model) return;
     try { recordReview(model, decision, { home: agentrelayHome() }); } catch {}
   };
