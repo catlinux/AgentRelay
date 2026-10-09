@@ -53,7 +53,7 @@ Without a browser (for example over SSH): `agentrelay login --device`. If you al
 agentrelay doctor
 ```
 
-**5. Set up your orchestrator** (once per machine; it asks for confirmation and offers optional executors such as Cline or OpenCode, which you can also add later with `agentrelay executors add <name>`):
+**5. Set up your orchestrator** (once per machine; it asks for confirmation and offers the optional OpenCode executor, which you can also add later with `agentrelay executors add <name>`):
 
 ```sh
 agentrelay setup
@@ -80,7 +80,7 @@ Always start with `agentrelay doctor`: it says what is wrong and which command f
 | Executor failure | `npm install` again in the AgentRelay folder and repeat `doctor`. |
 | "No session" | `agentrelay login` (or `login --device`). |
 | `EBADENGINE` warnings in `npm install` | Just warnings: it works with Node 20; Node 22 avoids them. |
-| Cline or OpenCode unavailable | `agentrelay executors add cline` or `opencode`. |
+| OpenCode unavailable | `agentrelay executors add opencode`. |
 | "not a git repository" | `agentrelay start` in the project folder. |
 
 ## Updating

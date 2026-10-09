@@ -8,7 +8,7 @@
 
 **Agentes**
 
-![Orquestador](https://img.shields.io/badge/orquestador-Claude%20Code-D97757?style=flat-square&labelColor=24292f) ![Ejecutor](https://img.shields.io/badge/ejecutor%20por%20defecto-Codex%20%2B%20GPT--6%20Luna-10A37F?style=flat-square&labelColor=24292f) ![Ejecutor opcional](https://img.shields.io/badge/ejecutor%20opcional-Cline-6E56CF?style=flat-square&labelColor=24292f)
+![Orquestador](https://img.shields.io/badge/orquestador-Claude%20Code-D97757?style=flat-square&labelColor=24292f) ![Ejecutor](https://img.shields.io/badge/ejecutor%20por%20defecto-Codex%20%2B%20GPT--6%20Luna-10A37F?style=flat-square&labelColor=24292f) ![Ejecutor opcional](https://img.shields.io/badge/ejecutor%20opcional-OpenCode-6E56CF?style=flat-square&labelColor=24292f)
 
 **Proyecto**
 
@@ -43,7 +43,6 @@ AgentRelay nunca hace commits ni push: los cambios quedan en tu carpeta para que
 |---|---|---|
 | **Codex** (por defecto, incluido) | Tu cuenta de ChatGPT, modelo GPT-6 Luna | Incluido en el plan gratuito |
 | **OpenCode** (opcional) | Modelos gratuitos de varios proveedores (OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter, Z.AI) y DeepSeek de pago | Gratis o lo que cobre el proveedor |
-| **Cline** (opcional) | Cualquier proveedor con clave de API (p. ej. DeepSeek) | Lo que cobre el proveedor |
 
 Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. `agentrelay providers` muestra los proveedores conectados, sus límites y un aviso de privacidad; la revisión diaria evalúa con tres pruebas los modelos gratuitos de todos los proveedores conectados y `agentrelay rank` muestra el ranquing. Con `agentrelay set routing auto`, AgentRelay pasa automáticamente de los gratuitos a los de pago cuando se agota la cuota; consulta [el manual](docs/MANUAL.md) para más detalles.
 

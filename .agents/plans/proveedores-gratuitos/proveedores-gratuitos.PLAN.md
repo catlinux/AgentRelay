@@ -68,7 +68,8 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 2. `agentrelay rank --run`; varios días de uso real con `routing.mode: "auto"` en un repo de pruebas.
 3. Proveedor sin ningún modelo apto → fuera del catálogo y anotado como descartado en `TODO.md`.
 
-### Paso 8 — Retirar Cline (solo si el paso 0 lo justifica) · AgentRelay, medio · [ ]
+### Paso 8 — Retirar Cline (solo si el paso 0 lo justifica) · AgentRelay, medio · [x]
+- Hecho (2026-10-09): `package.json` no tenía Cline (se instalaba bajo demanda en `~/.agentrelay/executors`), así que no se tocó. Queda la fila de Cline en la tabla de licencias de terceros de los README (créditos: decisión del usuario).
 - Quitar adaptador, dependencia (pedir permiso explícito para tocar `package.json`), entradas en `catalog.js`, `alternatives.js`, `doctor`, migración de configuración `cline` → `opencode deepseek/…` con aviso.
 
 ### Paso 9 — Documentación · AgentRelay, bajo, **un archivo por tarea** · [x]

@@ -46,7 +46,6 @@ begin
     'Codex con GPT-6 Luna ya se instala siempre.',
     False,
     False);
-  ExecutorsPage.Add('Cline (clave de API de cualquier proveedor)');
   ExecutorsPage.Add('OpenCode (modelos gratuitos y de pago)');
 
   AccountPage := CreateInputOptionPage(
@@ -78,13 +77,7 @@ begin
 
     SelectedExecutors := '';
     if ExecutorsPage.Values[0] then
-      SelectedExecutors := 'cline';
-    if ExecutorsPage.Values[1] then
-    begin
-      if SelectedExecutors <> '' then
-        SelectedExecutors := SelectedExecutors + ',';
-      SelectedExecutors := SelectedExecutors + 'opencode';
-    end;
+      SelectedExecutors := 'opencode';
     if SelectedExecutors <> '' then
       Parameters := Parameters + ' -Executors "' + SelectedExecutors + '"';
 

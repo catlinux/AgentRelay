@@ -8,7 +8,7 @@
 
 **Agents**
 
-![Orquestador](https://img.shields.io/badge/orchestrator-Claude%20Code-D97757?style=flat-square&labelColor=24292f) ![Ejecutor](https://img.shields.io/badge/default%20executor-Codex%20%2B%20GPT--6%20Luna-10A37F?style=flat-square&labelColor=24292f) ![Ejecutor opcional](https://img.shields.io/badge/optional%20executor-Cline-6E56CF?style=flat-square&labelColor=24292f)
+![Orquestador](https://img.shields.io/badge/orchestrator-Claude%20Code-D97757?style=flat-square&labelColor=24292f) ![Ejecutor](https://img.shields.io/badge/default%20executor-Codex%20%2B%20GPT--6%20Luna-10A37F?style=flat-square&labelColor=24292f) ![Ejecutor opcional](https://img.shields.io/badge/optional%20executor-OpenCode-6E56CF?style=flat-square&labelColor=24292f)
 
 **Project**
 
@@ -43,7 +43,6 @@ AgentRelay never commits or pushes: changes stay in your folder for you to revie
 |---|---|---|
 | **Codex** (default, bundled) | Your ChatGPT account, GPT-6 Luna model | Included in the free plan |
 | **OpenCode** (optional) | Free models from several providers (OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter, Z.AI) and paid DeepSeek | Free or whatever the provider charges |
-| **Cline** (optional) | Any provider with an API key (e.g. DeepSeek) | Whatever the provider charges |
 
 Switch between them with a single command: `agentrelay use` (interactive) or `agentrelay use opencode`. `agentrelay providers` shows the connected providers, their limits, and a privacy notice; the daily check evaluates free models from every connected provider with three tests, and `agentrelay rank` shows the ranking. With `agentrelay set routing auto`, AgentRelay automatically moves from free models to paid ones when the quota runs out; see [the manual](docs/MANUAL.md) for details.
 

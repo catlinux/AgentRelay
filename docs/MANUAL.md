@@ -69,7 +69,6 @@ Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `hi
 |---|---|---|
 | `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita) o clave de API de OpenAI. Viene incluido. | `agentrelay login` |
 | `opencode` | Modelos gratuitos y de pago de OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter, Z.AI y DeepSeek. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre el asistente de OpenCode para elegir proveedor; también puedes conectar con su variable de entorno) |
-| `cline` | Una clave de API, por ejemplo de DeepSeek. Se instala con `agentrelay executors add cline`. | El comando que muestra al instalarlo |
 
 AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
 
@@ -90,11 +89,11 @@ La clave se guarda en un perfil propio de AgentRelay (`~/.agentrelay/codex-api/`
 - Se desactiva con `agentrelay set executor.apiFallback false --local`. Con el enrutado automático no se usa este respaldo: Luna por API ya está en la lista. Solo se gasta dinero si tú has guardado la clave.
 
 ### Acceso a internet del ejecutor
-Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de Wowhead). Codex corre en un sandbox que por defecto tiene la red cerrada: AgentRelay la abre con `sandbox_workspace_write.network_access=true`. Cline no tiene sandbox y no necesita nada. Se desactiva con `agentrelay set executor.network false`.
+Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de Wowhead). Codex corre en un sandbox que por defecto tiene la red cerrada: AgentRelay la abre con `sandbox_workspace_write.network_access=true`. OpenCode no tiene sandbox y no necesita nada. Se desactiva con `agentrelay set executor.network false`.
 
 - En Windows, dentro del sandbox de Codex fallan `curl`, `curl.exe` e `Invoke-WebRequest` (error TLS de schannel): el ejecutor recibe la regla de usar Node (`fetch`). Si escribes la tarea a mano, indícale el script en Node y los campos que quieres.
 - Wowhead: `https://nether.wowhead.com/tooltip/item/<id>` devuelve JSON (también `spell`, `npc`, `quest`…). Las páginas normales responden a peticiones simples, pero un navegador automatizado (Playwright) recibe un 403: no hace falta navegador.
-- Comprobado con Luna y con Cline/DeepSeek en Windows. En Linux no está comprobado todavía.
+- Comprobado con Luna y con OpenCode/DeepSeek en Windows. En Linux no está comprobado todavía.
 
 ### Proveedores y modelos gratuitos de OpenCode
 `agentrelay providers` (o `/ar:providers`) muestra si cada proveedor está conectado, su nivel, los límites conocidos y un aviso de privacidad. Solo informa: no bloquea. La lista incluye OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter y Z.AI (gratuitos), y DeepSeek (de pago). Límites conocidos: NVIDIA, unas 40 peticiones/min; Groq, unas 1.000/día; modelos `:free` de OpenRouter, unas 50/día. Google puede usar los prompts para entrenar; la política de datos de los demás no está verificada.

@@ -142,7 +142,7 @@ if [[ -z "$INSTALL_DIR" ]]; then
 fi
 
 EXECUTORS=""
-if ! EXECUTORS="$(zen --list --checklist --multiple --height=360 --text='<b>Codex con GPT-6 Luna se instala siempre</b>: es el ejecutor por defecto y no hay que elegirlo.\n\nSi quieres, marca ejecutores <b>adicionales</b> (puedes cambiar de uno a otro cuando quieras con «agentrelay use»):' --column='Elegir' --column='Ejecutor' --column='Descripción' --print-column=2 --separator=, FALSE cline 'Cline: úsalo con tu propia clave de API de cualquier proveedor (por ejemplo DeepSeek, OpenAI o Anthropic)' FALSE opencode 'OpenCode: modelos gratuitos (algunos sin clave) y de pago')"; then
+if ! EXECUTORS="$(zen --list --checklist --multiple --height=360 --text='<b>Codex con GPT-6 Luna se instala siempre</b>: es el ejecutor por defecto y no hay que elegirlo.\n\nSi quieres, marca ejecutores <b>adicionales</b> (puedes cambiar de uno a otro cuando quieras con «agentrelay use»):' --column='Elegir' --column='Ejecutor' --column='Descripción' --print-column=2 --separator=, FALSE opencode 'OpenCode: modelos gratuitos (algunos sin clave) y de pago (DeepSeek, entre otros)')"; then
   exit 0
 fi
 

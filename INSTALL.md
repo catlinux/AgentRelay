@@ -53,7 +53,7 @@ Sin navegador (por ejemplo, por SSH): `agentrelay login --device`. Si ya usas Co
 agentrelay doctor
 ```
 
-**5. Prepara tu orquestador** (una vez por equipo; te pide confirmación y te ofrece ejecutores opcionales como Cline u OpenCode, que también puedes añadir luego con `agentrelay executors add <nombre>`):
+**5. Prepara tu orquestador** (una vez por equipo; te pide confirmación y te ofrece el ejecutor opcional OpenCode, que también puedes añadir luego con `agentrelay executors add <nombre>`):
 
 ```sh
 agentrelay setup
@@ -80,7 +80,7 @@ Empieza siempre por `agentrelay doctor`: dice qué falla y qué comando lo arreg
 | Fallo en el ejecutor | `npm install` otra vez en la carpeta de AgentRelay y repite `doctor`. |
 | «No hay sesión iniciada» | `agentrelay login` (o `login --device`). |
 | Avisos `EBADENGINE` en `npm install` | Solo son avisos: con Node 20 funciona; Node 22 los evita. |
-| Cline u OpenCode no disponible | `agentrelay executors add cline` o `opencode`. |
+| OpenCode no disponible | `agentrelay executors add opencode`. |
 | «no es un repositorio git» | `agentrelay start` en la carpeta del proyecto. |
 
 ## Actualizar
