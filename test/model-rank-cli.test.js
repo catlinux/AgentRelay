@@ -104,6 +104,7 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
   const adapter = { listModels: async () => [
     { id: 'opencode/zen-free' },
     { id: 'google/gemini-free' },
+    { id: 'google/gemini-limited' },
     { id: 'groq/llama-free' },
   ] };
   const metadata = {
@@ -113,6 +114,7 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
     providers: {
       google: {
         'gemini-free': { name: 'Gemini', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2026-01-01' },
+        'gemini-limited': { name: 'Gemini Limited', cost: { input: 0.1, output: 0.2 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2025-01-01' },
       },
       groq: {
         'llama-free': { name: 'Llama', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: false, tool_call: true },
@@ -121,16 +123,20 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
   };
   const listed = await adapter.listModels({});
   const candidates = discoverRankCandidates({ listed, metadata, source: 'red', connected: ['google'] });
-  assert.deepEqual(candidates.map(({ id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate }) => ({
-    id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate,
+  assert.deepEqual(candidates.map(({ id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate, freeTier, cost }) => ({
+    id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate, freeTier, cost,
   })), [
     {
       id: 'opencode/zen-free', free: true, listed: true, reason: 'metadatos', name: 'Zen', context: 128000,
-      reasoning: true, toolCall: true, releaseDate: null,
+      reasoning: true, toolCall: true, releaseDate: null, freeTier: undefined, cost: undefined,
     },
     {
       id: 'google/gemini-free', free: true, listed: true, reason: 'metadatos', name: 'Gemini', context: 100000,
-      reasoning: true, toolCall: true, releaseDate: '2026-01-01',
+      reasoning: true, toolCall: true, releaseDate: '2026-01-01', freeTier: true, cost: { input: 0, output: 0 },
+    },
+    {
+      id: 'google/gemini-limited', free: true, listed: true, reason: 'nivel gratuito con límites', name: 'Gemini Limited', context: 100000,
+      reasoning: true, toolCall: true, releaseDate: '2025-01-01', freeTier: true, cost: { input: 0.1, output: 0.2 },
     },
   ]);
 

@@ -465,6 +465,7 @@ function noteFor(entry) {
   else if (entry.source === 'sufijo') notes.push('por sufijo -free');
   else if (entry.source === 'sin precio conocido') notes.push('precio desconocido');
   else if (entry.source === 'metadatos, no listado') notes.push('no listado en tu cuenta');
+  else if (entry.source === 'nivel gratuito con límites') notes.push('nivel gratuito con límites');
   return notes.join(', ');
 }
 

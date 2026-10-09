@@ -138,19 +138,24 @@ function releaseTimestamp(value) {
 }
 
 /** Descubre modelos gratuitos conocidos para los proveedores conectados. */
-export function discoverProviderModels({ providers = {}, connected = [], live = {} } = {}) {
+export function discoverProviderModels({ providers = {}, connected = [], live = {}, freeTierProviders = [] } = {}) {
   const connectedIds = Array.isArray(connected) ? connected : [];
+  const freeTierIds = new Set(Array.isArray(freeTierProviders) ? freeTierProviders : []);
   const candidates = [];
 
   for (const provider of connectedIds) {
     const models = providers?.[provider];
     if (!isObject(models)) continue;
     const liveIds = Array.isArray(live?.[provider]) ? new Set(live[provider]) : null;
+    const freeTier = freeTierIds.has(provider);
     for (const [modelId, metadata] of Object.entries(models)) {
       const context = metadata?.limit?.context;
-      if (!isObject(metadata) || metadata.cost?.input !== 0 || metadata.cost?.output !== 0
+      const zeroCost = isZeroCost(metadata);
+      if (!isObject(metadata) || (!zeroCost && !freeTier)
         || metadata.tool_call !== true || typeof context !== 'number' || context < 64000
         || (liveIds && !liveIds.has(modelId))) continue;
+      if (freeTier && metadata.modalities != null
+        && !metadata.modalities?.output?.includes?.('text')) continue;
       candidates.push({
         id: `${provider}/${modelId}`,
         provider,
@@ -158,11 +163,21 @@ export function discoverProviderModels({ providers = {}, connected = [], live = 
         context,
         reasoning: metadata.reasoning ?? null,
         releaseDate: metadata.release_date ?? null,
+        freeTier,
+        ...(isObject(metadata.cost) ? { cost: { input: metadata.cost.input, output: metadata.cost.output } } : {}),
       });
     }
   }
 
   candidates.sort((a, b) => {
+    const aZeroCost = isZeroCost(a);
+    const bZeroCost = isZeroCost(b);
+    if (aZeroCost !== bZeroCost) return aZeroCost ? -1 : 1;
+    if (!aZeroCost) {
+      const aCost = typeof a.cost?.input === 'number' ? a.cost.input : Infinity;
+      const bCost = typeof b.cost?.input === 'number' ? b.cost.input : Infinity;
+      if (aCost !== bCost) return aCost - bCost;
+    }
     const aDate = releaseTimestamp(a.releaseDate);
     const bDate = releaseTimestamp(b.releaseDate);
     if (aDate === null) return bDate === null ? 0 : 1;

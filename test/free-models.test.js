@@ -206,7 +206,7 @@ test('descubre modelos gratuitos conectados con filtros de metadatos y modelos a
     cost: { input: 0, output: 0 }, tool_call: true, limit: { context: 64000 }, ...extra,
   });
   const found = discoverProviderModels({
-    connected: ['groq', 'google', 'mistral'],
+    connected: ['groq', 'google', 'mistral', 'nvidia'],
     providers: {
       groq: {
         newer: model({ name: 'New', release_date: '2026-01-01', reasoning: true }),
@@ -218,16 +218,74 @@ test('descubre modelos gratuitos conectados con filtros de metadatos y modelos a
         retired: model(),
       },
       google: { gemini: model({ release_date: '2025-06-01' }) },
+      nvidia: { audioFree: model({ modalities: { output: ['audio'] } }) },
       ignored: { model: model({ release_date: '2027-01-01' }) },
     },
     live: { groq: ['newer', 'older', 'undated', 'paid', 'noTools', 'small'] },
   });
   assert.deepEqual(found.map(({ id }) => id), [
-    'groq/newer', 'google/gemini', 'groq/older', 'groq/undated',
+    'groq/newer', 'google/gemini', 'groq/older', 'groq/undated', 'nvidia/audioFree',
   ]);
   assert.deepEqual(found[0], {
     id: 'groq/newer', provider: 'groq', name: 'New', context: 64000, reasoning: true, releaseDate: '2026-01-01',
+    freeTier: false, cost: { input: 0, output: 0 },
   });
+});
+
+test('incluye modelos de proveedores con nivel gratuito solo cuando se indica', () => {
+  const model = (extra = {}) => ({
+    cost: { input: 0.1, output: 0.2 }, tool_call: true, limit: { context: 64000 }, ...extra,
+  });
+  const providers = {
+    groq: { llama: model() },
+    google: { gemini: model() },
+    mistral: { large: model() },
+  };
+  const options = { providers, connected: ['groq', 'google', 'mistral'] };
+  assert.deepEqual(discoverProviderModels(options), []);
+  assert.deepEqual(
+    discoverProviderModels({ ...options, freeTierProviders: ['groq', 'google', 'mistral'] }).map(({ id, freeTier, cost }) => ({ id, freeTier, cost })),
+    [
+      { id: 'groq/llama', freeTier: true, cost: { input: 0.1, output: 0.2 } },
+      { id: 'google/gemini', freeTier: true, cost: { input: 0.1, output: 0.2 } },
+      { id: 'mistral/large', freeTier: true, cost: { input: 0.1, output: 0.2 } },
+    ],
+  );
+});
+
+test('los modelos de nivel gratuito descartan salidas solo de audio, imagen o embeddings', () => {
+  const model = (modalities) => ({ tool_call: true, limit: { context: 64000 }, ...(modalities ? { modalities } : {}) });
+  const found = discoverProviderModels({
+    connected: ['groq'],
+    freeTierProviders: ['groq'],
+    providers: { groq: {
+      audio: model({ input: ['text'], output: ['audio'] }),
+      image: model({ input: ['text'], output: ['image'] }),
+      embedding: model({ input: ['text'], output: ['embedding'] }),
+      text: model({ input: ['text'], output: ['text'] }),
+      missing: model(),
+    } },
+  });
+  assert.deepEqual(found.map(({ id }) => id), ['groq/text', 'groq/missing']);
+});
+
+test('ordena primero coste cero y después coste de entrada y fecha', () => {
+  const model = (cost, release_date) => ({
+    cost, release_date, tool_call: true, limit: { context: 64000 },
+  });
+  const found = discoverProviderModels({
+    connected: ['groq', 'google'],
+    freeTierProviders: ['groq', 'google'],
+    providers: {
+      groq: {
+        zero: model({ input: 0, output: 0 }, '2024-01-01'),
+        expensive: model({ input: 0.2, output: 0.3 }, '2026-01-01'),
+        cheapOld: model({ input: 0.1, output: 0.3 }, '2024-01-01'),
+      },
+      google: { cheapNew: model({ input: 0.1, output: 0.3 }, '2025-01-01') },
+    },
+  });
+  assert.deepEqual(found.map(({ id }) => id), ['groq/zero', 'google/cheapNew', 'groq/cheapOld', 'groq/expensive']);
 });
 
 test('ordena los candidatos por fecha de lanzamiento y deja los desconocidos al final', () => {

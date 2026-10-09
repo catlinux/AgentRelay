@@ -43,6 +43,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- **Groq, Google y Mistral no entraban en el ranquing.** models.dev les pone precio por token aunque tengan nivel gratuito con límites, y el filtro «coste 0» los dejaba fuera (0 de 7 modelos válidos en Groq, 0 de 22 en Google). El catálogo marca ahora esos proveedores como `freeTier` y se evalúan sus modelos con herramientas y 64k de contexto, los más baratos primero; en la tabla salen con la nota «nivel gratuito con límites».
 - **Pruebas y tareas con OpenCode en otra carpeta.** OpenCode toma su carpeta de trabajo de la variable `PWD` que hereda (y las versiones nuevas envían `run` a un servicio en segundo plano con su propia carpeta). Resultado: las pruebas del ranquing se ejecutaban en la carpeta desde la que lanzaste AgentRelay, no encontraban `.prompt.md` y suspendían todos los modelos. Ahora se fija `PWD` a la carpeta real y se usa `--standalone` cuando la versión lo admite.
 - `providers` y `doctor` no reconocían los proveedores conectados en Linux: `opencode auth list` usa allí viñetas y el tipo de credencial (`●  OpenCode Zen api`) en lugar de columnas.
 - El adaptador de OpenCode leía mal los errores (el mensaje viene en `error.message`), con lo que no se detectaban bien la cuota agotada ni el modelo no disponible.
