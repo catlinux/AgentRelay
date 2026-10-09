@@ -2,7 +2,7 @@
 // Simulador de Cline CLI para los tests: reproduce el formato NDJSON real
 // (--json) sin llamar a ningún modelo.
 //
-// FAKE_CLINE_PLAN: JSON { "<fase>": acción | [acción, acción, ...] }
+// FAKE_CLINE_PLAN: JSON { "<fase>": acción | [acción, acción, ...], byModel: { "<modelo>": { "<fase>": acción } } }
 //   acción: { write: { ruta: contenido }, report: {...} | null, text, finishReason, exitCode }
 // FAKE_CLINE_LOG: archivo donde se registra cada llamada (una línea JSON).
 
@@ -21,15 +21,19 @@ const instruction = args[args.length - 1];
 const promptFile = /Read the file (\S+) in the working directory/.exec(instruction)?.[1];
 const prompt = readFileSync(path.resolve(process.cwd(), promptFile), 'utf8');
 const phase = /^AgentRelay-Phase: (\S+)/m.exec(prompt)[1];
+const modelIndex = args.indexOf('-m');
+const model = modelIndex < 0 ? null : args[modelIndex + 1];
+const plan = JSON.parse(process.env.FAKE_CLINE_PLAN || '{}');
+const modelSteps = plan.byModel?.[model]?.[phase];
 
 const logFile = process.env.FAKE_CLINE_LOG;
 const previous = logFile && existsSync(logFile)
-  ? readFileSync(logFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((c) => c.phase === phase).length
+  ? readFileSync(logFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    .filter((c) => c.phase === phase && (modelSteps === undefined || c.model === model)).length
   : 0;
-if (logFile) appendFileSync(logFile, `${JSON.stringify({ phase, args, promptFile })}\n`);
+if (logFile) appendFileSync(logFile, `${JSON.stringify({ phase, model, args, promptFile })}\n`);
 
-const plan = JSON.parse(process.env.FAKE_CLINE_PLAN || '{}');
-const steps = plan[phase];
+const steps = modelSteps ?? plan[phase];
 const action = (Array.isArray(steps) ? steps[Math.min(previous, steps.length - 1)] : steps) || {};
 
 for (const [file, content] of Object.entries(action.write || {})) {
@@ -78,6 +82,6 @@ emit({
 });
 emit({
   type: 'run_result', finishReason, iterations: 1, usage, aggregateUsage: usage, durationMs: 5, text,
-  model: { id: 'fake-model', provider: 'fake' },
+  model: { id: model ?? 'fake-model', provider: 'fake' },
 });
 process.exit(action.exitCode ?? 0);
