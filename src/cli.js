@@ -797,7 +797,7 @@ async function cmdRank(positionals, values) {
   try {
     result = await rankModels({
       candidates, executor, adapter, max, home, now,
-      log: values.background || values.json ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/2 (${item.seconds} s)\n`),
+      log: values.background || values.json ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
     });
   } catch (error) {
     if (values.background) return 0;
@@ -884,7 +884,7 @@ async function cmdExecutors(positionals, values) {
         const now = new Date();
         const result = await rankModels({
           candidates: available, executor, adapter, home, now,
-          log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/2 (${item.seconds} s)\n`),
+          log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
         });
         if (!values.background) process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: available.length })}\n`);
       } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (agentrelay login opencode); se omite la prueba de modelos.\n');

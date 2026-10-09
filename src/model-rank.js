@@ -1,10 +1,11 @@
 // Pruebas sintéticas y clasificación de modelos gratuitos de OpenCode.
 
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { classifyExecutorError } from './executors/common.js';
-import { buildProbe, loadChecks, PROBE_TASK, runSyntheticProbe, saveChecks } from './model-check.js';
+import { buildProbe, loadChecks, MAX_SECONDS, PROBE_TASK, runSyntheticProbe, saveChecks } from './model-check.js';
 import { normalizeTask } from './task.js';
 
 export function buildHardProbe(baseDir = os.tmpdir()) {
@@ -100,6 +101,141 @@ export const HARD_TASK = normalizeTask({
   ],
 });
 
+const DEEP_TESTS = `import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { reservar, stockDisponible } from '../src/inventario.js';
+import { precioTotal } from '../src/precios.js';
+
+test('stock disponible descuenta reservas solo del almacén solicitado', () => {
+  const inventario = {
+    stock: { norte: { cafe: 8 }, sur: { cafe: 40 } },
+    reservas: { norte: { cafe: 2 }, sur: { cafe: 5 } },
+  };
+  assert.equal(stockDisponible(inventario, 'norte', 'cafe'), 6);
+  assert.equal(stockDisponible(inventario, 'sur', 'cafe'), 35);
+  assert.equal(stockDisponible(inventario, 'norte', 'te'), 0);
+});
+
+test('reservar respeta la disponibilidad restante y permite reservarla entera', () => {
+  const inventario = { stock: { norte: { cafe: 9 } }, reservas: { norte: { cafe: 4 } } };
+  assert.equal(reservar(inventario, 'norte', 'cafe', 6), false);
+  assert.equal(inventario.reservas.norte.cafe, 4);
+  assert.equal(reservar(inventario, 'norte', 'cafe', 5), true);
+  assert.equal(inventario.reservas.norte.cafe, 9);
+  assert.equal(stockDisponible(inventario, 'norte', 'cafe'), 0);
+});
+
+test('reservar rechaza cantidades inválidas sin cambiar el inventario', () => {
+  const inventario = { stock: { norte: { cafe: 10 } }, reservas: {} };
+  for (const cantidad of [0, -1, 1.5, Number.NaN]) {
+    assert.equal(reservar(inventario, 'norte', 'cafe', cantidad), false);
+  }
+  assert.deepEqual(inventario.reservas, {});
+});
+
+test('precio total usa el tramo más alto que alcanza la cantidad y redondea a céntimos', () => {
+  const tramos = [
+    { desde: 1, descuento: 0 },
+    { desde: 5, descuento: 0.1 },
+    { desde: 10, descuento: 0.2 },
+  ];
+  assert.equal(precioTotal(10, 0, tramos), 0);
+  assert.equal(precioTotal(10, 4, tramos), 40);
+  assert.equal(precioTotal(10, 5, tramos), 45);
+  assert.equal(precioTotal(10, 10, tramos), 80);
+  assert.equal(precioTotal(19.99, 3, [{ desde: 1, descuento: 0.1 }]), 53.97);
+  assert.equal(precioTotal(10, 10, [...tramos].reverse()), 80);
+});
+`;
+
+export function buildDeepProbe(baseDir = os.tmpdir()) {
+  const root = mkdtempSync(path.join(baseDir, 'agentrelay-model-rank-deep-'));
+  const workDir = path.join(root, 'work');
+  const srcDir = path.join(workDir, 'src');
+  const testDir = path.join(workDir, 'test');
+  mkdirSync(srcDir, { recursive: true });
+  mkdirSync(testDir, { recursive: true });
+  writeFileSync(path.join(workDir, 'package.json'), '{"type":"module"}\n');
+  writeFileSync(path.join(srcDir, 'inventario.js'), `export function stockDisponible(inventario, almacen, producto) {
+  const stock = inventario.stock?.[almacen]?.[producto] ?? 0;
+  const reservado = inventario.reservas?.[almacen]?.[producto] ?? 0;
+  return stock;
+}
+
+export function reservar(inventario, almacen, producto, cantidad) {
+  if (!Number.isSafeInteger(cantidad) || cantidad <= 0) return false;
+  const stock = inventario.stock?.[almacen]?.[producto] ?? 0;
+  if (stock < cantidad) return false;
+  inventario.reservas ??= {};
+  inventario.reservas[almacen] ??= {};
+  inventario.reservas[almacen][producto] = (inventario.reservas[almacen][producto] ?? 0) + cantidad;
+  return true;
+}
+`);
+  writeFileSync(path.join(srcDir, 'precios.js'), `export function precioTotal(precioUnitario, cantidad, tramos = []) {
+  if (!Number.isFinite(precioUnitario) || precioUnitario < 0) throw new TypeError('Precio inválido');
+  if (!Number.isSafeInteger(cantidad) || cantidad < 0) throw new TypeError('Cantidad inválida');
+  let descuento = 0;
+  for (const tramo of tramos) {
+    if (cantidad >= tramo.desde) {
+      descuento = tramo.descuento;
+      break;
+    }
+  }
+  return Math.round((precioUnitario * cantidad * (1 - descuento) + Number.EPSILON) * 100) / 100;
+}
+`);
+  writeFileSync(path.join(testDir, 'inventario.test.js'), DEEP_TESTS);
+  const testHash = createHash('sha256').update(DEEP_TESTS).digest('hex');
+  const checkFile = path.join(root, 'check.mjs');
+  writeFileSync(checkFile, `import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { reservar, stockDisponible } from './work/src/inventario.js';
+import { precioTotal } from './work/src/precios.js';
+
+const fallados = [];
+const comprobar = (nombre, funcion) => {
+  try { if (!funcion()) fallados.push(nombre); }
+  catch { fallados.push(nombre); }
+};
+comprobar('stock reservado', () => stockDisponible({ stock: { a: { x: 7 }, b: { x: 30 } }, reservas: { a: { x: 3 }, b: { x: 20 } } }, 'a', 'x') === 4);
+comprobar('reserva acumulada', () => {
+  const inventario = { stock: { a: { x: 8 } }, reservas: { a: { x: 6 } } };
+  return reservar(inventario, 'a', 'x', 3) === false && inventario.reservas.a.x === 6;
+});
+comprobar('almacén nuevo', () => {
+  const inventario = { stock: { a: { x: 4 } }, reservas: {} };
+  return stockDisponible(inventario, 'b', 'x') === 0 && reservar(inventario, 'b', 'x', 1) === false;
+});
+comprobar('límite de tramo', () => precioTotal(12.5, 6, [{ desde: 1, descuento: 0.05 }, { desde: 5, descuento: 0.2 }]) === 60);
+comprobar('redondeo monetario', () => precioTotal(1.01, 3, [{ desde: 1, descuento: 0.1 }]) === 2.73);
+comprobar('tests sin modificar', () => createHash('sha256').update(readFileSync('./work/test/inventario.test.js')).digest('hex') === '${testHash}');
+const tests = spawnSync(process.execPath, ['--test', 'test/inventario.test.js'], { cwd: './work', encoding: 'utf8' });
+if (tests.status !== 0) fallados.push('tests visibles');
+if (fallados.length) {
+  console.error(fallados.join(', '));
+  process.exit(1);
+}
+console.log('OK');
+`);
+  return { root, workDir, checkFile };
+}
+
+export const DEEP_TASK = normalizeTask({
+  title: 'Corregir inventario y precios con pruebas',
+  objective: 'Corrige src/inventario.js y src/precios.js para que pasen node --test sin modificar ningún archivo de tests. En inventario.js exporta stockDisponible(inventario, almacen, producto), que devuelve el stock menos las reservas de ese almacén y producto (como mínimo cero), y reservar(inventario, almacen, producto, cantidad), que reserva solo una cantidad positiva entera que esté disponible y devuelve true; si no se puede reservar, devuelve false sin modificar el inventario. La estructura es { stock: { almacen: { producto: cantidad } }, reservas: { almacen: { producto: cantidad } } }. En precios.js exporta precioTotal(precioUnitario, cantidad, tramos): recibe un precio unitario no negativo, una cantidad entera no negativa y tramos { desde, descuento }, aplica el descuento del mayor umbral desde que no supere la cantidad (los tramos pueden venir en cualquier orden), devuelve el total redondeado a céntimos y usa descuento cero si no hay tramo aplicable. Rechaza precio o cantidad inválidos con TypeError.',
+  context: 'Es una prueba sintética aislada. Revisa test/inventario.test.js para entender el contrato. Hay casos límite adicionales en una comprobación oculta. No accedas a archivos fuera de este directorio.',
+  files: ['src/inventario.js', 'src/precios.js'],
+  acceptanceCriteria: [
+    'node --test pasa sin modificar test/inventario.test.js.',
+    'stockDisponible descuenta solo las reservas del almacén y producto solicitados, devuelve cero para datos ausentes y nunca un saldo negativo.',
+    'reservar no permite superar el stock disponible, acumula correctamente reservas válidas y no modifica datos cuando rechaza la reserva.',
+    'precioTotal usa el mayor umbral elegible sin depender del orden de tramos, trata el umbral como inclusivo, admite cantidad cero y redondea el total a dos decimales.',
+    'precioTotal lanza TypeError si el precio no es finito y no negativo o la cantidad no es un entero seguro no negativo.',
+  ],
+});
+
 export function classifyProbeFailure(raw, record) {
   if (record?.status === 'approved') return null;
   const errorText = `${raw?.error ?? ''} ${raw?.rawError ?? ''}`;
@@ -135,6 +271,9 @@ function kindPriority(kind) {
 }
 
 function rankingOrder(a, b) {
+  if (a.apt !== b.apt) return Number(b.apt) - Number(a.apt);
+  const tierPriority = (tier) => ({ A: 0, B: 1, null: 2 })[tier] ?? 2;
+  if (tierPriority(a.tier) !== tierPriority(b.tier)) return tierPriority(a.tier) - tierPriority(b.tier);
   if (a.score !== b.score) return b.score - a.score;
   if (a.score === 0 && a.kind !== b.kind) return kindPriority(a.kind) - kindPriority(b.kind);
   return a.seconds - b.seconds;
@@ -158,6 +297,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
   const selected = all ? orderedCandidates : orderedCandidates.slice(0, Math.max(0, max));
   const basicProbe = probes?.basic ?? ((options) => runSyntheticProbe({ ...options, build: buildProbe, task: PROBE_TASK }));
   const hardProbe = probes?.hard ?? ((options) => runSyntheticProbe({ ...options, build: buildHardProbe, task: HARD_TASK }));
+  const deepProbe = probes?.deep ?? ((options) => runSyntheticProbe({ ...options, build: buildDeepProbe, task: DEEP_TASK }));
   const entries = [];
   let stoppedBy = null;
   let quotaStreak = 0;
@@ -169,6 +309,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
     const rawBasic = await safelyProbe(basicProbe, { ...common, build: buildProbe, task: PROBE_TASK }, now);
     const basic = probeView(rawBasic);
     let hard = null;
+    let deep = null;
     let failedKind = null;
     let detail = null;
     if (basic.status !== 'approved') {
@@ -180,12 +321,21 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
       if (hard.status !== 'approved') {
         failedKind = classifyProbeFailure(rawHard?.raw, rawHard);
         detail = failureDetail(rawHard?.raw);
+      } else {
+        const rawDeep = await safelyProbe(deepProbe, { ...common, build: buildDeepProbe, task: DEEP_TASK }, now);
+        deep = probeView(rawDeep);
+        if (deep.status !== 'approved') {
+          failedKind = classifyProbeFailure(rawDeep?.raw, rawDeep);
+          detail = failureDetail(rawDeep?.raw);
+        }
       }
     }
 
-    const score = Number(basic.status === 'approved') + Number(hard?.status === 'approved');
-    const kind = score === 2 ? 'ok' : score === 1 ? 'parcial' : failedKind ?? 'fail';
-    const seconds = basic.seconds + (hard?.seconds ?? 0);
+    const score = Number(basic.status === 'approved') + Number(hard?.status === 'approved') + Number(deep?.status === 'approved');
+    const kind = score === 3 ? 'ok' : score > 0 ? 'parcial' : failedKind ?? 'fail';
+    const seconds = basic.seconds + (hard?.seconds ?? 0) + (deep?.seconds ?? 0);
+    const apt = hard?.status === 'approved' && deep?.status === 'approved';
+    const tier = !apt ? null : [basic, hard, deep].every((probe) => probe.seconds <= MAX_SECONDS / 2) ? 'A' : 'B';
     const entry = {
       id: candidate.id,
       name: candidate.name,
@@ -195,6 +345,9 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
       reasoning: candidate.reasoning,
       basic,
       hard,
+      deep,
+      apt,
+      tier,
       detail,
       score,
       seconds,
@@ -273,12 +426,14 @@ export function renderRanking(result, { date, unlisted = [], total } = {}) {
     `Ranquing de modelos gratuitos de OpenCode — ${dateText}`,
     'La cuota restante no se puede consultar; se deduce de los resultados de estas pruebas.',
   ];
-  const headers = ['#', 'Modelo', 'Prueba 1', 'Prueba 2', 'Tiempo', 'Nota'];
+  const headers = ['#', 'Modelo', 'Prueba 1', 'Prueba 2', 'Prueba 3', 'Nivel', 'Tiempo', 'Nota'];
   const rows = (result?.entries ?? []).map((entry, index) => [
     String(index + 1),
     String(entry.id),
     testMark(entry.basic),
     testMark(entry.hard),
+    testMark(entry.deep),
+    entry.tier ?? '—',
     `${Number(entry.seconds || 0).toFixed(1)} s`,
     noteFor(entry),
   ]);
