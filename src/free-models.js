@@ -154,8 +154,9 @@ export function discoverProviderModels({ providers = {}, connected = [], live = 
       if (!isObject(metadata) || (!zeroCost && !freeTier)
         || metadata.tool_call !== true || typeof context !== 'number' || context < 64000
         || (liveIds && !liveIds.has(modelId))) continue;
-      if (freeTier && metadata.modalities != null
-        && !metadata.modalities?.output?.includes?.('text')) continue;
+      // Un agente de código no sirve con modelos que generan imágenes o audio.
+      if (metadata.modalities != null && (!metadata.modalities?.output?.includes?.('text')
+        || metadata.modalities.output.some((kind) => kind === 'image' || kind === 'audio'))) continue;
       candidates.push({
         id: `${provider}/${modelId}`,
         provider,

@@ -20,6 +20,8 @@ export function classifyExecutorError(text) {
     || /\b(?:status|http|error|code)[^a-z0-9]{0,3}401\b/.test(value)) {
     return 'credentials';
   }
+  // El prompt del agente supera el límite de tokens por minuto del plan: ese modelo no sirve, aunque el aviso hable de planes de pago.
+  if (/\brequest too large for model\b|\breduce your message size\b/.test(value)) return 'unavailable';
   if (/\b(?:insufficient_quota|quota exceeded|exceeded your current quota|billing|insufficient balance|out of credits|payment required)\b/.test(value)
     || /\b402\s+payment required\b/.test(value)
     || /\b(?:status|http|error|code)[^a-z0-9]{0,3}402\b/.test(value)

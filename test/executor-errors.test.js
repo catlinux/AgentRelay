@@ -149,3 +149,9 @@ test('marca agotado un modelo de OpenCode cuando la ejecución falla por cuota',
     repo.cleanup();
   }
 });
+
+test('un prompt mayor que el límite de tokens por minuto del plan es modelo no disponible, no cuota', () => {
+  const text = 'Request too large for model `openai/gpt-oss-safeguard-20b` on tokens per minute (TPM): Limit 2000, Requested 7930, please reduce your message size. Upgrade to Dev Tier today at https://console.groq.com/settings/billing';
+  assert.equal(classifyExecutorError(text), 'unavailable');
+  assert.equal(classifyExecutorError('insufficient_quota'), 'quota');
+});
