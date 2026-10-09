@@ -1,69 +1,73 @@
-# Plan: proveedores con cuota gratuita en AgentRelay
+# Plan: enrutado de ejecutores con cuotas gratuitas y paso a pago
 
-Creado 2026-10-08. Objetivo: aprovechar las IA con nivel gratuito (no solo OpenCode Zen) como ejecutores, probarlas de verdad y quedarse con las que funcionen.
+Creado 2026-10-08, rehecho 2026-10-09. Objetivo: descubrir las IA gratuitas que valen como ejecutoras, evaluarlas, seguir su cuota en tiempo real y rotar entre ellas; cuando no quede ninguna gratuita, pasar a las de pago.
 
 ## Decisiones tomadas con el usuario (no reabrir)
 
-- **Vía única: OpenCode.** OpenCode ya habla con NVIDIA, Groq, Google, Mistral, OpenRouter, Z AI… (`-m proveedor/modelo`, ver `src/executors/opencode.js:56`). No se crean adaptadores nuevos ni se guardan claves en AgentRelay: cada proveedor se conecta con `agentrelay login opencode` (asistente de OpenCode) o con su variable de entorno.
-- **Cadena automática opt-in:** nuevo `executor.freeChain` (booleano, por defecto `false`). Si está activo y un modelo gratuito agota la cuota, el mismo intento sigue con el siguiente gratuito del ranquing. Desactivado, todo sigue como hoy (falla y propone alternativas).
-- **Privacidad: solo avisar.** Los proveedores que pueden usar los prompts para entrenar se marcan en el catálogo y se avisa en `providers`, `use` y al cambiar de modelo en la cadena; no se bloquean.
-- **Selección por prueba real:** se conectan todos los candidatos; los que fallen en las pruebas se quitan del catálogo y se anota en `TODO.md` («Descartado» con su porqué).
-- **Versionado (excepción del repo):** no se sube la versión; todo va a `## [Sin publicar]` del `CHANGELOG.md`.
+- **Ejecutores:** Codex (imprescindible: cuota gratuita de ChatGPT con Luna + Luna por API de pago) y OpenCode (todos los proveedores gratuitos y DeepSeek). **Cline se retira solo si** DeepSeek Flash y Pro rinden igual por OpenCode (paso 0); si no, se queda.
+- **Sin claves en AgentRelay** (salvo el perfil de API de Codex que ya existe): los proveedores de OpenCode se conectan con `agentrelay login opencode` o su variable de entorno.
+- **Privacidad: solo avisar** (no se bloquean proveedores que entrenan con los prompts).
+- **Proveedores:** se prueban todos los candidatos; los que fallen se quitan del catálogo y se anotan como descartados en `TODO.md`.
+- **Pago sin tope:** al agotarse los gratuitos se pasa al de pago sin preguntar; el informe diario muestra lo usado de pago. Orden de pago: DeepSeek Flash → Luna API → DeepSeek Pro.
+- **Una cuenta por proveedor:** se rota entre proveedores, nunca entre cuentas del mismo (condiciones de uso).
+- **Versionado (excepción del repo):** no se sube la versión; todo a `## [Sin publicar]` del `CHANGELOG.md`.
+- Sustituye a la «cadena opt-in `executor.freeChain`» del plan anterior: el enrutado se activa una vez en la configuración (`routing.mode: "auto"`); con `"off"` (por defecto) todo funciona como hoy.
 
-## Candidatos (datos de terceros a 2026-10, sin verificar)
+## Arquitectura (cuatro piezas)
 
-| Proveedor (id en OpenCode) | Variable | Límite gratuito | Entrena | Notas |
-|---|---|---|---|---|
-| `nvidia` | `NVIDIA_API_KEY` | ~40 RPM, ~10.000 RPD/modelo | no consta | Muchos modelos retirados (410) o 404; GLM 5.3, GLM 5.3 Flash, Nemotron 3.5 Lightning y Laguna XS funcionaron como agente (prueba de falkenslab, 2026-09-24) |
-| `groq` | `GROQ_API_KEY` | 30 RPM, 1.000 RPD/modelo | no consta | gpt-oss-120b, qwen3.8-27b |
-| `google` | `GOOGLE_GENERATIVE_AI_API_KEY` | no publicado | **sí** | Familia Flash |
-| `mistral` | `MISTRAL_API_KEY` | créditos mensuales | comprobar | Codestral/Devstral |
-| `openrouter` | `OPENROUTER_API_KEY` | 20 RPM, 50 RPD (`:free`) | **puede** | Solo reserva |
-| `zai` | (ver models.dev) | 1 petición simultánea | comprobar | GLM Flash |
-| `opencode` (Zen) | sesión de OpenCode | por IP | comprobar | Ya integrado |
-
-Comprobar los ids y variables reales en `https://models.dev/api.json` (campos `id`, `env`, `models.*.cost`) antes de escribirlos.
+1. **Inventario** (`src/free-providers.js`, `src/free-models.js`): models.dev (coste 0, `tool_call`, contexto) de los proveedores conectados, cruzado con la lista en vivo del proveedor para excluir retirados (410/404). Prefiltro sin gastar cuota: `tool_call === true` y contexto ≥ 64k.
+2. **Evaluación** (`src/model-rank.js`, `src/free-ranking.js`): tres pruebas (fácil, media, difícil con varios archivos y un test que arreglar). **Apto** = supera media y difícil. Nivel **A** (pasa las tres con margen de tiempo) o **B**. La nota se ajusta con las revisiones reales del orquestador (accept suma, fix/reject resta). Se reevalúa solo lo nuevo o lo caducado (7 días).
+3. **Estado de cuota** (nuevo `src/quota-state.js`, en `~/.agentrelay/quota.json`): por `proveedor/modelo` y por proveedor: `available` | `exhausted { until, source }` | `unknown { nextProbe }`. `until` sale del error (Retry-After, «resets at…», `parseQuotaReset` de `src/executors/common.js`) o de reglas del catálogo (p. ej. reinicio diario 00:00 UTC); si no se sabe, reintento a 10, 30 y 60 min. Generaliza lo que hoy hace Luna (`markExhausted` + reintento cada 10 min).
+4. **Enrutador** (nuevo `src/router.js` + `src/orchestrator.js`): lista ordenada = gratuitos (Luna gratis y aptos por nota) y después pago (DeepSeek Flash, Luna API, DeepSeek Pro). Cada tarea empieza por el primero disponible; tareas `effort: high|xhigh` solo usan nivel A o pago. Cuota agotada a media tarea → se marca, se continúa con el siguiente sobre el árbol actual (modo `fix` con «continúa el trabajo») sin consumir `retriesUsed`; máximo 5 cambios por ejecución. Antes de cada tarea se vuelve a comprobar si uno de más arriba se ha restablecido. Cada cambio emite `route_switch {from, to, reason, paid, trainsOnData}` y queda en el informe.
 
 ## Pasos
 
-Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En todas las tareas, `constraints`: no cambiar la versión, no tocar `package.json`, `.gitignore` ni la licencia, no escribir secuencias `\u` sueltas, no usar scripts de PowerShell (hay archivos CRLF); `validation`: `npm test`. El orquestador revisa según `AGENTS.md`.
+Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En todas: `constraints` = no cambiar la versión, no tocar `package.json`, `.gitignore` ni la licencia, no escribir secuencias `\u` sueltas, no usar scripts de PowerShell (hay archivos CRLF); `validation` = `npm test`. Revisión según `AGENTS.md`. Cada paso añade su entrada en «Sin publicar» del `CHANGELOG.md` y marca aquí `[x]`.
 
-### Paso 1 — Catálogo de proveedores gratuitos · AgentRelay, esfuerzo medio · [ ]
-- Archivos: nuevo `src/free-providers.js`, test nuevo en `test/`.
-- Contenido: lista de candidatos con `{ id, name, env, signupUrl, limits (texto), trainsOnData: true|false|null, notes }` y funciones `listFreeProviders()`, `connectedProviders({ env, opencodeAuth })` (conectado si la variable existe o el proveedor aparece en las credenciales de OpenCode; reutilizar cómo `src/executors/opencode.js` lee hoy la sesión).
-- Terminado: tests cubren conectado/no conectado por variable y por credencial; `npm test` en verde.
-- CHANGELOG (Sin publicar → Añadido): se añade al cerrar el paso 3 junto con el comando visible.
+### Paso 0 — DeepSeek: OpenCode frente a Cline · la propia sesión (Sonnet, medio) + el usuario · [ ]
+- El usuario conecta DeepSeek en OpenCode (`agentrelay login opencode` → deepseek) y mira en platform.deepseek.com si tiene crédito de regalo.
+- 3-4 tareas reales pequeñas iguales con `agentrelay use cline deepseek-v4-flash` y `agentrelay use opencode deepseek/<id>` (y lo mismo con Pro). Comparar aceptación, intentos, tiempo y tokens.
+- Terminado: resultado anotado aquí y decisión (retirar Cline o no) en `TODO.md`.
 
-### Paso 2 — Descubrimiento multiproveedor · AgentRelay, esfuerzo medio · [ ]
-- Archivos: `src/free-models.js`, `src/model-check.js`, sus tests.
-- Cambios: la caché de models.dev guarda todos los proveedores del catálogo (no solo `opencode`); un modelo es gratuito si `cost.input === 0 && cost.output === 0` en un proveedor **conectado**; ids siempre `proveedor/modelo`. Zen conserva el recurso al sufijo `-free` sin conexión. `isFreeModel` deja de depender solo del sufijo (aceptar un conjunto conocido de gratuitos).
-- Terminado: con un JSON de models.dev de prueba, salen los gratuitos de los proveedores conectados y no los de pago ni los de proveedores sin conectar; las cachés antiguas (solo `opencode`) siguen leyéndose.
+### Paso 1 — Catálogo de proveedores · AgentRelay, medio · [ ]
+- Archivos: nuevo `src/free-providers.js` + test.
+- Entradas `{ id, name, env, signupUrl, tier: 'free'|'paid', limits, resetRule, trainsOnData, notes }` para: opencode (Zen), nvidia, groq, google, mistral, openrouter, zai, deepseek (paid). Ids y variables verificados en `https://models.dev/api.json`.
+- `connectedProviders({ env, opencodeAuth })`: conectado si existe la variable o la credencial de OpenCode.
+- Terminado: tests de conectado/no conectado.
 
-### Paso 3 — Comando `agentrelay providers` y `doctor` · AgentRelay, esfuerzo bajo · [ ]
-- Archivos: `src/cli.js`, `src/help.js` (y los `/ar:` se regeneran solos desde la ayuda: comprobar), tests.
-- Salida: por proveedor, conectado sí/no, límite, aviso «puede usar tus prompts para entrenar» si `trainsOnData !== false`, y cómo conectarlo (`agentrelay login opencode` o la variable). `doctor` añade una línea con los proveedores gratuitos conectados.
-- CHANGELOG: «Proveedores con cuota gratuita (NVIDIA, Groq, Gemini, Mistral, OpenRouter, Z AI) a través de OpenCode: `agentrelay providers`…».
+### Paso 2 — Inventario multiproveedor · AgentRelay, medio · [ ]
+- Archivos: `src/free-models.js`, `src/model-check.js` + tests.
+- La caché de models.dev guarda todos los proveedores del catálogo; gratuito = coste 0 en un proveedor conectado; ids `proveedor/modelo`; prefiltro `tool_call` y contexto ≥ 64k; Zen conserva el sufijo `-free` sin conexión; cachés antiguas siguen leyéndose. `isFreeModel` deja de depender solo del sufijo.
 
-### Paso 4 — Ranquing multiproveedor y modelos retirados · AgentRelay, esfuerzo medio · [ ]
-- Archivos: `src/model-rank.js`, `src/free-ranking.js`, `src/executors/common.js` (`classifyExecutorError`), tests.
-- Cambios: el ranquing prueba los gratuitos de todos los proveedores conectados; un 410/404/«model not found|deprecated|retired» se clasifica como no disponible y se excluye sin gastar la segunda prueba; las pruebas de un mismo proveedor van en serie (respetar RPM); `--max` limita por proveedor. `use`/`use --list` muestran el proveedor y el aviso de privacidad.
-- Terminado: tests con salidas simuladas de 410, 404 y 429.
+### Paso 3 — `agentrelay providers` y `doctor` · AgentRelay, bajo · [ ]
+- Archivos: `src/cli.js`, `src/help.js` (comprobar que `/ar:providers` se genera) + tests.
+- Por proveedor: conectado, nivel gratuito/pago, límites, aviso de privacidad si `trainsOnData !== false`, cómo conectarlo. `doctor`: una línea con los conectados.
 
-### Paso 5 — Prueba real y criba · el usuario + la propia sesión (Sonnet, esfuerzo medio) · [ ]
-1. El usuario crea las claves (NVIDIA Build, Groq, Google AI Studio, Mistral, OpenRouter, Z AI) y las conecta con `agentrelay login opencode`; `agentrelay providers` debe mostrarlas conectadas.
-2. `agentrelay rank --run` y después 2-3 tareas reales pequeñas por proveedor con su mejor modelo (en un repo de pruebas, no en código sensible).
-3. Proveedor sin ningún modelo que complete una tarea → se quita del catálogo y se anota en `TODO.md` como descartado con el porqué. Los que funcionen quedan en el catálogo y en `docs/` con su modelo recomendado.
-- Terminado: catálogo depurado y resultados anotados (fecha, modelo, tiempo, resultado).
+### Paso 4 — Evaluación con tercera prueba, niveles y nota real · AgentRelay, alto · [ ]
+- Archivos: `src/model-rank.js`, `src/free-ranking.js`, `src/executors/common.js` (`classifyExecutorError`: 410/404/«not found|deprecated|retired» → no disponible) + tests.
+- Tercera prueba difícil; apto/nivel A/B; pruebas del mismo proveedor en serie (RPM); `--max` por proveedor; reevaluación a los 7 días; `agentrelay review` actualiza la nota del modelo usado (registro en `~/.agentrelay/`).
 
-### Paso 6 — Cadena de gratuitos `executor.freeChain` · AgentRelay, esfuerzo alto · [ ]
-- Archivos: `src/config.js` (clave, por defecto `false`, validación booleana, lista de claves de `executor`), `src/settings.js`, `src/config-template.js`, `src/orchestrator.js`, tests.
-- Comportamiento (en la rama `errorKind === 'quota'` de `continueCycle`): si `freeChain` es `true` y el ejecutor es `opencode`, `markExhausted` del modelo actual, elegir el siguiente de `rankedFree` que no esté agotado ni probado ya en esta ejecución, emitir evento `chain_switch {from, to, trainsOnData}`, repetir el intento con el mismo modo **sin consumir** `retriesUsed` y sin cambiar la configuración guardada. Máximo 3 cambios por ejecución; agotados todos, falla como hoy con las alternativas. El informe (`show`) lista los modelos usados.
-- Terminado: tests de cadena desactivada (comportamiento idéntico al actual), activada con éxito en el segundo modelo, límite de 3 y sin candidatos.
-- CHANGELOG: «Cadena de modelos gratuitos opcional (`executor.freeChain`)…».
+### Paso 5 — Estado de cuota generalizado · AgentRelay, alto · [ ]
+- Archivos: nuevo `src/quota-state.js`, `src/free-ranking.js` (`markExhausted` pasa a usarlo), `src/executors/codex.js` (Luna usa el mismo almacén sin cambiar su comportamiento) + tests.
+- Estados y cálculo de `until` como en «Arquitectura 3»; escritura atómica; `isAvailable(id, now)`.
+- Terminado: tests con reloj simulado (agotado hasta X, restablecido, backoff 10/30/60).
 
-### Paso 7 — Documentación · AgentRelay, esfuerzo bajo, **un archivo por tarea** · [ ]
-- `docs/DISENO.md` (sección Modelos gratuitos: multiproveedor, cadena opt-in, aviso de privacidad), `README.md`, `README.en.md`, manual de uso en `docs/` (comando `providers`, `freeChain`). Quitar de `TODO.md` el punto «Más proveedores con nivel gratuito…».
+### Paso 6 — Enrutador · **Opus** en la propia sesión (diseño delicado) · [ ]
+- Archivos: nuevo `src/router.js`, `src/orchestrator.js`, `src/config.js` / `src/settings.js` / `src/config-template.js` (`routing.mode: "off"|"auto"`, `routing.paidOrder`), `src/report.js` + tests.
+- El orquestador debe poder cambiar de **tipo** de ejecutor entre intentos (Codex ↔ OpenCode), no solo de modelo. Con `routing.mode: "auto"`, el `apiFallback` interno de Codex se desactiva y Luna gratis y Luna API son dos entradas de la lista (una sola lógica de cambio).
+- Terminado: tests con `mode: off` idéntico al actual; cambio a mitad de tarea; vuelta a gratuito al restablecerse; esfuerzo alto solo nivel A/pago; todos agotados → falla con alternativas.
+
+### Paso 7 — Prueba real y criba de proveedores · el usuario + la propia sesión (Sonnet, medio) · [ ]
+1. El usuario crea las claves (NVIDIA Build, Groq, Google AI Studio, Mistral, OpenRouter, Z AI) y las conecta; `agentrelay providers` debe mostrarlas.
+2. `agentrelay rank --run`; varios días de uso real con `routing.mode: "auto"` en un repo de pruebas.
+3. Proveedor sin ningún modelo apto → fuera del catálogo y anotado como descartado en `TODO.md`.
+
+### Paso 8 — Retirar Cline (solo si el paso 0 lo justifica) · AgentRelay, medio · [ ]
+- Quitar adaptador, dependencia (pedir permiso explícito para tocar `package.json`), entradas en `catalog.js`, `alternatives.js`, `doctor`, migración de configuración `cline` → `opencode deepseek/…` con aviso.
+
+### Paso 9 — Documentación · AgentRelay, bajo, **un archivo por tarea** · [ ]
+- `docs/DISENO.md` (enrutado y su política), `README.md`, `README.en.md`, manual en `docs/` (`providers`, `routing`).
 
 ## Cómo seguir en barato
 
-`/clear` → `/model sonnet` → «ejecuta el paso 1 de .agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md». El paso 6 conviene revisarlo con Opus.
+`/clear` → `/model sonnet` → «ejecuta el paso 1 de .agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md». Los pasos 1-5 son independientes del 0; el paso 6 con `/model opus`.
