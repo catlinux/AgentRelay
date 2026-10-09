@@ -202,6 +202,13 @@ export function formatEvent(event, startedAtMs, options = {}) {
       return fmt(`  · ${parts.join(' · ')}`);
     }
     case 'retry': return fmt(`↻ Corrección automática ${event.n}/${event.max}`, { tone: '33' });
+    case 'route_switch': {
+      const details = [
+        event.paid ? 'de pago' : '',
+        event.trainsOnData ? 'aviso: puede usar tus prompts para entrenar' : '',
+      ].filter(Boolean);
+      return fmt(`⇄ Cambio de ejecutor: ${event.from} → ${event.to} (${event.reason})${details.length ? ` · ${details.join(' · ')}` : ''}`, { tone: '33' });
+    }
     case 'self_review_start': return fmt('▶ Self-review del ejecutor', { tone: '1;36' });
     case 'self_review_skipped': return fmt(`  · self-review separada omitida: ${event.reason}`);
     case 'status': {

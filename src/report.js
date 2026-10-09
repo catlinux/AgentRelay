@@ -27,9 +27,26 @@ function attemptsTable(attempts) {
   const rows = attempts.map((a) => {
     const tokens = a.usage ? `${a.usage.inputTokens ?? 0} / ${a.usage.outputTokens ?? 0}` : '-';
     const result = a.ok ? (a.report?.status ?? 'sin informe') : `error: ${a.error}`;
-    return `| ${a.n} | ${a.kind} | ${result} | ${fmtSeconds(a.durationMs)} | ${tokens} | ${fmtCost(a.usage?.totalCost)} |`;
+    return `| ${a.n} | ${a.route ? `${a.kind} · ${a.route}` : a.kind} | ${result} | ${fmtSeconds(a.durationMs)} | ${tokens} | ${fmtCost(a.usage?.totalCost)} |`;
   });
   return ['| # | Fase | Resultado | Duración | Tokens entrada / salida | Coste estimado |', '|---|---|---|---|---|---|', ...rows].join('\n');
+}
+
+function routeSection(route, attempts) {
+  const switches = route.switches?.length
+    ? route.switches.map((change) => {
+      const at = new Date(change.at);
+      const time = Number.isFinite(at.getTime())
+        ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+        : '--:--';
+      const details = [change.paid ? 'de pago' : '', change.trainsOnData ? 'aviso: puede usar tus prompts para entrenar' : ''].filter(Boolean);
+      return `- ${time} ${change.from} → ${change.to} (${change.reason})${details.length ? ` · ${details.join(' · ')}` : ''}`;
+    }).join('\n') : '_(sin cambios de ejecutor)_';
+  const skipped = [...new Map((route.skipped ?? []).map((entry) => [entry.key, entry])).values()]
+    .map((entry) => `- ${entry.key}: ${entry.reason}`);
+  const paid = attempts.some((attempt) => attempt.paid === true)
+    ? '\n\n**Se ha usado un ejecutor de pago en esta ejecución.**' : '';
+  return `## Enrutado\n\n${switches}\n\nEntradas descartadas al elegir:\n${skipped.length ? skipped.join('\n') : '_(ninguna)_'}${paid}`;
 }
 
 function validationsSection(check) {
@@ -115,10 +132,10 @@ ${list(task.acceptanceCriteria)}
 ## Orquestación
 
 - Revisión: ${policy.review} · reintentos: ${state.retriesUsed}/${policy.maxRetries}
-- Ejecutor: ${executor.type} · ${[executor.provider, executor.model].filter(Boolean).join('/') || 'modelo por defecto del ejecutor'}
+- Ejecutor: ${state.route ? `enrutado automático · empezó con ${state.route.first} · ahora ${state.route.current?.key ?? '-'}` : `${executor.type} · ${[executor.provider, executor.model].filter(Boolean).join('/') || 'modelo por defecto del ejecutor'}`}
 - Self-review: ${selfReviewLine(state)}
 
-## Intentos
+${state.route ? `${routeSection(state.route, state.attempts)}\n\n` : ''}## Intentos
 
 ${attemptsTable(state.attempts)}
 
