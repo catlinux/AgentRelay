@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { applyReview, startRun } from '../src/orchestrator.js';
 import { readEvents } from '../src/events.js';
-import { listRunIds, runDir } from '../src/store.js';
+import { listRunIds, runDir, saveState } from '../src/store.js';
+import { loadChecks } from '../src/model-check.js';
 import { normalizeTask } from '../src/task.js';
 import { baseTask, fakePlan, git, makeRepo, testConfig } from './helpers.js';
 
@@ -256,6 +258,47 @@ test('revisión: límite de reintentos y escalado', async () => {
     assert.equal(state.status, 'escalated');
   } finally {
     repo.cleanup();
+  }
+});
+
+test('la revisión registra decisiones de OpenCode con el modelo de la ejecución', async () => {
+  const repo = makeRepo();
+  const home = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-review-'));
+  const previousHome = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = home;
+  try {
+    let state = await run(repo, { plan: { implement: GOOD } });
+    state.config.executor.type = 'opencode';
+    state.config.executor.model = 'vendor/config-free';
+    state.attempts[0].model = { id: 'vendor/run-free', provider: null };
+    saveState(repo.dir, state);
+    state = await applyReview({ root: repo.dir, id: state.id, decision: 'accept' });
+
+    assert.equal(state.status, 'accepted');
+    assert.equal(loadChecks(home).reviews['vendor/run-free'].accept, 1);
+    assert.equal(loadChecks(home).reviews['vendor/config-free'], undefined);
+  } finally {
+    if (previousHome === undefined) delete process.env.AGENTRELAY_HOME;
+    else process.env.AGENTRELAY_HOME = previousHome;
+    repo.cleanup();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('la revisión no registra modelos de otros ejecutores', async () => {
+  const repo = makeRepo();
+  const home = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-review-'));
+  const previousHome = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = home;
+  try {
+    const state = await run(repo, { plan: { implement: GOOD } });
+    await applyReview({ root: repo.dir, id: state.id, decision: 'reject' });
+    assert.equal(loadChecks(home).reviews, undefined);
+  } finally {
+    if (previousHome === undefined) delete process.env.AGENTRELAY_HOME;
+    else process.env.AGENTRELAY_HOME = previousHome;
+    repo.cleanup();
+    rmSync(home, { recursive: true, force: true });
   }
 });
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clearExhausted, isExhausted, lastQuotaEvent, logQuotaEvent, markExhausted, rankPosition, rankedFree, recordQuotaRecovered } from '../src/free-ranking.js';
+import { clearExhausted, isExhausted, lastQuotaEvent, logQuotaEvent, markExhausted, rankPosition, rankedFree, recordQuotaRecovered, recordReview, reviewNet } from '../src/free-ranking.js';
 import { loadChecks, saveChecks } from '../src/model-check.js';
 
 function makeHome() {
@@ -33,6 +33,53 @@ test('rankedFree conserva el orden y filtra por score, max y agotamiento', () =>
   assert.equal(models.stale, false);
   assert.equal(Object.keys(models).includes('at'), false);
   assert.deepEqual(rankedFree(checks, { now, minScore: 2 }).map(({ id }) => id), ['vendor/first-free']);
+});
+
+test('recordReview acumula decisiones válidas y reviewNet calcula el saldo', () => {
+  const home = makeHome();
+  try {
+    const now = new Date('2026-10-05T14:30:00.000Z');
+    recordReview('vendor/model-free', 'accept', { home, now });
+    recordReview('vendor/model-free', 'accept', { home, now: new Date(now.getTime() + 1_000) });
+    recordReview('vendor/model-free', 'fix', { home, now });
+    recordReview('vendor/model-free', 'reject', { home, now });
+    const record = recordReview('vendor/model-free', 'escalate', { home, now });
+    const checks = loadChecks(home);
+
+    assert.deepEqual(record, { accept: 2, fix: 1, reject: 1, escalate: 1, last: now.toISOString() });
+    assert.equal(reviewNet(checks, 'vendor/model-free'), -1);
+    assert.equal(reviewNet(checks, 'vendor/missing-free'), 0);
+    assert.equal(recordReview('vendor/model-free', 'unknown', { home, now }), null);
+    assert.deepEqual(loadChecks(home).reviews['vendor/model-free'], record);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('rankedFree prioriza apt, tier, score y net de revisiones con desempate estable', () => {
+  const checks = {
+    reviews: {
+      'vendor/a-low-net-free': { accept: 0, fix: 1, reject: 0, escalate: 0 },
+      'vendor/a-high-net-free': { accept: 2, fix: 0, reject: 0, escalate: 0 },
+      'vendor/b-high-net-free': { accept: 20, fix: 0, reject: 0, escalate: 0 },
+    },
+    ranking: { at: '2026-10-05T09:00:00.000Z', entries: [
+      { id: 'vendor/apt-free', score: 1, tier: 'B', apt: true },
+      { id: 'vendor/b-high-net-free', score: 2, tier: 'B' },
+      { id: 'vendor/a-low-net-free', score: 2, tier: 'A' },
+      { id: 'vendor/rest-free', score: 9 },
+      { id: 'vendor/a-high-score-free', score: 3, tier: 'A' },
+      { id: 'vendor/a-high-net-free', score: 2, tier: 'A' },
+    ] },
+  };
+
+  const models = rankedFree(checks);
+  assert.deepEqual(models.map(({ id }) => id), [
+    'vendor/apt-free',
+    'vendor/a-high-score-free', 'vendor/a-high-net-free', 'vendor/a-low-net-free',
+    'vendor/b-high-net-free', 'vendor/rest-free',
+  ]);
+  assert.equal(models.find(({ id }) => id === 'vendor/a-high-net-free').net, 2);
 });
 
 test('markExhausted guarda hasta medianoche local y conserva datos previos', () => {
