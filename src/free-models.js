@@ -14,10 +14,17 @@ function validProvider(value) {
   return isObject(value) && isObject(value.models);
 }
 
+function validProviders(value) {
+  if (!isObject(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, provider]) => validProvider(provider)));
+}
+
 function cacheShape(value) {
   if (!isObject(value) || typeof value.fetchedAt !== 'string'
     || !Number.isFinite(Date.parse(value.fetchedAt)) || !validProvider(value.opencode)) return null;
-  return { fetchedAt: value.fetchedAt, opencode: value.opencode };
+  const providers = validProviders(value.providers);
+  if (!providers.opencode) providers.opencode = value.opencode;
+  return { fetchedAt: value.fetchedAt, opencode: value.opencode, providers };
 }
 
 /** Descarga y valida el JSON de models.dev. */
@@ -50,13 +57,15 @@ export function readCache(home = agentrelayHome()) {
   }
 }
 
-/** Escribe únicamente el proveedor opencode y reemplaza el archivo de forma atómica. */
+/** Escribe los proveedores válidos y reemplaza el archivo de forma atómica. */
 export function writeCache(home = agentrelayHome(), data) {
-  const provider = data?.opencode;
+  const providers = validProviders(data?.providers);
+  const provider = data?.opencode ?? providers.opencode;
   if (!validProvider(provider)) throw new Error('No se puede guardar la caché: falta un proveedor opencode válido');
   const cache = cacheShape({
     fetchedAt: data.fetchedAt ?? new Date().toISOString(),
     opencode: provider,
+    providers: { ...providers, opencode: provider },
   });
   if (!cache) throw new Error('No se puede guardar la caché: fetchedAt no es una fecha válida');
 
@@ -78,16 +87,31 @@ export async function loadFreeMetadata({ home = agentrelayHome(), now = new Date
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   const age = cached ? nowMs - Date.parse(cached.fetchedAt) : Infinity;
   if (!force && cached && age >= 0 && age < CACHE_TTL_MS) {
-    return { models: cached.opencode.models, source: 'caché' };
+    return {
+      models: cached.opencode.models,
+      source: 'caché',
+      providers: Object.fromEntries(Object.entries(cached.providers).map(([id, value]) => [id, value.models])),
+    };
   }
 
   try {
     const data = await fetchModelsDev({ fetchFn });
-    writeCache(home, { fetchedAt: new Date(nowMs).toISOString(), opencode: data.opencode });
-    return { models: data.opencode.models, source: 'red' };
+    const providers = validProviders(data);
+    writeCache(home, { fetchedAt: new Date(nowMs).toISOString(), opencode: data.opencode, providers });
+    return {
+      models: data.opencode.models,
+      source: 'red',
+      providers: Object.fromEntries(Object.entries(providers).map(([id, value]) => [id, value.models])),
+    };
   } catch {
-    if (cached) return { models: cached.opencode.models, source: 'caché caducada' };
-    return { models: {}, source: 'sufijo' };
+    if (cached) {
+      return {
+        models: cached.opencode.models,
+        source: 'caché caducada',
+        providers: Object.fromEntries(Object.entries(cached.providers).map(([id, value]) => [id, value.models])),
+      };
+    }
+    return { models: {}, source: 'sufijo', providers: {} };
   }
 }
 
@@ -111,6 +135,41 @@ function releaseTimestamp(value) {
   if (typeof value !== 'string') return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/** Descubre modelos gratuitos conocidos para los proveedores conectados. */
+export function discoverProviderModels({ providers = {}, connected = [], live = {} } = {}) {
+  const connectedIds = Array.isArray(connected) ? connected : [];
+  const candidates = [];
+
+  for (const provider of connectedIds) {
+    const models = providers?.[provider];
+    if (!isObject(models)) continue;
+    const liveIds = Array.isArray(live?.[provider]) ? new Set(live[provider]) : null;
+    for (const [modelId, metadata] of Object.entries(models)) {
+      const context = metadata?.limit?.context;
+      if (!isObject(metadata) || metadata.cost?.input !== 0 || metadata.cost?.output !== 0
+        || metadata.tool_call !== true || typeof context !== 'number' || context < 64000
+        || (liveIds && !liveIds.has(modelId))) continue;
+      candidates.push({
+        id: `${provider}/${modelId}`,
+        provider,
+        name: metadata.name ?? null,
+        context,
+        reasoning: metadata.reasoning ?? null,
+        releaseDate: metadata.release_date ?? null,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const aDate = releaseTimestamp(a.releaseDate);
+    const bDate = releaseTimestamp(b.releaseDate);
+    if (aDate === null) return bDate === null ? 0 : 1;
+    if (bDate === null) return -1;
+    return bDate - aDate;
+  });
+  return candidates;
 }
 
 /** Cruza los modelos de la cuenta con metadatos y devuelve los candidatos gratuitos. */

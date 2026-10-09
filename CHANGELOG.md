@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- **Inventario multiproveedor** (`src/free-models.js`): la caché de models.dev guarda ahora todos los proveedores y `discoverProviderModels` lista los modelos gratuitos (coste 0, `tool_call`, contexto de 64k o más) de los proveedores conectados, descartando los retirados. Las cachés antiguas siguen valiendo. Aún no se usa desde ningún comando.
 - **Catálogo de proveedores** (`src/free-providers.js`): nivel, variables de entorno, límites y aviso de privacidad de los proveedores de OpenCode, y detección de los conectados. Aún no se usa desde ningún comando.
 - **Comandos iguales en el terminal y en el chat.** Cada comando de `agentrelay` tiene su `/ar:<comando>` con el mismo nombre y los mismos argumentos (20 comandos; sin `watch` ni `hook`). Los archivos se generan a partir de la ayuda. En el chat, los que cambian algo (`setup`, `init`, `start`, `update`) se aplican añadiendo `--yes`.
 - **`agentrelay rank`**: busca los modelos gratuitos de OpenCode por los precios de models.dev (también los que no llevan `-free`, con caché de 24 h y recurso al sufijo sin conexión), los prueba con una tarea sencilla y otra más difícil, detecta cuota agotada o modelo no disponible y los ordena de mejor a peor. Sin opciones muestra el último ranquing; `--run` lo calcula, `--detach` lo lanza en segundo plano, `--max N` limita, `--json`.

@@ -39,7 +39,7 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 - `connectedProviders({ env, opencodeAuth })`: conectado si existe la variable o la credencial de OpenCode.
 - Terminado: tests de conectado/no conectado.
 
-### Paso 2 — Inventario multiproveedor · AgentRelay, medio · [ ]
+### Paso 2 — Inventario multiproveedor · AgentRelay, medio · [x]
 - Archivos: `src/free-models.js`, `src/model-check.js` + tests.
 - La caché de models.dev guarda todos los proveedores del catálogo; gratuito = coste 0 en un proveedor conectado; ids `proveedor/modelo`; prefiltro `tool_call` y contexto ≥ 64k; Zen conserva el sufijo `-free` sin conexión; cachés antiguas siguen leyéndose. `isFreeModel` deja de depender solo del sufijo.
 
