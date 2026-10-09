@@ -27,6 +27,12 @@ test('connectedProviderIds identifica la primera columna de opencode auth list',
   }), []);
 });
 
+test('connectedProviderIds entiende el formato de Linux con viñetas y tipo de credencial', async () => {
+  const stdout = '\n┌  Credentials ~/.local/share/opencode/auth.json\n│\n●  OpenCode Go api\n│\n●  OpenCode Zen api\n│\n●  DeepSeek api\n│\n●  Z.AI oauth\n│\n└  4 credentials\n';
+  const ids = await connectedProviderIds({ command: 'opencode' }, { run: async () => ({ code: 0, stdout, stderr: '' }) });
+  assert.deepEqual(ids.sort(), ['deepseek', 'opencode', 'zai']);
+});
+
 test('providers --json muestra conexiones y recomendaciones sin credenciales', async () => {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-providers-'));
   try {

@@ -222,6 +222,8 @@ export async function authStatus(executor, { run = runProcess } = {}) {
   }
 }
 
+const ANSI_COLORS = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+
 /** Lista los proveedores con credenciales guardadas en OpenCode, sin exponerlas. */
 export async function connectedProviderIds(executor, { run = runProcess } = {}) {
   try {
@@ -230,12 +232,16 @@ export async function connectedProviderIds(executor, { run = runProcess } = {}) 
     if (res.code !== 0 || res.error || res.timedOut) return [];
     const names = new Set();
     for (const line of (res.stdout || '').split(/\r?\n/)) {
-      const name = line.trim().split(/\s{2,}/, 1)[0]?.trim();
+      // Windows: "Nombre  Cuenta  stored" (columnas). Linux: "●  Nombre tipo" (viñeta y tipo de credencial).
+      const name = line.replace(ANSI_COLORS, '').replace(/^[\s●○•*│┌└]+/, '').trim().split(/\s{2,}/, 1)[0]?.trim();
       if (!name) continue;
-      const normalized = name.toLowerCase().replace(/\s+/g, '');
-      if (normalized === 'opencodeconsole') names.add('opencode');
-      for (const provider of PROVIDERS) {
-        if (normalized === provider.name.toLowerCase().replace(/\s+/g, '')) names.add(provider.id);
+      const withoutType = name.replace(/\s+(?:api|oauth|wellknown|env|stored)$/i, '');
+      for (const candidate of new Set([name, withoutType])) {
+        const normalized = candidate.toLowerCase().replace(/\s+/g, '');
+        if (normalized === 'opencodeconsole') names.add('opencode');
+        for (const provider of PROVIDERS) {
+          if (normalized === provider.name.toLowerCase().replace(/\s+/g, '')) names.add(provider.id);
+        }
       }
     }
     return [...names];

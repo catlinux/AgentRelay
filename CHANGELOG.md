@@ -43,6 +43,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- `providers` y `doctor` no reconocían los proveedores conectados en Linux: `opencode auth list` usa allí viñetas y el tipo de credencial (`●  OpenCode Zen api`) en lugar de columnas.
 - El adaptador de OpenCode leía mal los errores (el mensaje viene en `error.message`), con lo que no se detectaban bien la cuota agotada ni el modelo no disponible.
 - El prompt del ejecutor indica usar `npm.cmd` si PowerShell bloquea `npm.ps1`.
 
