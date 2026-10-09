@@ -289,22 +289,69 @@ async function safelyProbe(probe, options, now) {
   }
 }
 
-export async function rankModels({ candidates = [], executor, adapter, max = Infinity, all = false, home, now = new Date(), probes, log = () => {}, stopAfterQuota = 3 }) {
+function providerOf(candidate) {
+  const slash = candidate.id.indexOf('/');
+  return slash === -1 ? 'opencode' : candidate.id.slice(0, slash);
+}
+
+function interleaveProviders(candidates, maxPerProvider) {
+  const providers = new Map();
+  for (const candidate of candidates) {
+    const provider = providerOf(candidate);
+    const models = providers.get(provider) ?? [];
+    if (models.length < maxPerProvider) models.push(candidate);
+    providers.set(provider, models);
+  }
+
+  const interleaved = [];
+  while ([...providers.values()].some((models) => models.length)) {
+    for (const models of providers.values()) {
+      if (models.length) interleaved.push(models.shift());
+    }
+  }
+  return interleaved;
+}
+
+const RECENT_KINDS = new Set(['ok', 'parcial', 'fail', 'timeout']);
+const RANKING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function reusableEntry(entry, now) {
+  if (!RECENT_KINDS.has(entry?.kind)) return false;
+  const checkedAt = Date.parse(entry.checkedAt);
+  const age = now.getTime() - checkedAt;
+  return Number.isFinite(checkedAt) && age >= 0 && age < RANKING_TTL_MS;
+}
+
+export async function rankModels({ candidates = [], executor, adapter, max = Infinity, maxPerProvider = Infinity, force = false, all = false, home, now = new Date(), probes, log = () => {}, stopAfterQuota = 3 }) {
   const orderedCandidates = candidates
     .map((candidate, index) => ({ candidate, index }))
     .sort((a, b) => Number(a.candidate?.toolCall === false) - Number(b.candidate?.toolCall === false) || a.index - b.index)
     .map(({ candidate }) => candidate);
-  const selected = all ? orderedCandidates : orderedCandidates.slice(0, Math.max(0, max));
+  const providerLimit = Math.max(0, Math.floor(maxPerProvider));
+  const interleaved = interleaveProviders(orderedCandidates, providerLimit);
+  const selected = all ? interleaved : interleaved.slice(0, Math.max(0, max));
   const basicProbe = probes?.basic ?? ((options) => runSyntheticProbe({ ...options, build: buildProbe, task: PROBE_TASK }));
   const hardProbe = probes?.hard ?? ((options) => runSyntheticProbe({ ...options, build: buildHardProbe, task: HARD_TASK }));
   const deepProbe = probes?.deep ?? ((options) => runSyntheticProbe({ ...options, build: buildDeepProbe, task: DEEP_TASK }));
   const entries = [];
-  let stoppedBy = null;
-  let quotaStreak = 0;
-  let lastChecks;
+  const quotaStreaks = new Map();
+  const stoppedProviders = new Set();
+  const lastChecks = home ? loadChecks(home) : null;
+  const previousEntries = new Map((Array.isArray(lastChecks?.ranking?.entries) ? lastChecks.ranking.entries : [])
+    .filter((entry) => typeof entry?.id === 'string')
+    .map((entry) => [entry.id, entry]));
 
   for (let index = 0; index < selected.length; index += 1) {
     const candidate = selected[index];
+    const provider = providerOf(candidate);
+    if (stoppedProviders.has(provider)) continue;
+    const previous = previousEntries.get(candidate.id);
+    if (!force && reusableEntry(previous, now)) {
+      entries.push(previous);
+      log(previous);
+      continue;
+    }
+
     const common = { id: candidate.id, executor, adapter, now };
     const rawBasic = await safelyProbe(basicProbe, { ...common, build: buildProbe, task: PROBE_TASK }, now);
     const basic = probeView(rawBasic);
@@ -338,6 +385,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
     const tier = !apt ? null : [basic, hard, deep].every((probe) => probe.seconds <= MAX_SECONDS / 2) ? 'A' : 'B';
     const entry = {
       id: candidate.id,
+      checkedAt: now.toISOString(),
       name: candidate.name,
       listed: candidate.listed,
       source: candidate.reason,
@@ -355,8 +403,7 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
     };
     entries.push(entry);
 
-    if (home) {
-      lastChecks ??= loadChecks(home);
+    if (lastChecks) {
       lastChecks.models[candidate.id] = {
         status: basic.status,
         checkedAt: rawBasic?.checkedAt ?? now.toISOString(),
@@ -366,21 +413,23 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
       saveChecks(lastChecks, home);
     }
 
+    let quotaStreak = quotaStreaks.get(provider) ?? 0;
     if (failedKind === 'quota') quotaStreak += 1;
     else if (failedKind !== 'unavailable') quotaStreak = 0;
+    quotaStreaks.set(provider, quotaStreak);
     log(entry);
     if (stopAfterQuota > 0 && quotaStreak >= stopAfterQuota) {
-      stoppedBy = 'cuota';
-      break;
+      stoppedProviders.add(provider);
     }
   }
 
+  // Una cuota alcanzada cuenta como detención aunque otros proveedores terminen sus pruebas.
+  const stoppedBy = stoppedProviders.size ? 'cuota' : null;
   entries.sort(rankingOrder);
   const testedIds = new Set(entries.map((entry) => entry.id));
   const skipped = orderedCandidates.filter((candidate) => !testedIds.has(candidate.id)).map((candidate) => candidate.id);
 
   if (home) {
-    lastChecks ??= loadChecks(home);
     lastChecks.ranking = {
       at: now.toISOString(),
       stoppedBy,

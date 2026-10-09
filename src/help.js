@@ -268,12 +268,13 @@ const COMMANDS = {
   },
   rank: {
     summary: 'Muestra o calcula el ranquing de modelos gratuitos de OpenCode.',
-    usage: ['agentrelay rank [--run] [--detach] [--max <N>] [--json]'],
+    usage: ['agentrelay rank [--run] [--detach] [--max <N>] [--force] [--json]'],
     description: 'Sin opciones muestra el último ranquing guardado, o indica cómo calcularlo si aún no existe. Usa run para probar ahora los modelos gratuitos y guardar el resultado; detach inicia ese cálculo en segundo plano.',
     options: [
       ['--run', 'Calcula y guarda ahora el ranquing.'],
       ['--detach', 'Calcula el ranquing en segundo plano y vuelve enseguida.'],
-      ['--max <N>', 'Limita el número de modelos probados.'],
+      ['--max <N>', 'Limita el número de modelos probados por proveedor.'],
+      ['--force', 'Repite las pruebas aunque se hayan hecho hace menos de 7 días.'],
       ['--json', 'Imprime el ranquing en JSON.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
@@ -281,7 +282,8 @@ const COMMANDS = {
     examples: [
       ['agentrelay rank', 'Muestra el último ranquing guardado.'],
       ['agentrelay rank --run', 'Calcula y guarda el ranquing ahora.'],
-      ['agentrelay rank --run --max 4', 'Prueba como máximo cuatro modelos.'],
+      ['agentrelay rank --run --max 4', 'Prueba como máximo cuatro modelos por proveedor.'],
+      ['agentrelay rank --run --force', 'Repite las pruebas recientes.'],
       ['agentrelay rank --detach', 'Inicia el cálculo en segundo plano.'],
     ],
   },

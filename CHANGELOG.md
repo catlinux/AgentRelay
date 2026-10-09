@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- **`rank` evalúa todos los proveedores conectados.** Además de OpenCode Zen prueba los modelos gratuitos de los demás proveedores conectados, intercalándolos para no repetir llamadas seguidas al mismo; `--max` pasa a ser por proveedor, la racha de cuota se cuenta por proveedor y una prueba hecha hace menos de 7 días no se repite salvo con `--force`.
 - **Ranquing con tercera prueba.** `rank` añade una prueba difícil con varios archivos y calcula si el modelo es apto (supera la media y la difícil) y su nivel: A (las tres pruebas en 150 s o menos cada una) o B. Puntuación de 0 a 3; la tabla muestra Prueba 3 y Nivel.
 - **Modelo retirado o inexistente.** Los errores 410/404 de modelo (`model not found`, retirado, obsoleto…) se clasifican como `unavailable` y la ejecución falla con un mensaje claro en lugar de reintentar o hablar de cuota.
 - **`agentrelay providers [--json]`** (y `/ar:providers`): muestra qué proveedores están conectados (por OpenCode o por variable de entorno), su nivel, límites, aviso de privacidad y cómo conectar los demás. `doctor` añade una línea con los conectados cuando el ejecutor es OpenCode.

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { discoverRankCandidates } from '../src/cli.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
@@ -97,6 +98,47 @@ test('rank --run rechaza --max 0', () => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /--max debe ser un entero mayor o igual que 1/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
+});
+
+test('rank convierte los modelos listados de proveedores conectados en candidatos', async () => {
+  const adapter = { listModels: async () => [
+    { id: 'opencode/zen-free' },
+    { id: 'google/gemini-free' },
+    { id: 'groq/llama-free' },
+  ] };
+  const metadata = {
+    models: {
+      'zen-free': { name: 'Zen', cost: { input: 0, output: 0 }, limit: { context: 128000 }, reasoning: true, tool_call: true },
+    },
+    providers: {
+      google: {
+        'gemini-free': { name: 'Gemini', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2026-01-01' },
+      },
+      groq: {
+        'llama-free': { name: 'Llama', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: false, tool_call: true },
+      },
+    },
+  };
+  const listed = await adapter.listModels({});
+  const candidates = discoverRankCandidates({ listed, metadata, source: 'red', connected: ['google'] });
+  assert.deepEqual(candidates.map(({ id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate }) => ({
+    id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate,
+  })), [
+    {
+      id: 'opencode/zen-free', free: true, listed: true, reason: 'metadatos', name: 'Zen', context: 128000,
+      reasoning: true, toolCall: true, releaseDate: null,
+    },
+    {
+      id: 'google/gemini-free', free: true, listed: true, reason: 'metadatos', name: 'Gemini', context: 100000,
+      reasoning: true, toolCall: true, releaseDate: '2026-01-01',
+    },
+  ]);
+
+  const zenOnly = await { listModels: async () => [{ id: 'opencode/zen-free' }] }.listModels({});
+  assert.deepEqual(
+    discoverRankCandidates({ listed: zenOnly, metadata, source: 'red', connected: ['google'] }).map(({ id }) => id),
+    ['opencode/zen-free'],
+  );
 });
 
 test('rank --json imprime el ranquing guardado como JSON', () => {

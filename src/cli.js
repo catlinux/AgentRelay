@@ -38,7 +38,7 @@ import { collectProjectState, refreshProjectState, renderProjectState, writeProj
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { isDue, loadChecks, markDay, startDailyCheck } from './model-check.js';
-import { loadFreeMetadata, discoverFreeModels } from './free-models.js';
+import { loadFreeMetadata, discoverFreeModels, discoverProviderModels } from './free-models.js';
 import { rankModels, renderRanking } from './model-rank.js';
 import { isExhausted, lastQuotaEvent } from './free-ranking.js';
 import { connectedProviders, PROVIDERS } from './free-providers.js';
@@ -65,7 +65,7 @@ Uso:
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
-  agentrelay rank [--run] [--detach] [--max <N>] [--json]  Muestra o calcula el ranquing de modelos gratuitos
+  agentrelay rank [--run] [--detach] [--max <N>] [--force] [--json]  Muestra o calcula el ranquing de modelos gratuitos
   agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
@@ -720,9 +720,26 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
+export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [] } = {}) {
+  const zenCandidates = discoverFreeModels({ listed, metadata: metadata.models, source });
+  const live = Object.fromEntries(connected.map((provider) => [provider, []]));
+  for (const model of listed) {
+    const id = typeof model === 'string' ? model : model?.id;
+    const slash = typeof id === 'string' ? id.indexOf('/') : -1;
+    if (slash < 1) continue;
+    const provider = id.slice(0, slash);
+    (live[provider] ??= []).push(id.slice(slash + 1));
+  }
+  const providerCandidates = discoverProviderModels({ providers: metadata.providers, connected, live })
+    .map(({ id, name, context, reasoning, releaseDate }) => ({
+      id, free: true, listed: true, reason: 'metadatos', name, context, reasoning, toolCall: true, releaseDate,
+    }));
+  return [...zenCandidates, ...providerCandidates];
+}
+
 async function cmdRank(positionals, values) {
   if (positionals.length) {
-    process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--max <N>] [--json]\n');
+    process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--max <N>] [--force] [--json]\n');
     return 1;
   }
   const max = values.max === undefined ? Infinity : Number(values.max);
@@ -768,6 +785,7 @@ async function cmdRank(positionals, values) {
     const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
     const args = [entry, 'rank', '--run', '--background'];
     if (values.max !== undefined) args.push('--max', String(max));
+    if (values.force) args.push('--force');
     const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true });
     child.unref();
     process.stdout.write('Ranquing en marcha en segundo plano (puede tardar varios minutos y usa la cuota gratuita de los modelos). Mira el resultado con: agentrelay rank\n');
@@ -775,7 +793,11 @@ async function cmdRank(positionals, values) {
   }
   const listed = await adapter.listModels(executor);
   const metadata = await loadFreeMetadata({ home });
-  const candidates = discoverFreeModels({ listed, metadata: metadata.models, source: metadata.source });
+  const opencodeAuth = await connectedProviderIds(executor);
+  const connected = connectedProviders({ env: process.env, opencodeAuth })
+    .filter(({ id, tier }) => id !== 'opencode' && tier === 'free')
+    .map(({ id }) => id);
+  const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected });
   if (!candidates.length) {
     if (!values.background) {
       const message = 'No hay modelos gratuitos disponibles en tu cuenta de OpenCode.';
@@ -786,17 +808,23 @@ async function cmdRank(positionals, values) {
     }
     return 0;
   }
-  const selected = Math.min(candidates.length, max);
+  const selected = candidates.reduce((counts, candidate) => {
+    const slash = candidate.id.indexOf('/');
+    const provider = slash === -1 ? 'opencode' : candidate.id.slice(0, slash);
+    counts.set(provider, Math.min(max, (counts.get(provider) ?? 0) + 1));
+    return counts;
+  }, new Map());
+  const selectedCount = [...selected.values()].reduce((total, count) => total + count, 0);
   const unlistedCount = candidates.filter((candidate) => candidate.listed === false).length;
   if (!values.background && !values.json) {
-    process.stdout.write(`Rastreando ${selected} modelos que se sospecha que son gratuitos (${candidates.length - unlistedCount} de tu cuenta y ${unlistedCount} que solo constan como gratuitos en models.dev: si no existen en tu cuenta se descartan al momento). Puede tardar bastante: cada prueba consume cuota gratuita. Usa --max N para limitarlo.\n`);
+    process.stdout.write(`Rastreando ${selectedCount} modelos que se sospecha que son gratuitos (${candidates.length - unlistedCount} de tu cuenta y ${unlistedCount} que solo constan como gratuitos en models.dev: si no existen en tu cuenta se descartan al momento). Puede tardar bastante: cada prueba consume cuota gratuita. Usa --max N para limitarlo por proveedor.\n`);
     process.stdout.write(`Metadatos: ${metadata.source}\n`);
   }
   const now = new Date();
   let result;
   try {
     result = await rankModels({
-      candidates, executor, adapter, max, home, now,
+      candidates, executor, adapter, max: Infinity, maxPerProvider: max, force: values.force, home, now,
       log: values.background || values.json ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
     });
   } catch (error) {
@@ -883,7 +911,7 @@ async function cmdExecutors(positionals, values) {
         const available = candidates.filter(({ id }) => !isExhausted(checks, id));
         const now = new Date();
         const result = await rankModels({
-          candidates: available, executor, adapter, home, now,
+          candidates: available, executor, adapter, home, now, force: values.force,
           log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
         });
         if (!values.background) process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: available.length })}\n`);

@@ -13,6 +13,13 @@ const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-model-rank-tes
 const approved = (seconds = 1) => ({ status: 'approved', checkedAt: '2026-10-05T00:00:00.000Z', seconds, reason: 'correcto', raw: null });
 const failed = (reason = 'falló', seconds = 1, raw = {}) => ({ status: 'failed', checkedAt: '2026-10-05T00:00:00.000Z', seconds, reason, raw });
 const candidate = (id, fields = {}) => ({ id, name: id, listed: true, reason: 'metadatos', context: null, reasoning: false, toolCall: true, ...fields });
+const savedRankEntry = (id, checkedAt, kind = 'ok') => ({
+  id, checkedAt, name: id, listed: true, source: 'metadatos', context: null, reasoning: false,
+  basic: { status: 'approved', seconds: 1, reason: 'correcto' },
+  hard: { status: 'approved', seconds: 1, reason: 'correcto' },
+  deep: { status: 'approved', seconds: 1, reason: 'correcto' },
+  apt: true, tier: 'A', detail: null, score: 3, seconds: 3, kind,
+});
 const fakeProbes = ({ basic = {}, hard = {}, deep = {}, calls = [] } = {}) => ({
   basic: async ({ id }) => { calls.push(`basic:${id}`); return basic[id] ?? approved(); },
   hard: async ({ id }) => { calls.push(`hard:${id}`); return hard[id] ?? approved(); },
@@ -126,6 +133,117 @@ test('rankModels limita por max y prioriza modelos con toolCall sin alterar el o
   const result = await rankModels({ candidates, executor: {}, adapter: {}, max: 2, probes: fakeProbes({ calls }) });
   assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), ['basic:dos', 'basic:cuatro']);
   assert.deepEqual(result.skipped, ['uno', 'tres']);
+});
+
+test('rankModels intercala proveedores y conserva el orden de sus modelos', async () => {
+  const calls = [];
+  const ids = ['google/uno', 'google/dos', 'groq/uno', 'groq/dos', 'opencode/uno', 'opencode/dos'];
+  await rankModels({
+    candidates: ids.map((id) => candidate(id)), executor: {}, adapter: {}, stopAfterQuota: 0,
+    probes: fakeProbes({ calls }),
+  });
+  assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), [
+    'basic:google/uno', 'basic:groq/uno', 'basic:opencode/uno',
+    'basic:google/dos', 'basic:groq/dos', 'basic:opencode/dos',
+  ]);
+});
+
+test('rankModels limita por maxPerProvider sin reducir el límite total', async () => {
+  const calls = [];
+  const ids = ['google/uno', 'google/dos', 'groq/uno', 'groq/dos'];
+  const result = await rankModels({
+    candidates: ids.map((id) => candidate(id)), executor: {}, adapter: {}, maxPerProvider: 1,
+    stopAfterQuota: 0, probes: fakeProbes({ calls }),
+  });
+  assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), ['basic:google/uno', 'basic:groq/uno']);
+  assert.deepEqual(result.skipped, ['google/dos', 'groq/dos']);
+});
+
+test('rankModels detiene la racha de cuota de un proveedor y continúa con los demás', async () => {
+  const calls = [];
+  const ids = ['google/uno', 'groq/uno', 'google/dos', 'groq/dos', 'google/tres', 'groq/tres'];
+  const result = await rankModels({
+    candidates: ids.map((id) => candidate(id)), executor: {}, adapter: {}, stopAfterQuota: 2,
+    probes: fakeProbes({ basic: {
+      'google/uno': failed('cuota', 1, { error: 'insufficient_quota' }),
+      'google/dos': failed('cuota', 1, { error: 'insufficient_quota' }),
+    }, calls }),
+  });
+  assert.equal(result.stoppedBy, 'cuota');
+  assert.equal(result.tested, 5);
+  assert.deepEqual(result.skipped, ['google/tres']);
+  assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), [
+    'basic:google/uno', 'basic:groq/uno', 'basic:google/dos', 'basic:groq/dos', 'basic:groq/tres',
+  ]);
+});
+
+test('rankModels reutiliza resultados recientes y guarda checkedAt', async () => {
+  const home = temp();
+  const now = new Date('2026-10-09T12:00:00.000Z');
+  const cached = savedRankEntry('google/reciente', '2026-10-06T12:00:00.000Z');
+  const calls = [];
+  try {
+    saveChecks({ lastRun: null, models: {}, ranking: { entries: [cached] } }, home);
+    const result = await rankModels({
+      candidates: [candidate(cached.id)], executor: {}, adapter: {}, home, now, probes: fakeProbes({ calls }),
+    });
+    assert.deepEqual(result.entries, [cached]);
+    assert.equal(result.tested, 1);
+    assert.deepEqual(calls, []);
+
+    const fresh = await rankModels({
+      candidates: [candidate('google/nuevo')], executor: {}, adapter: {}, now,
+      probes: fakeProbes(),
+    });
+    assert.equal(fresh.entries[0].checkedAt, now.toISOString());
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test('rankModels reintenta resultados de más de siete días y cuando se fuerza', async () => {
+  for (const { ageDays, force } of [{ ageDays: 8, force: false }, { ageDays: 1, force: true }]) {
+    const home = temp();
+    const now = new Date('2026-10-09T12:00:00.000Z');
+    const checkedAt = new Date(now.getTime() - ageDays * 24 * 60 * 60 * 1000).toISOString();
+    const calls = [];
+    try {
+      saveChecks({ lastRun: null, models: {}, ranking: { entries: [savedRankEntry('google/reintento', checkedAt)] } }, home);
+      await rankModels({
+        candidates: [candidate('google/reintento')], executor: {}, adapter: {}, home, now, force,
+        probes: fakeProbes({ calls }),
+      });
+      assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), ['basic:google/reintento']);
+    } finally { rmSync(home, { recursive: true, force: true }); }
+  }
+});
+
+test('rankModels reintenta siempre entradas recientes de cuota, credenciales o no disponible', async () => {
+  for (const kind of ['quota', 'credentials', 'unavailable']) {
+    const home = temp();
+    const calls = [];
+    const now = new Date('2026-10-09T12:00:00.000Z');
+    try {
+      saveChecks({ lastRun: null, models: {}, ranking: { entries: [savedRankEntry(`google/${kind}`, now.toISOString(), kind)] } }, home);
+      await rankModels({
+        candidates: [candidate(`google/${kind}`)], executor: {}, adapter: {}, home, now,
+        probes: fakeProbes({ calls }),
+      });
+      assert.deepEqual(calls.filter((call) => call.startsWith('basic:')), [`basic:google/${kind}`]);
+    } finally { rmSync(home, { recursive: true, force: true }); }
+  }
+});
+
+test('rankModels descarta entradas guardadas de candidatos que ya no existen', async () => {
+  const home = temp();
+  const now = new Date('2026-10-09T12:00:00.000Z');
+  const cached = savedRankEntry('google/vigente', now.toISOString());
+  try {
+    saveChecks({ lastRun: null, models: {}, ranking: { entries: [cached, savedRankEntry('google/obsoleto', now.toISOString())] } }, home);
+    const result = await rankModels({
+      candidates: [candidate(cached.id)], executor: {}, adapter: {}, home, now, probes: fakeProbes(),
+    });
+    assert.deepEqual(result.entries.map(({ id }) => id), ['google/vigente']);
+    assert.deepEqual(loadChecks(home).ranking.entries.map(({ id }) => id), ['google/vigente']);
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
 test('rankModels prueba todos los candidatos por defecto', async () => {
