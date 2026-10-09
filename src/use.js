@@ -283,6 +283,7 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
 
   let choice;
   if (positionals.length) {
+    if (positionals[0] === 'cline') throw new Error('Ejecutor desconocido: cline. Disponibles: codex, opencode. Cline se retiró; usa: agentrelay use opencode deepseek/deepseek-flash');
     const parsed = parseUseArgs(positionals, profiles);
     if (parsed.profile) {
       const profile = profiles[parsed.profile];

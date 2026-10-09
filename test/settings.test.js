@@ -108,11 +108,11 @@ test('cambiar executor.type elimina model, provider y command', () => {
   try {
     mkdirSync(home, { recursive: true });
     writeFileSync(file, '{\n  "executor": {\n    "type": "codex",\n    "model": "saved",\n    "provider": "p",\n    "command": "custom"\n  }\n}\n');
-    const result = run(['set', 'executor', 'cline'], dir, home, codexHome);
+    const result = run(['set', 'executor', 'opencode'], dir, home, codexHome);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Se eliminaron model, provider y command/);
     const updated = readFileSync(file, 'utf8');
-    assert.match(updated, /"type": "cline"/);
+    assert.match(updated, /"type": "opencode"/);
     for (const key of ['model', 'provider', 'command']) assert.doesNotMatch(updated, new RegExp(`^\\s*"${key}"\\s*:`, 'm'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

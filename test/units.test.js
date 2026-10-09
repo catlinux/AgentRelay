@@ -6,14 +6,12 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
 import {
-  buildArgs, commandParts, describeTool, extractAgentReport, findBundledCline, parseOutput, toActivity,
-} from '../src/executors/cline.js';
-import {
   authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
 } from '../src/executors/codex.js';
 import {
   buildArgs as opencodeBuildArgs, parseOutput as opencodeParseOutput, run as opencodeRun, toActivity as opencodeToActivity,
 } from '../src/executors/opencode.js';
+import { extractAgentReport } from '../src/executors/common.js';
 import { appendEvent, describeCommand, formatEvent, readEvents, supportsLinks, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';
 import { quoteWindowsArg, runShell } from '../src/proc.js';
@@ -21,15 +19,6 @@ import { relativize } from '../src/executors/common.js';
 import { FAKE_CODEX, FAKE_OPENCODE } from './helpers.js';
 import { loadTask, normalizeTask } from '../src/task.js';
 import { scopeViolations } from '../src/validate.js';
-
-// Salida real de Cline CLI 3.0.66 (recortada).
-const CLINE_OUTPUT = [
-  '{"ts":"2026-09-30T16:40:43.786Z","type":"hook_event","hookEventName":"agent_start","agentId":"a","taskId":"t","parentAgentId":null}',
-  '{"ts":"2026-09-30T16:40:45.752Z","type":"agent_event","event":{"type":"content_start","contentType":"reasoning","reasoning":"The","redacted":false}}',
-  '{"ts":"2026-09-30T16:40:47.399Z","type":"hook_event","hookEventName":"tool_call","agentId":"a","taskId":"t","parentAgentId":null}',
-  '{"ts":"2026-09-30T16:40:50.545Z","type":"agent_event","event":{"type":"done","reason":"completed","text":"DONE","iterations":3,"usage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"totalCost":0.002883615}}}',
-  '{"ts":"2026-09-30T16:40:50.781Z","type":"run_result","finishReason":"completed","iterations":3,"usage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"cacheWriteTokens":0,"totalCost":0.002883615},"aggregateUsage":{"inputTokens":17339,"outputTokens":244,"cacheReadTokens":11520,"cacheWriteTokens":0,"totalCost":0.002883615},"durationMs":6763,"text":"DONE","model":{"id":"deepseek-v4-pro","provider":"deepseek"}}',
-].join('\n');
 
 // Salida real de Codex CLI 0.155 (`codex exec --json`).
 const CODEX_OUTPUT = [
@@ -206,57 +195,6 @@ test('codex: authStatus y login usan la CLI configurada', async () => {
   }
 });
 
-test('cline: interpreta el NDJSON real', () => {
-  const parsed = parseOutput(CLINE_OUTPUT);
-  assert.equal(parsed.finishReason, 'completed');
-  assert.equal(parsed.text, 'DONE');
-  assert.equal(parsed.iterations, 3);
-  assert.equal(parsed.toolCalls, 1);
-  assert.equal(parsed.usage.totalCost, 0.002883615);
-  assert.deepEqual(parsed.model, { provider: 'deepseek', id: 'deepseek-v4-pro' });
-});
-
-test('cline: recoge los errores (también los que llegan por stderr)', () => {
-  const parsed = parseOutput('texto\n{"ts":"x","type":"error","message":"JSON output mode requires a prompt"}');
-  assert.equal(parsed.finishReason, null);
-  assert.deepEqual(parsed.errors, ['JSON output mode requires a prompt']);
-});
-
-test('cline: extrae el informe estructurado del texto final', () => {
-  const text = 'Hecho.\n```json\n{"status":"done","summary":"ok","filesChanged":"a.js","issues":[]}\n```';
-  const report = extractAgentReport(text);
-  assert.equal(report.status, 'done');
-  assert.deepEqual(report.filesChanged, ['a.js']);
-  assert.equal(report.needsEscalation, false);
-  assert.equal(extractAgentReport('sin informe'), null);
-  assert.equal(extractAgentReport('```json\n{roto\n```'), null);
-  // Usa el último bloque válido.
-  const two = '```json\n{"status":"partial"}\n```\n```json\n{"status":"done"}\n```';
-  assert.equal(extractAgentReport(two).status, 'done');
-});
-
-test('cline: argumentos de línea de comandos', () => {
-  const args = buildArgs({ provider: 'deepseek', model: 'deepseek-v4-pro', thinking: 'high', timeoutSeconds: 60, extraArgs: ['-v'] }, 'instr');
-  assert.deepEqual(args, ['--json', '--auto-approve', 'true', '-P', 'deepseek', '-m', 'deepseek-v4-pro', '--thinking', 'high', '-t', '60', '-v', 'instr']);
-});
-
-test('cline: localiza la copia instalada aunque falte el enlace de .bin', () => {
-  const root = path.join('base');
-  const link = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'cline.cmd' : 'cline');
-  const launcher = path.join(root, 'node_modules', 'cline', 'bin', 'cline');
-  assert.deepEqual(findBundledCline(root, (p) => p === link || p === launcher), [link]);
-  // Caso de Linux con npm 10: sin enlace, se ejecuta el lanzador con el propio Node.
-  assert.deepEqual(findBundledCline(root, (p) => p === launcher), [process.execPath, launcher]);
-  assert.equal(findBundledCline(root, () => false), null);
-});
-
-test('cline: commandParts respeta los valores explícitos', () => {
-  assert.deepEqual(commandParts(['node', 'x.js']), ['node', 'x.js']);
-  assert.deepEqual(commandParts('/opt/cline'), ['/opt/cline']);
-  const parts = commandParts('cline');
-  assert.ok(parts.length >= 1 && parts.every((p) => typeof p === 'string'));
-});
-
 test('opencode: interpreta el JSON real', () => {
   const parsed = opencodeParseOutput(OPENCODE_OUTPUT);
   assert.equal(parsed.toolCalls, 1);
@@ -386,12 +324,12 @@ test('config: valores por defecto, archivo, archivo local y opciones', () => {
     const home = path.join(dir, 'home');
     assert.equal(loadConfig({ cwd: dir, home }).config.executor.model, 'gpt-6-luna');
     writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ validation: { commands: ['npm test'] } }));
-    writeFileSync(path.join(dir, 'agentrelay.config.local.json'), JSON.stringify({ executor: { command: ['node', 'cline.js'] } }));
+    writeFileSync(path.join(dir, 'agentrelay.config.local.json'), JSON.stringify({ executor: { command: ['node', 'custom.js'] } }));
     const { config, sources } = loadConfig({ cwd: dir, home, overrides: { executor: { timeoutSeconds: 77 } } });
     assert.equal(sources.length, 2);
     assert.equal(config.executor.timeoutSeconds, 77);
     assert.deepEqual(config.validation.commands, ['npm test']);
-    assert.deepEqual(config.executor.command, ['node', 'cline.js']);
+    assert.deepEqual(config.executor.command, ['node', 'custom.js']);
     assert.equal(config.executor.provider, null);
     assert.throws(() => loadConfig({ cwd: dir, home, overrides: { executor: { timeoutSeconds: 0 } } }), /número positivo/);
   } finally {
@@ -410,12 +348,12 @@ test('config: los valores por defecto de executor dependen del tipo', () => {
     assert.equal(byDefault.executor.provider, null);
     assert.equal(byDefault.executor.model, 'gpt-6-luna');
 
-    writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'cline' } }));
-    const cline = loadConfig({ cwd: dir, home }).config;
-    assert.equal(cline.executor.type, 'cline');
-    assert.equal(cline.executor.command, 'cline');
-    assert.equal(cline.executor.provider, 'deepseek');
-    assert.equal(cline.executor.model, 'deepseek-v4-pro');
+    writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'opencode' } }));
+    const opencode = loadConfig({ cwd: dir, home }).config;
+    assert.equal(opencode.executor.type, 'opencode');
+    assert.equal(opencode.executor.command, 'opencode');
+    assert.equal(opencode.executor.provider, null);
+    assert.equal(opencode.executor.model, 'opencode/nemotron-3-ultra-free');
 
     // Codex usa la sesión de ChatGPT y el modelo Luna.
     writeFileSync(path.join(dir, LOCAL_CONFIG_FILE), JSON.stringify({ executor: { type: 'codex' } }));
@@ -440,7 +378,7 @@ test('config: rechaza un ejecutor no soportado', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
     writeFileSync(path.join(dir, CONFIG_FILE), JSON.stringify({ executor: { type: 'foo' } }));
-    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: cline, codex, opencode\)/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: codex, opencode\)/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -476,49 +414,6 @@ test('validate: archivos protegidos', () => {
   assert.deepEqual(scopeViolations(files, ['LICENSE', 'docs/']), ['docs/x.md', 'LICENSE']);
   assert.deepEqual(scopeViolations(files, ['./src/a.js']), ['src/a.js']);
   assert.deepEqual(scopeViolations(files, []), []);
-});
-
-test('cline: describeTool describe herramientas y relativiza rutas bajo cwd', () => {
-  const cwd = 'C:\\repo';
-  assert.equal(describeTool('read_files', { files: [{ path: 'C:\\repo\\src\\text.js' }] }, cwd), './src/text.js');
-  assert.equal(describeTool('editor', { path: 'C:\\repo\\src\\text.js', old_text: 'a', new_text: 'b' }, cwd), './src/text.js');
-  assert.equal(describeTool('run_commands', { commands: ["cd 'C:\\repo'; npm test"] }, cwd), "cd '.'; npm test");
-  assert.equal(describeTool('other', { a: 1 }, cwd), '{"a":1}');
-  // También con separadores "/".
-  assert.equal(describeTool('editor', { path: '/repo/src/text.js' }, '/repo'), './src/text.js');
-});
-
-test('cline: toActivity convierte líneas NDJSON en actividades', () => {
-  const cwd = 'C:\\repo';
-  assert.deepEqual(
-    toActivity({ type: 'agent_event', event: { type: 'iteration_start', iteration: 1 } }, cwd),
-    { kind: 'iteration', n: 1 },
-  );
-  assert.deepEqual(
-    toActivity({ type: 'agent_event', event: { type: 'content_end', contentType: 'reasoning', reasoning: 'Let me read the file first to understand the task.' } }, cwd),
-    { kind: 'thinking', text: 'Let me read the file first to understand the task.' },
-  );
-  assert.deepEqual(
-    toActivity({ type: 'agent_event', event: { type: 'content_start', contentType: 'tool', toolCallId: 'call_1', toolName: 'read_files', input: { files: [{ path: 'C:\\repo\\src\\text.js' }] } } }, cwd),
-    { kind: 'tool', tool: 'read_files', detail: './src/text.js' },
-  );
-  assert.deepEqual(
-    toActivity({ type: 'agent_event', event: { type: 'usage', inputTokens: 5463, outputTokens: 140, cost: 0.0024, totalInputTokens: 5463, totalOutputTokens: 140, totalCost: 0.0024 } }, cwd),
-    { kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: 0.0024 },
-  );
-  assert.deepEqual(toActivity({ type: 'error', message: 'boom' }, cwd), { kind: 'error', message: 'boom' });
-  assert.equal(toActivity({ type: 'agent_event', event: { type: 'done' } }, cwd), null);
-  assert.equal(toActivity({ type: 'run_result' }, cwd), null);
-});
-
-test('cline: toActivity lee usage dentro de agent_event (formato real)', () => {
-  const line = '{"type":"agent_event","event":{"type":"usage","inputTokens":5463,"outputTokens":140,"cost":0.0024,"totalInputTokens":5463,"totalOutputTokens":140,"totalCost":0.0024}}';
-  assert.deepEqual(
-    toActivity(JSON.parse(line), 'C:\\repo'),
-    { kind: 'usage', inputTokens: 5463, outputTokens: 140, cost: 0.0024 },
-  );
-  // El usage de primer nivel ya no se reconoce.
-  assert.equal(toActivity({ type: 'usage', totalInputTokens: 1, totalOutputTokens: 2, totalCost: 0.1 }, 'C:\\repo'), null);
 });
 
 test('events: appendEvent añade ts y readEvents ignora líneas no válidas', () => {

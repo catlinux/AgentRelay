@@ -24,7 +24,7 @@ function trainsOnDataFor(type, model) {
 
 /** Convierte "tipo:modelo" de routing.paidOrder en una entrada de pago. */
 export function parsePaidEntry(spec) {
-  const match = /^(opencode|codex|codex-api|cline):(\S+)$/.exec(String(spec));
+  const match = /^(opencode|codex|codex-api):(\S+)$/.exec(String(spec));
   if (!match) return null;
   const [, kind, model] = match;
   const api = kind === 'codex-api';

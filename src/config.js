@@ -19,11 +19,11 @@ export function agentrelayHome() {
 export const DEFAULT_CONFIG = Object.freeze({
   executor: {
     type: 'codex',
-    // Programa a ejecutar. Puede ser un array: ["node", "ruta/a/cline"].
+    // Programa a ejecutar.
     command: 'codex',
     provider: null,
     model: 'gpt-6-luna',
-    // low | medium | high | xhigh | max (Codex con GPT-6 Luna; Cline también admite none); null deja el valor por defecto del ejecutor.
+    // low | medium | high | xhigh | max; null deja el valor por defecto del ejecutor.
     thinking: null,
     timeoutSeconds: 1200,
     extraArgs: [],
@@ -50,11 +50,52 @@ export const DEFAULT_CONFIG = Object.freeze({
 // propio comando y, a veces, no tiene proveedor ni modelo. El usuario siempre
 // puede sobrescribirlos.
 export const EXECUTOR_DEFAULTS = Object.freeze({
-  cline: { command: 'cline', provider: 'deepseek', model: 'deepseek-v4-pro' },
   codex: { command: 'codex', provider: null, model: 'gpt-6-luna' },
   opencode: { command: 'opencode', provider: null, model: 'opencode/nemotron-3-ultra-free' },
 });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function isClineCommand(command) {
+  const parts = Array.isArray(command) ? command.slice(0, 2) : [command];
+  return parts.some((part) => typeof part === 'string' && /(?:^|[\\/])cline(?:\.(?:cmd|exe))?$/i.test(part));
+}
+
+function migrateClineConfig(config) {
+  if (!isObject(config) || config.type !== 'cline') return null;
+  const model = typeof config.model === 'string' && config.model.toLowerCase().includes('flash')
+    ? 'deepseek/deepseek-flash'
+    : 'deepseek/deepseek-v4-pro';
+  config.type = 'opencode';
+  if (config.command === undefined || isClineCommand(config.command)) {
+    config.command = 'opencode';
+  }
+  config.provider = null;
+  config.model = model;
+  config.extraArgs = [];
+  return model;
+}
+
+function migrateLayer(layer, warnings) {
+  if (!isObject(layer.data)) return;
+  const data = { ...layer.data };
+  let model = null;
+  if (isObject(data.executor)) {
+    data.executor = { ...data.executor };
+    model = migrateClineConfig(data.executor);
+  }
+  if (isObject(data.profiles)) {
+    data.profiles = { ...data.profiles };
+    for (const [name, profile] of Object.entries(data.profiles)) {
+      if (!isObject(profile)) continue;
+      const migrated = { ...profile };
+      const profileModel = migrateClineConfig(migrated);
+      if (profileModel && !model) model = profileModel;
+      data.profiles[name] = migrated;
+    }
+  }
+  layer.data = data;
+  if (model) warnings.push(`Cline se ha retirado: tu configuración se ha leído como OpenCode con ${model}. Cambia el archivo ${layer.origin} (agentrelay use opencode ${model}) para quitar este aviso.`);
+}
 
 export function merge(base, override) {
   if (!isObject(override)) return base;
@@ -174,6 +215,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (existsSync(localFile)) warnings.push(`Archivo antiguo ${localFile}: ejecuta 'agentrelay config migrate'`);
   for (const file of projectFiles) if (configPath || existsSync(file)) { layers.push({ data: readConfig(file), origin: file }); sources.push(file); }
   if (overrides) layers.push({ data: overrides, origin: 'línea de comandos' });
+  for (const layer of layers.slice(1)) migrateLayer(layer, warnings);
   let mergedUser = {};
   for (const layer of layers.slice(1)) mergedUser = merge(mergedUser, layer.data);
   const type = mergedUser.executor?.type ?? DEFAULT_CONFIG.executor.type;
@@ -222,7 +264,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
   if (!['off', 'auto'].includes(config.routing.mode)) invalid('routing.mode', 'debe ser off o auto');
-  if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api|cline):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
+  if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
   if (!Number.isInteger(config.routing.maxSwitches) || config.routing.maxSwitches < 0 || config.routing.maxSwitches > 20) invalid('routing.maxSwitches', 'debe ser un entero entre 0 y 20');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }
   if (!Array.isArray(config.validation.commands) || !config.validation.commands.every((v) => typeof v === 'string')) invalid('validation.commands', 'debe ser una lista de textos');

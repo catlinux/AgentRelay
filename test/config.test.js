@@ -122,12 +122,56 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
       paidOrder: ['opencode:deepseek/deepseek-flash', 'codex-api:gpt-6-luna', 'opencode:deepseek/deepseek-v4-pro'],
       maxSwitches: 5,
     });
-    writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'cline:deepseek/model'], maxSwitches: 0 } }));
+    writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'opencode:deepseek/deepseek-flash'], maxSwitches: 0 } }));
     const result = loadConfig({ cwd: dir, home: path.join(dir, 'home') });
     assert.deepEqual(result.config.routing, {
-      mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'cline:deepseek/model'], maxSwitches: 0,
+      mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'opencode:deepseek/deepseek-flash'], maxSwitches: 0,
     });
     assert.ok(!result.warnings.some((warning) => warning.includes('routing')));
+    writeFileSync(file, JSON.stringify({ routing: { paidOrder: ['cline:deepseek/model'] } }));
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.paidOrder debe ser una lista de entradas tipo:modelo válidas/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('migra configuraciones Cline a OpenCode sin modificar el archivo', () => {
+  const dir = temp(), file = path.join(dir, 'agentrelay.config.json');
+  const home = path.join(dir, 'home');
+  try {
+    for (const [oldModel, model, command] of [
+      ['deepseek-v4-flash', 'deepseek/deepseek-flash', ['node', 'node_modules/cline/bin/cline']],
+      ['deepseek-v4-pro', 'deepseek/deepseek-v4-pro', undefined],
+    ]) {
+      const source = JSON.stringify({ executor: { type: 'cline', model: oldModel, command, provider: 'deepseek', extraArgs: ['--old'] } });
+      writeFileSync(file, source);
+      const result = loadConfig({ cwd: dir, home });
+      assert.deepEqual(result.config.executor, {
+        ...DEFAULT_CONFIG.executor,
+        type: 'opencode', command: 'opencode', provider: null, model, extraArgs: [],
+      });
+      assert.equal(result.warnings.filter((warning) => warning.includes('Cline se ha retirado')).length, 1);
+      assert.ok(result.warnings.some((warning) => warning === `Cline se ha retirado: tu configuración se ha leído como OpenCode con ${model}. Cambia el archivo ${file} (agentrelay use opencode ${model}) para quitar este aviso.`));
+      assert.equal(readFileSync(file, 'utf8'), source);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('migra perfiles Cline y avisa una vez por capa', () => {
+  const dir = temp(), file = path.join(dir, 'agentrelay.config.json');
+  const home = path.join(dir, 'home');
+  try {
+    const source = JSON.stringify({ profiles: {
+      flash: { type: 'cline', model: 'deepseek-flash', thinking: 'high' },
+      pro: { type: 'cline' },
+    } });
+    writeFileSync(file, source);
+    const result = loadConfig({ cwd: dir, home });
+    assert.deepEqual(result.config.profiles, {
+      flash: { type: 'opencode', model: 'deepseek/deepseek-flash', thinking: 'high', command: 'opencode', provider: null, extraArgs: [] },
+      pro: { type: 'opencode', model: 'deepseek/deepseek-v4-pro', command: 'opencode', provider: null, extraArgs: [] },
+    });
+    assert.equal(result.warnings.filter((warning) => warning.includes('Cline se ha retirado')).length, 1);
+    assert.match(result.warnings.find((warning) => warning.includes('Cline se ha retirado')), /OpenCode con deepseek\/deepseek-flash/);
+    assert.equal(readFileSync(file, 'utf8'), source);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

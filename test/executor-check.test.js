@@ -29,8 +29,8 @@ test('no bloquea si el adaptador no ofrece modelos', async () => {
 });
 
 test('no bloquea si la lista está vacía o falla', async () => {
-  const empty = await checkExecutorModel({ type: 'cline', model: 'fake' }, { adapter: adapterWith([]) });
-  const failed = await checkExecutorModel({ type: 'cline', model: 'fake' }, {
+  const empty = await checkExecutorModel({ type: 'opencode', model: 'fake' }, { adapter: adapterWith([]) });
+  const failed = await checkExecutorModel({ type: 'opencode', model: 'fake' }, {
     adapter: { listModels: async () => { throw new Error('fallo'); } },
   });
   assert.deepEqual(empty, { ok: true, unknown: true });

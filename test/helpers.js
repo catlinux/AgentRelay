@@ -7,7 +7,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_CONFIG, merge } from '../src/config.js';
 
-export const FAKE_CLINE = fileURLToPath(new URL('./fixtures/fake-cline.mjs', import.meta.url));
 export const FAKE_CODEX = fileURLToPath(new URL('./fixtures/fake-codex.mjs', import.meta.url));
 export const FAKE_OPENCODE = fileURLToPath(new URL('./fixtures/fake-opencode.mjs', import.meta.url));
 

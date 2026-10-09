@@ -65,6 +65,8 @@ test('parsePaidEntry reconoce Codex API, OpenCode y rechaza una cadena inválida
   assert.equal(opencode.paid, true);
   assert.equal(opencode.quotaId, 'paid:opencode:deepseek/deepseek-v4-pro');
 
+  assert.equal(parsePaidEntry('cline:deepseek/model'), null);
+
   assert.equal(parsePaidEntry('not-an-executor'), null);
 });
 

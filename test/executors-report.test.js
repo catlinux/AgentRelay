@@ -38,7 +38,7 @@ test('renderReport resume saldos, uso, estado y ranking de OpenCode', async () =
   ] } };
   const data = await collectReport({ current: { type: 'codex', model: 'demo', thinking: 'high' }, now,
     isInstalled: async () => true, authStatuses: { codex: { ok: true, message: 'conectado' } }, checks,
-    listModels: async (type) => { if (type === 'cline') throw new Error('lista rota'); return type === 'opencode' ? ['a-free', 'b-free', 'c-free', 'paid-model'].map((id) => ({ id })) : [{ id: 'demo', efforts: ['low', 'high'] }]; },
+    listModels: async (type) => { if (type === 'opencode') throw new Error('lista rota'); return [{ id: 'demo', efforts: ['low', 'high'] }]; },
     balances: { deepseek: { ok: true, text: '10 USD' } } });
   const text = renderReport(data);
   assert.ok(text.indexOf('## Saldos') < text.indexOf('## En uso'));
@@ -46,7 +46,7 @@ test('renderReport resume saldos, uso, estado y ranking de OpenCode', async () =
   assert.ok(text.indexOf('## Estado') < text.indexOf('## OpenCode: mejores gratuitos de hoy'));
   assert.match(text, /OpenAI: no consultable por API;.*https:\/\/platform\.openai\.com/);
   assert.match(text, /- Codex \(OpenAI\): instalado, sesión conectada ·/);
-  assert.match(text, /- Cline: instalado, no se pudo leer la lista: lista rota ·/);
+  assert.match(text, /- OpenCode: instalado, no se pudo leer la lista: lista rota ·/);
   assert.match(text, /1\. a-free — ✔✔ 12 s/);
   assert.match(text, /2\. b-free — ✔ 3 s/);
   assert.match(text, /3\. c-free — ✔✔ 4 s/);

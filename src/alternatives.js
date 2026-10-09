@@ -29,12 +29,12 @@ export function alternativesHint({ current, checks, installed }) {
         lines.push('- OpenCode gratis: agentrelay executors check (prueba los modelos nuevos) y luego agentrelay use opencode');
       }
     }
-  } else if (current?.type !== 'opencode') {
+  } else {
     lines.push('- OpenCode gratis: agentrelay executors add opencode');
   }
 
-  if (current?.type !== 'cline') {
-    lines.push('- DeepSeek de pago (Flash): agentrelay use cline deepseek-v4-flash (necesita su clave de API)');
+  if (current?.type !== 'opencode' || !String(current?.model || '').includes('deepseek')) {
+    lines.push('- DeepSeek de pago (Flash): agentrelay use opencode deepseek/deepseek-flash (necesita su clave de API)');
   }
 
   lines.push('Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>.');
