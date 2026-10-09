@@ -47,7 +47,7 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 - Archivos: `src/cli.js`, `src/help.js` (comprobar que `/ar:providers` se genera) + tests.
 - Por proveedor: conectado, nivel gratuito/pago, límites, aviso de privacidad si `trainsOnData !== false`, cómo conectarlo. `doctor`: una línea con los conectados.
 
-### Paso 4 — Evaluación con tercera prueba, niveles y nota real · AgentRelay, alto · [ ]
+### Paso 4 — Evaluación con tercera prueba, niveles y nota real · AgentRelay, alto · [x]
 - Archivos: `src/model-rank.js`, `src/free-ranking.js`, `src/executors/common.js` (`classifyExecutorError`: 410/404/«not found|deprecated|retired» → no disponible) + tests.
 - Tercera prueba difícil; apto/nivel A/B; pruebas del mismo proveedor en serie (RPM); `--max` por proveedor; reevaluación a los 7 días; `agentrelay review` actualiza la nota del modelo usado (registro en `~/.agentrelay/`).
 

@@ -26,7 +26,7 @@ import { loadChecks } from './model-check.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
 import { agentrelayHome } from './config.js';
-import { markExhausted } from './free-ranking.js';
+import { markExhausted, recordReview } from './free-ranking.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -374,6 +374,15 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
 
   const ctx = context(root, state, onEvent);
   const review = { at: new Date().toISOString(), decision, feedback: feedback || null };
+  const recordModelReview = () => {
+    if (ctx.config.executor.type !== 'opencode') return;
+    const attemptModel = (Array.isArray(state.attempts) ? [...state.attempts] : []).reverse()
+      .map((attempt) => typeof attempt?.model === 'string' ? attempt.model : attempt?.model?.id)
+      .find((model) => typeof model === 'string' && model);
+    const model = attemptModel ?? state.task?.model ?? ctx.config.executor.model;
+    if (typeof model !== 'string' || !model) return;
+    try { recordReview(model, decision, { home: agentrelayHome() }); } catch {}
+  };
 
   if (decision === 'fix') {
     if (!feedback.trim()) throw new Error('La decisión "fix" necesita --feedback con los problemas a corregir');
@@ -389,6 +398,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.pid = process.pid;
     state.host = os.hostname();
     saveState(root, state);
+    recordModelReview();
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
     ctx.emit({ type: 'status', runId: state.id, status: 'running', reasons: [] });
     return guard(root, state, async () => {
@@ -409,6 +419,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.acceptedBy = 'orchestrator';
     state.statusReasons = [check.passed ? 'aceptada tras validación final' : 'aceptada con --force sin superar la validación final'];
     saveState(root, state);
+    recordModelReview();
     writeReport(root, state, check.patch);
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
     ctx.emit({ type: 'status', runId: state.id, status: 'accepted', reasons: state.statusReasons });
@@ -424,6 +435,7 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.statusReasons = [feedback || 'rechazada por el orquestador; los cambios siguen en el árbol de trabajo'];
   }
   saveState(root, state);
+  recordModelReview();
   ctx.emit({ type: 'review', decision, feedback: review.feedback });
   ctx.emit({ type: 'status', runId: state.id, status: state.status, reasons: state.statusReasons });
   return state;
