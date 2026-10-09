@@ -12,7 +12,7 @@ const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 test('listCommands lee los comandos reales y su metadato', () => {
   assert.match(commandsSourceDir(), /claude-commands[\\/]ar[\\/]?$/);
   const commands = listCommands();
-  assert.deepEqual(commands.map(({ name }) => name), ['check.md', 'config.md', 'doctor.md', 'executors.md', 'help.md', 'init.md', 'list.md', 'login.md', 'rank.md', 'recover.md', 'review.md', 'run.md', 'set.md', 'setup.md', 'show.md', 'start.md', 'status.md', 'unset.md', 'update.md', 'use.md']);
+  assert.deepEqual(commands.map(({ name }) => name), ['check.md', 'config.md', 'doctor.md', 'executors.md', 'help.md', 'init.md', 'list.md', 'login.md', 'providers.md', 'rank.md', 'recover.md', 'review.md', 'run.md', 'set.md', 'setup.md', 'show.md', 'start.md', 'status.md', 'unset.md', 'update.md', 'use.md']);
   for (const { content } of commands) {
     const frontmatter = content.split('---')[1];
     assert.ok(content.includes(MANAGED_MARK));

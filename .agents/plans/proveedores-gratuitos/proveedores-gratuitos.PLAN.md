@@ -43,7 +43,7 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 - Archivos: `src/free-models.js`, `src/model-check.js` + tests.
 - La caché de models.dev guarda todos los proveedores del catálogo; gratuito = coste 0 en un proveedor conectado; ids `proveedor/modelo`; prefiltro `tool_call` y contexto ≥ 64k; Zen conserva el sufijo `-free` sin conexión; cachés antiguas siguen leyéndose. `isFreeModel` deja de depender solo del sufijo.
 
-### Paso 3 — `agentrelay providers` y `doctor` · AgentRelay, bajo · [ ]
+### Paso 3 — `agentrelay providers` y `doctor` · AgentRelay, bajo · [x]
 - Archivos: `src/cli.js`, `src/help.js` (comprobar que `/ar:providers` se genera) + tests.
 - Por proveedor: conectado, nivel gratuito/pago, límites, aviso de privacidad si `trainsOnData !== false`, cómo conectarlo. `doctor`: una línea con los conectados.
 

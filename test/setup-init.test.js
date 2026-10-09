@@ -44,7 +44,7 @@ test('setup --yes instala, es idempotente y --uninstall lo retira', () => {
     assert.match(r1.stdout, /agentrelay setup --uninstall/);
     const commandDir = path.join(dir, 'commands', 'ar');
     assert.ok(existsSync(path.join(commandDir, 'status.md')));
-    assert.match(r1.stdout, /comandos creados: 20/);
+    assert.match(r1.stdout, /comandos creados: 21/);
     assert.match(r1.stdout, /Comandos de Claude Code: .*\/ar:status/);
     assert.equal(readFileSync(claude, 'utf8'), GLOBAL_BLOCK + '\n');
 

@@ -285,6 +285,20 @@ const COMMANDS = {
       ['agentrelay rank --detach', 'Inicia el cálculo en segundo plano.'],
     ],
   },
+  providers: {
+    summary: 'Muestra qué proveedores de modelos están conectados.',
+    usage: ['agentrelay providers [--json]'],
+    description: 'Lista los proveedores conectados por OpenCode o mediante variables de entorno, junto con su nivel, límites y política de datos conocida. Para los demás muestra cómo conectarlos.',
+    options: [
+      ['--json', 'Imprime la lista en JSON.'],
+      ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
+      ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
+    ],
+    examples: [
+      ['agentrelay providers', 'Muestra los proveedores y cómo conectar los que faltan.'],
+      ['agentrelay providers --json', 'Imprime los datos de proveedores en JSON.'],
+    ],
+  },
   set: {
     summary: 'Cambia un ajuste de configuración.',
     usage: ['agentrelay set <clave> <valor> [--local|--project]'],
