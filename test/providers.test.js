@@ -67,6 +67,8 @@ test('providers --json muestra conexiones y recomendaciones sin credenciales', a
     assert.equal(providers.find(({ id }) => id === 'deepseek').status, 'no conectado');
     assert.equal(providers.find(({ id }) => id === 'zai').connected, false);
     assert.equal(providers.find(({ id }) => id === 'groq').connected, true);
+    assert.equal(providers.find(({ id }) => id === 'groq').freeTier, true);
+    assert.equal(providers.find(({ id }) => id === 'nvidia').freeTier, false);
     assert.equal(providers.find(({ id }) => id === 'google').dataNotice, 'puede usar tus prompts para entrenar');
     assert.equal(providers.find(({ id }) => id === 'mistral').dataNotice, 'política de datos sin verificar');
     assert.equal(providers.find(({ id }) => id === 'mistral').connection.env[0], 'MISTRAL_API_KEY');

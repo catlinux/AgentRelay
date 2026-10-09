@@ -353,11 +353,13 @@ test('renderRanking muestra notas de unavailable y de fuentes nuevas y omite lí
     entries: [
       { id: 'unknown', source: 'sin precio conocido', basic: failed(), hard: null, deep: null, tier: null, score: 0, seconds: 1, kind: 'fail' },
       { id: 'unlisted', source: 'metadatos, no listado', listed: false, basic: failed(), hard: null, deep: null, tier: null, score: 0, seconds: 1, kind: 'unavailable' },
+      { id: 'limited', source: 'nivel gratuito con límites', basic: failed(), hard: null, deep: null, tier: null, score: 0, seconds: 1, kind: 'fail' },
     ],
   }, { date: '2026-10-05', total: 3, unlisted: [] });
   assert.match(output, /no disponible en tu cuenta/);
   assert.match(output, /precio desconocido/);
   assert.match(output, /no listado en tu cuenta/);
+  assert.match(output, /nivel gratuito con límites/);
   assert.doesNotMatch(output, /Sin probar:/);
   assert.doesNotMatch(output, /Gratuitos según models\.dev/);
 });

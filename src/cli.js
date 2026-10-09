@@ -720,7 +720,11 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
-export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [], includeUnlisted = true } = {}) {
+function freeTierProviderIds() {
+  return PROVIDERS.filter(({ freeTier }) => freeTier).map(({ id }) => id);
+}
+
+export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [], includeUnlisted = true, freeTierProviders = freeTierProviderIds() } = {}) {
   const zenCandidates = discoverFreeModels({ listed, metadata: metadata.models, source, includeUnlisted });
   const live = Object.fromEntries(connected.map((provider) => [provider, []]));
   for (const model of listed) {
@@ -730,9 +734,19 @@ export function discoverRankCandidates({ listed = [], metadata = {}, source = 's
     const provider = id.slice(0, slash);
     (live[provider] ??= []).push(id.slice(slash + 1));
   }
-  const providerCandidates = discoverProviderModels({ providers: metadata.providers, connected, live })
-    .map(({ id, name, context, reasoning, releaseDate }) => ({
-      id, free: true, listed: true, reason: 'metadatos', name, context, reasoning, toolCall: true, releaseDate,
+  const providerCandidates = discoverProviderModels({ providers: metadata.providers, connected, live, freeTierProviders })
+    .map(({ id, name, context, reasoning, releaseDate, freeTier, cost }) => ({
+      id,
+      free: true,
+      listed: true,
+      reason: cost?.input === 0 && cost?.output === 0 ? 'metadatos' : 'nivel gratuito con límites',
+      name,
+      context,
+      reasoning,
+      toolCall: true,
+      releaseDate,
+      freeTier,
+      ...(cost ? { cost } : {}),
     }));
   return [...zenCandidates, ...providerCandidates];
 }
@@ -802,7 +816,7 @@ async function cmdRank(positionals, values) {
   const listed = await adapter.listModels(executor);
   const metadata = await loadFreeMetadata({ home });
   const connected = await freeProvidersConnected(executor);
-  const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected });
+  const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, freeTierProviders: freeTierProviderIds() });
   if (!candidates.length) {
     if (!values.background) {
       const message = 'No hay modelos gratuitos disponibles en tu cuenta de OpenCode.';
@@ -868,6 +882,7 @@ async function cmdProviders(positionals, values) {
       connected: isConnected,
       status: isConnected ? 'conectado' : 'no conectado',
       tier: provider.tier === 'free' ? 'gratuito' : 'de pago',
+      ...(values.json ? { freeTier: provider.freeTier } : {}),
       limits: provider.limits,
       dataNotice,
       connection,
@@ -912,7 +927,7 @@ async function cmdExecutors(positionals, values) {
         const listed = await adapter.listModels(executor);
         const metadata = await loadFreeMetadata({ home });
         const connected = await freeProvidersConnected(executor);
-        const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, includeUnlisted: false });
+        const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, includeUnlisted: false, freeTierProviders: freeTierProviderIds() });
         const checks = loadChecks(home);
         const available = candidates.filter(({ id }) => !isExhausted(checks, id));
         const now = new Date();
