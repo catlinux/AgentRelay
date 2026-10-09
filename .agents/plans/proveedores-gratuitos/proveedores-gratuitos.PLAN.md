@@ -57,9 +57,10 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 - Terminado: tests con reloj simulado (agotado hasta X, restablecido, backoff 10/30/60).
 - Hecho con una desviación: `quota-state.js` no usa un `quota.json` nuevo, sino el mismo almacén de `model-checks.json` (`exhausted` y `quotaLog`), para que `use`, el informe diario y Codex sigan leyendo lo mismo. Sin reglas de reinicio por proveedor: el catálogo no las conoce (`resetRule` es null); hasta saberlas, backoff.
 
-### Paso 6 — Enrutador · **Opus** en la propia sesión (diseño delicado) · [ ]
+### Paso 6 — Enrutador · **Opus** en la propia sesión (diseño delicado) · [x]
 - Archivos: nuevo `src/router.js`, `src/orchestrator.js`, `src/config.js` / `src/settings.js` / `src/config-template.js` (`routing.mode: "off"|"auto"`, `routing.paidOrder`), `src/report.js` + tests.
 - El orquestador debe poder cambiar de **tipo** de ejecutor entre intentos (Codex ↔ OpenCode), no solo de modelo. Con `routing.mode: "auto"`, el `apiFallback` interno de Codex se desactiva y Luna gratis y Luna API son dos entradas de la lista (una sola lógica de cambio).
+- Hecho (2026-10-09): `src/router.js`, integración en `src/orchestrator.js` (`switchRoute`, `startRoute`, `entryUsable`), `forceApi` en Codex, informe y `watch`. Decisiones: credenciales y modelo no disponible también cambian de entrada (solo para esa ejecución, sin marcar cuota); Luna gratis se descarta si Codex inicia sesión con clave de API (factura por uso); `task.model` desactiva el enrutado de esa tarea; solo se vuelve a la gratuita al empezar una ejecución nueva, no a media tarea.
 - Terminado: tests con `mode: off` idéntico al actual; cambio a mitad de tarea; vuelta a gratuito al restablecerse; esfuerzo alto solo nivel A/pago; todos agotados → falla con alternativas.
 
 ### Paso 7 — Prueba real y criba de proveedores · el usuario + la propia sesión (Sonnet, medio) · [ ]
