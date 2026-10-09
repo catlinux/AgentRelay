@@ -20,7 +20,7 @@ export function pruneExhausted(checks, now = new Date()) {
   return checks;
 }
 
-export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada', ttlMs, until: resetAt, resetKnown } = {}) {
+export function markExhausted(id, { home = agentrelayHome(), now = new Date(), reason = 'cuota agotada', ttlMs, until: resetAt, resetKnown, source, strikes } = {}) {
   const checks = pruneExhausted(loadChecks(home), now);
   const until = resetAt instanceof Date ? resetAt : ttlMs === undefined ? endOfLocalDay(now) : new Date(now.getTime() + ttlMs);
   const exhausted = checks.exhausted && typeof checks.exhausted === 'object' && !Array.isArray(checks.exhausted)
@@ -28,6 +28,8 @@ export function markExhausted(id, { home = agentrelayHome(), now = new Date(), r
     : {};
   const record = { at: now.toISOString(), until: until.toISOString(), reason };
   if (resetKnown !== undefined) record.resetKnown = Boolean(resetKnown);
+  if (source !== undefined) record.source = source;
+  if (strikes !== undefined) record.strikes = strikes;
   checks.exhausted = {
     ...exhausted,
     [id]: record,

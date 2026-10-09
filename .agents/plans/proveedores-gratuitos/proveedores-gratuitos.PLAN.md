@@ -51,10 +51,11 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
 - Archivos: `src/model-rank.js`, `src/free-ranking.js`, `src/executors/common.js` (`classifyExecutorError`: 410/404/«not found|deprecated|retired» → no disponible) + tests.
 - Tercera prueba difícil; apto/nivel A/B; pruebas del mismo proveedor en serie (RPM); `--max` por proveedor; reevaluación a los 7 días; `agentrelay review` actualiza la nota del modelo usado (registro en `~/.agentrelay/`).
 
-### Paso 5 — Estado de cuota generalizado · AgentRelay, alto · [ ]
+### Paso 5 — Estado de cuota generalizado · AgentRelay, alto · [x]
 - Archivos: nuevo `src/quota-state.js`, `src/free-ranking.js` (`markExhausted` pasa a usarlo), `src/executors/codex.js` (Luna usa el mismo almacén sin cambiar su comportamiento) + tests.
 - Estados y cálculo de `until` como en «Arquitectura 3»; escritura atómica; `isAvailable(id, now)`.
 - Terminado: tests con reloj simulado (agotado hasta X, restablecido, backoff 10/30/60).
+- Hecho con una desviación: `quota-state.js` no usa un `quota.json` nuevo, sino el mismo almacén de `model-checks.json` (`exhausted` y `quotaLog`), para que `use`, el informe diario y Codex sigan leyendo lo mismo. Sin reglas de reinicio por proveedor: el catálogo no las conoce (`resetRule` es null); hasta saberlas, backoff.
 
 ### Paso 6 — Enrutador · **Opus** en la propia sesión (diseño delicado) · [ ]
 - Archivos: nuevo `src/router.js`, `src/orchestrator.js`, `src/config.js` / `src/settings.js` / `src/config-template.js` (`routing.mode: "off"|"auto"`, `routing.paidOrder`), `src/report.js` + tests.

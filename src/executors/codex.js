@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { runInteractive, runProcess } from '../proc.js';
 import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, parseQuotaReset, relativize, tail } from './common.js';
 import { agentrelayHome } from '../config.js';
-import { isExhausted, logQuotaEvent, markExhausted, recordQuotaRecovered } from '../free-ranking.js';
+import { isExhausted } from '../free-ranking.js';
+import { markQuotaAvailable, markQuotaExhausted } from '../quota-state.js';
 import { loadChecks } from '../model-check.js';
 
 export const name = 'codex';
@@ -312,28 +313,25 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
 
   const result = await runCodex(false);
   if (result.ok) {
-    try { recordQuotaRecovered('codex:chatgpt', { home: agentrelayHome() }); } catch { /* El registro no debe alterar la ejecución gratuita. */ }
+    try { markQuotaAvailable('codex:chatgpt', { home: agentrelayHome() }); } catch { /* El registro no debe alterar la ejecución gratuita. */ }
     return result;
   }
   if (!apiEnabled || classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`) !== 'quota') return result;
 
   const now = new Date();
-  const reset = parseQuotaReset(`${result.error ?? ''} ${result.rawError ?? ''}`, now);
-  const resetKnown = Boolean(reset);
+  const errorText = `${result.error ?? ''} ${result.rawError ?? ''}`;
+  const reset = parseQuotaReset(errorText, now);
   const delayMs = reset
     ? Math.min(8 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, reset.getTime() - now.getTime() + 60 * 1000))
     : 10 * 60 * 1000;
   const until = new Date(now.getTime() + delayMs);
   try {
-    markExhausted('codex:chatgpt', {
+    markQuotaExhausted('codex:chatgpt', {
       home: agentrelayHome(),
-      until,
-      resetKnown,
+      now,
+      errorText,
       reason: 'cuota gratuita de ChatGPT agotada',
-    });
-    logQuotaEvent(agentrelayHome(), {
-      id: 'codex:chatgpt', event: 'agotada', until, resetKnown,
-      reason: 'cuota gratuita de ChatGPT agotada', now,
+      unknownDelayMs: 10 * 60 * 1000,
     });
   } catch {
     // Un fallo al guardar el límite no debe impedir el intento con la API.

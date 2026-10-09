@@ -26,7 +26,8 @@ import { loadChecks } from './model-check.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
 import { agentrelayHome } from './config.js';
-import { markExhausted, recordReview } from './free-ranking.js';
+import { recordReview } from './free-ranking.js';
+import { markQuotaExhausted } from './quota-state.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -207,7 +208,12 @@ async function continueCycle(ctx, result) {
             : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
         if (errorKind === 'quota') {
           if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
-            try { markExhausted(ctx.config.executor.model, { home: agentrelayHome() }); } catch {}
+            try {
+              markQuotaExhausted(ctx.config.executor.model, {
+                home: agentrelayHome(),
+                errorText: `${result.error ?? ''} ${result.rawError ?? ''}`,
+              });
+            } catch {}
           }
           try {
             const installed = {

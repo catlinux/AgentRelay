@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- **Estado de cuota generalizado** (`src/quota-state.js`): disponible, agotado hasta la hora que dice el error, o desconocido con reintento a 10, 30 y 60 minutos; por modelo y por proveedor. Lo usan OpenCode (antes: agotado hasta medianoche) y Codex, que mantiene su comportamiento.
 - **Nota con revisiones reales.** `agentrelay review` apunta la decisión (accept suma; fix, reject y escalate restan) al modelo de OpenCode usado, y el orden de los gratuitos desempata con ese saldo dentro de cada nivel y puntuación.
 - **`rank` evalúa todos los proveedores conectados.** Además de OpenCode Zen prueba los modelos gratuitos de los demás proveedores conectados, intercalándolos para no repetir llamadas seguidas al mismo; `--max` pasa a ser por proveedor, la racha de cuota se cuenta por proveedor y una prueba hecha hace menos de 7 días no se repite salvo con `--force`.
 - **Ranquing con tercera prueba.** `rank` añade una prueba difícil con varios archivos y calcula si el modelo es apto (supera la media y la difícil) y su nivel: A (las tres pruebas en 150 s o menos cada una) o B. Puntuación de 0 a 3; la tabla muestra Prueba 3 y Nivel.
