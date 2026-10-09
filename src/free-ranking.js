@@ -81,8 +81,8 @@ export function rankedFree(checks, { now = new Date(), max = Infinity, minScore 
       && Number.isFinite(entry.score) && entry.score >= minScore
       && !isExhausted(checks, entry.id, now))
     .slice(0, Math.max(0, max))
-    .map(({ id, score, seconds, kind, name, context, reasoning }) => ({
-      id, score, seconds, kind, name, context, reasoning,
+    .map(({ id, score, seconds, kind, name, context, reasoning, apt, tier }) => ({
+      id, score, seconds, kind, name, context, reasoning, apt, tier,
     }));
   const at = ranking?.at ?? null;
   const rankedAt = Date.parse(at);

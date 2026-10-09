@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  buildHardProbe, classifyProbeFailure, rankModels, renderRanking,
+  buildDeepProbe, buildHardProbe, classifyProbeFailure, rankModels, renderRanking,
 } from '../src/model-rank.js';
 import { checksFile, loadChecks, saveChecks } from '../src/model-check.js';
 
@@ -13,9 +13,10 @@ const temp = () => mkdtempSync(path.join(os.tmpdir(), 'agentrelay-model-rank-tes
 const approved = (seconds = 1) => ({ status: 'approved', checkedAt: '2026-10-05T00:00:00.000Z', seconds, reason: 'correcto', raw: null });
 const failed = (reason = 'falló', seconds = 1, raw = {}) => ({ status: 'failed', checkedAt: '2026-10-05T00:00:00.000Z', seconds, reason, raw });
 const candidate = (id, fields = {}) => ({ id, name: id, listed: true, reason: 'metadatos', context: null, reasoning: false, toolCall: true, ...fields });
-const fakeProbes = ({ basic = {}, hard = {}, calls = [] } = {}) => ({
+const fakeProbes = ({ basic = {}, hard = {}, deep = {}, calls = [] } = {}) => ({
   basic: async ({ id }) => { calls.push(`basic:${id}`); return basic[id] ?? approved(); },
   hard: async ({ id }) => { calls.push(`hard:${id}`); return hard[id] ?? approved(); },
+  deep: async ({ id }) => { calls.push(`deep:${id}`); return deep[id] ?? approved(); },
 });
 
 test('rankModels ordena por pruebas aprobadas y después por tiempo', async () => {
@@ -26,8 +27,8 @@ test('rankModels ordena por pruebas aprobadas y después por tiempo', async () =
   });
   const result = await rankModels({ candidates, executor: {}, adapter: {}, probes });
   assert.deepEqual(result.entries.map(({ id, score, seconds, kind }) => ({ id, score, seconds, kind })), [
-    { id: 'rapido', score: 2, seconds: 1.5, kind: 'ok' },
-    { id: 'lento', score: 2, seconds: 5, kind: 'ok' },
+    { id: 'rapido', score: 3, seconds: 2.5, kind: 'ok' },
+    { id: 'lento', score: 3, seconds: 6, kind: 'ok' },
     { id: 'parcial', score: 1, seconds: 1.25, kind: 'parcial' },
     { id: 'fallo', score: 0, seconds: 1, kind: 'fail' },
   ]);
@@ -43,7 +44,67 @@ test('rankModels no ejecuta la prueba difícil cuando falla la básica', async (
   });
   assert.deepEqual(calls, ['basic:malo']);
   assert.equal(result.entries[0].hard, null);
+  assert.equal(result.entries[0].deep, null);
   assert.equal(result.entries[0].score, 0);
+});
+
+test('rankModels no ejecuta la tercera prueba cuando falla la difícil', async () => {
+  const calls = [];
+  const result = await rankModels({
+    candidates: [candidate('medio')], executor: {}, adapter: {},
+    probes: fakeProbes({ hard: { medio: failed() }, calls }),
+  });
+  assert.deepEqual(calls, ['basic:medio', 'hard:medio']);
+  assert.equal(result.entries[0].deep, null);
+  assert.equal(result.entries[0].score, 1);
+});
+
+test('rankModels calcula aptitud y nivel según aprobados y tiempos individuales', async () => {
+  const result = await rankModels({
+    candidates: [candidate('nivel-a'), candidate('nivel-b'), candidate('no-apto')],
+    executor: {}, adapter: {}, probes: fakeProbes({
+      basic: { 'nivel-a': approved(150), 'nivel-b': approved(150.01) },
+      hard: { 'nivel-a': approved(150), 'nivel-b': approved(1), 'no-apto': approved(1) },
+      deep: { 'nivel-a': approved(150), 'nivel-b': approved(1), 'no-apto': failed('incorrecto', 2) },
+    }),
+  });
+  const byId = Object.fromEntries(result.entries.map((entry) => [entry.id, entry]));
+  assert.deepEqual([byId['nivel-a'].apt, byId['nivel-a'].tier, byId['nivel-a'].seconds], [true, 'A', 450]);
+  assert.deepEqual([byId['nivel-b'].apt, byId['nivel-b'].tier], [true, 'B']);
+  assert.deepEqual([byId['no-apto'].apt, byId['no-apto'].tier, byId['no-apto'].score], [false, null, 2]);
+});
+
+test('rankModels ordena por aptitud, nivel, score, kind con score cero y tiempo', async () => {
+  const ids = ['no-score-timeout', 'partial-two', 'apt-b', 'zero-fail', 'apt-a-slow', 'partial-one', 'apt-a-fast'];
+  const result = await rankModels({
+    candidates: ids.map((id) => candidate(id)), executor: {}, adapter: {}, probes: fakeProbes({
+      basic: {
+        'no-score-timeout': failed('timeout', 0.1, { timedOut: true }),
+        'zero-fail': failed('fallo', 8),
+        'partial-one': approved(1),
+        'partial-two': approved(1),
+        'apt-a-slow': approved(100),
+        'apt-a-fast': approved(1),
+        'apt-b': approved(151),
+      },
+      hard: {
+        'partial-two': approved(1),
+        'partial-one': failed('incorrecto', 1),
+        'apt-a-slow': approved(100),
+        'apt-a-fast': approved(1),
+        'apt-b': approved(1),
+      },
+      deep: {
+        'partial-two': failed('incorrecto', 1),
+        'apt-a-slow': approved(100),
+        'apt-a-fast': approved(1),
+        'apt-b': approved(1),
+      },
+    }),
+  });
+  assert.deepEqual(result.entries.map(({ id }) => id), [
+    'apt-a-fast', 'apt-a-slow', 'apt-b', 'partial-two', 'partial-one', 'zero-fail', 'no-score-timeout',
+  ]);
 });
 
 test('rankModels se detiene tras tres fallos seguidos por cuota y deja el resto sin probar', async () => {
@@ -154,12 +215,13 @@ test('renderRanking alinea columnas y añade mejor, detención, sin probar y mod
     skipped: ['otro-free'],
     entries: [{
       id: 'opencode/model-free', name: 'Modelo', source: 'metadatos', context: 128000, reasoning: true,
-      basic: { status: 'approved' }, hard: null, score: 1, seconds: 1.26, kind: 'parcial',
+      basic: { status: 'approved' }, hard: { status: 'approved' }, deep: { status: 'approved' }, apt: true, tier: 'A',
+      score: 3, seconds: 1.26, kind: 'ok',
     }],
   }, { date: '2026-10-05', total: 2, unlisted: ['opencode/a', 'opencode/b', 'opencode/c', 'opencode/d', 'opencode/e', 'opencode/f'] });
   assert.match(output, /^Ranquing de modelos gratuitos de OpenCode — 2026-10-05/m);
-  assert.match(output, /Prueba 1\s+Prueba 2\s+Tiempo\s+Nota/);
-  assert.match(output, /✔\s+—\s+1\.3 s\s+contexto 128k, razona, detectado por metadatos/);
+  assert.match(output, /Prueba 1\s+Prueba 2\s+Prueba 3\s+Nivel\s+Tiempo\s+Nota/);
+  assert.match(output, /✔\s+✔\s+✔\s+A\s+1\.3 s\s+contexto 128k, razona, detectado por metadatos/);
   assert.match(output, /Mejor: opencode\/model-free  →  agentrelay use opencode opencode\/model-free/);
   assert.match(output, /Pruebas detenidas: varios modelos seguidos devolvieron límite o cuota agotada; vuelve a intentarlo más tarde\./);
   assert.match(output, /Sin probar: 1 de 2 \(vuelve a lanzar sin --max para probarlos todos\)\./);
@@ -171,8 +233,8 @@ test('renderRanking muestra notas de unavailable y de fuentes nuevas y omite lí
     tested: 3,
     skipped: [],
     entries: [
-      { id: 'unknown', source: 'sin precio conocido', basic: failed(), hard: null, score: 0, seconds: 1, kind: 'fail' },
-      { id: 'unlisted', source: 'metadatos, no listado', listed: false, basic: failed(), hard: null, score: 0, seconds: 1, kind: 'unavailable' },
+      { id: 'unknown', source: 'sin precio conocido', basic: failed(), hard: null, deep: null, tier: null, score: 0, seconds: 1, kind: 'fail' },
+      { id: 'unlisted', source: 'metadatos, no listado', listed: false, basic: failed(), hard: null, deep: null, tier: null, score: 0, seconds: 1, kind: 'unavailable' },
     ],
   }, { date: '2026-10-05', total: 3, unlisted: [] });
   assert.match(output, /no disponible en tu cuenta/);
@@ -213,6 +275,21 @@ export function agrupar(personas) {
     const badRun = spawnSync(process.execPath, [bad.checkFile], { cwd: bad.root, encoding: 'utf8' });
     assert.equal(badRun.status, 1);
     assert.match(badRun.stderr, /analiza una fila/);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('buildDeepProbe crea la estructura y su comprobación rechaza los módulos originales', () => {
+  const base = temp();
+  try {
+    const probe = buildDeepProbe(base);
+    assert.equal(readFileSync(path.join(probe.workDir, 'package.json'), 'utf8'), '{"type":"module"}\n');
+    assert.match(readFileSync(path.join(probe.workDir, 'src', 'inventario.js'), 'utf8'), /stockDisponible/);
+    assert.match(readFileSync(path.join(probe.workDir, 'src', 'precios.js'), 'utf8'), /precioTotal/);
+    assert.match(readFileSync(path.join(probe.workDir, 'test', 'inventario.test.js'), 'utf8'), /node:test/);
+    const result = spawnSync(process.execPath, [probe.checkFile], { cwd: probe.root, encoding: 'utf8' });
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /stock reservado/);
+    assert.match(result.stderr, /límite de tramo/);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
 

@@ -82,7 +82,7 @@ export function renderReport(data) {
     const models = rankedFree(data.checks, { now: data.now, max: 8 });
     if (Array.isArray(data.checks?.ranking?.entries)) {
       for (const model of models) {
-        const mark = model.score === 2 ? '✔✔' : '✔';
+        const mark = `${model.score >= 2 ? '✔✔' : '✔'}${model.tier ? ` nivel ${model.tier}` : ''}`;
         lines.push(`${rankPosition(data.checks, model.id)}. ${model.id} — ${mark} ${model.seconds ?? 0} s`);
       }
       if (models.stale) lines.push('(ranquing de hace más de 36 h; se actualiza el primer uso de cada día)');
