@@ -31,6 +31,23 @@ export function classifyExecutorError(text) {
     || /\b(?:\d+\s*[- ]?hour|weekly)\s+usage\s+limit\b/.test(value)) {
     return 'quota';
   }
+  const mentionsModelOrEndpoint = /\b(?:models?|endpoints?)\b/.test(value);
+  if ((mentionsModelOrEndpoint && (
+    /\b(?:status|http|error|code)[^a-z0-9]{0,3}(?:410|404)\b/.test(value)
+    || /\b410\s+gone\b/.test(value)
+    || /\b404\s+not found\b/.test(value)
+  ))
+    || /\bmodel(?:\s+|_)?not(?:\s+|_)found\b/.test(value)
+    || /\bprovidermodelnotfounderror\b/.test(value)
+    || /\bunknown model\b/.test(value)
+    || /\bno such model\b/.test(value)
+    || /\bmodel\b[^.\r\n]{0,80}\b(?:is\s+)?not\s+(?:available|supported)\b/.test(value)
+    || /\bmodel unavailable\b/.test(value)
+    || /\bmodels?\b[^.\r\n]{0,80}\b(?:deprecated|retired|decommissioned)\b/.test(value)
+    || /\b(?:deprecated|retired|decommissioned)\b[^.\r\n]{0,40}\bmodels?\b/.test(value)
+    || /\bno longer (?:available|supported)\b/.test(value)) {
+    return 'unavailable';
+  }
   return null;
 }
 

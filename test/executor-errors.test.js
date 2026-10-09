@@ -28,16 +28,49 @@ test('clasifica errores de cuota o saldo', () => {
   }
 });
 
+test('clasifica modelos no disponibles sin confundir errores normales', () => {
+  for (const text of [
+    'HTTP 410 Gone: model retired',
+    'status: 404 endpoint not found',
+    'HTTP 404 from /v1/models/example',
+    'model not found',
+    'model_not_found',
+    'ProviderModelNotFoundError: provider/model',
+    'unknown model provider/model',
+    'no such model provider/model',
+    'model provider/model is not available',
+    'model provider/model not supported',
+    'model deprecated',
+    'model retired',
+    'model is no longer available',
+    'model is no longer supported',
+    'model decommissioned',
+  ]) {
+    assert.equal(classifyExecutorError(text), 'unavailable', text);
+  }
+  for (const [text, kind] of [
+    ['404', null],
+    ['GET /unrelated-url returned 404', null],
+    ['HTTP 404 from /v1/unrelated-resource', null],
+    ['DeprecationWarning: Buffer() is deprecated', null],
+    ['insufficient_quota; model not found', 'quota'],
+    ['401 unauthorized; model not found', 'credentials'],
+  ]) {
+    assert.equal(classifyExecutorError(text), kind, text);
+  }
+});
+
 test('no clasifica límites de velocidad ni errores normales', () => {
   for (const text of ['429', 'rate limit', 'too many requests', '429 too many requests', 'network timeout', 'at file.js:401', 'took 402 ms', '']) {
     assert.equal(classifyExecutorError(text), null, text);
   }
 });
 
-test('detiene errores de credenciales y cuota sin reintentos ni self-review', async () => {
+test('detiene errores de credenciales, cuota y modelo no disponible sin reintentos ni self-review', async () => {
   for (const [error, reason] of [
     ['invalid api key', /credenciales.*agentrelay doctor.*agentrelay login/],
     ['insufficient_quota', /cuota o saldo.*elige otro ejecutor\.[\s\S]*Alternativas \(no se cambia nada solo; elige una\):[\s\S]*agentrelay use codex[\s\S]*Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>\./],
+    ['ProviderModelNotFoundError: provider/model', /el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use/],
   ]) {
     const repo = makeRepo();
     try {

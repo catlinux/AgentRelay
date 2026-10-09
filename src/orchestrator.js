@@ -202,7 +202,9 @@ async function continueCycle(ctx, result) {
       if (errorKind) {
         let reason = errorKind === 'credentials'
           ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
-          : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
+          : errorKind === 'unavailable'
+            ? 'el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use'
+            : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
         if (errorKind === 'quota') {
           if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
             try { markExhausted(ctx.config.executor.model, { home: agentrelayHome() }); } catch {}
