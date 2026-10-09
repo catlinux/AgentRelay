@@ -16,7 +16,7 @@ Necesitan al usuario en casa o una clave:
 
 Mejoras acordadas:
 
-- [ ] Enrutado de ejecutores: inventario y evaluación de IA gratuitas (Zen, NVIDIA, Groq, Gemini, Mistral, OpenRouter, Z AI), estado de cuota en tiempo real y rotación gratuitos → pago (DeepSeek Flash → Luna API → DeepSeek Pro, sin tope), aviso de privacidad (no bloqueo). Se prueban todos los proveedores y se quitan los que fallen; Cline se retira solo si DeepSeek rinde igual por OpenCode. Plan: [.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md](.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md).
+- [ ] Enrutado de ejecutores: inventario y evaluación de IA gratuitas (Zen, NVIDIA, Groq, Gemini, Mistral, OpenRouter, Z AI), estado de cuota en tiempo real y rotación gratuitos → pago (DeepSeek Flash → Luna API → DeepSeek Pro, sin tope), aviso de privacidad (no bloqueo). Se prueban todos los proveedores y se quitan los que fallen; Paso 0 hecho: DeepSeek rinde igual por OpenCode, Cline se retira (paso 8). Plan: [.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md](.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md).
 
 - [ ] Cadena de ejecutores: cuando se agota Luna (cuota gratuita por cuenta) el aviso ya propone alternativas (y, con respaldo `login --api`, Luna continúa con la API de pago y vuelve a la gratuita al restablecerse); con otros ejecutores nunca se cambia solo; falta afinar con el texto real del error de cuota de Codex y OpenCode (hoy se detecta con patrones genéricos).
 - [ ] Ranquing: más pruebas (hoy son dos) para distinguir mejor entre modelos que pasan ambas.
