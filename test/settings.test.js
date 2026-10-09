@@ -24,6 +24,31 @@ test('aliases y valores españoles conservan su parsing', () => {
   assert.equal(canonicalSetting('level'), null);
 });
 
+test('routing admite alias y valida sus ajustes', () => {
+  assert.equal(canonicalSetting('routing'), 'routing.mode');
+  assert.equal(canonicalSetting('routing.mode'), 'routing.mode');
+  assert.equal(canonicalSetting('routing.maxSwitches'), 'routing.maxSwitches');
+  for (const input of ['off', 'no', 'desactivado']) assert.deepEqual(parseSettingValue('routing', input), { value: 'off' });
+  for (const input of ['auto', 'automatico', 'automático']) assert.deepEqual(parseSettingValue('routing.mode', input), { value: 'auto' });
+  assert.deepEqual(parseSettingValue('routing.maxSwitches', '20'), { value: 20 });
+  assert.deepEqual(parseSettingValue('routing.maxSwitches', '0'), { value: 0 });
+  assert.throws(() => parseSettingValue('routing.mode', 'si'), /off o auto/);
+  assert.throws(() => parseSettingValue('routing.maxSwitches', '21'), /entero entre 0 y 20/);
+  assert.throws(() => parseSettingValue('routing.maxSwitches', '1.5'), /entero entre 0 y 20/);
+});
+
+test('set routing auto --local actualiza la configuración del proyecto', () => {
+  const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex'), file = path.join(dir, 'agentrelay.config.json');
+  try {
+    initRepo(dir);
+    const result = run(['set', 'routing', 'auto', '--local'], dir, home, codexHome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(file, 'utf8'), /"mode": "auto",/);
+    assert.match(readFileSync(file, 'utf8'), /"paidOrder": \[/);
+    assert.match(readFileSync(file, 'utf8'), /"maxSwitches": 5,/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('set crea config.json desde la plantilla y conserva sus comentarios', () => {
   const dir = temp(), home = path.join(dir, 'home'), codexHome = path.join(dir, 'codex');
   try {

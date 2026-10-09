@@ -58,6 +58,13 @@ export function configTemplate({ scope } = {}) {
     lines.push('  // },');
   }
 
+  lines.push('', '  // ── Enrutado de ejecutores ──');
+  lines.push('  // "routing": {');
+  lines.push(...option('mode', DEFAULT_CONFIG.routing.mode, 'El modo off conserva el ejecutor configurado. En auto, cada tarea empieza por el primer ejecutor disponible: primero Codex con la cuota gratuita de ChatGPT y los modelos gratuitos aptos del ranking; después se usan los de pago en paidOrder. Si se agota la cuota a media tarea, continúa con la siguiente entrada. El respaldo executor.apiFallback de Codex no se usa en este modo.', 'off o auto', 'usa auto para continuar con otro ejecutor cuando se agote la cuota.', '    '));
+  lines.push(...option('paidOrder', DEFAULT_CONFIG.routing.paidOrder, 'Entradas de pago en formato tipo:modelo; los tipos admitidos son opencode, codex, codex-api (Codex con la clave de agentrelay login --api) y cline. Se usan sin tope de gasto al agotarse los gratuitos; edita la lista directamente en el archivo.', 'lista de entradas tipo:modelo', 'ordena los ejecutores de pago según tu preferencia.', '    '));
+  lines.push(...option('maxSwitches', DEFAULT_CONFIG.routing.maxSwitches, 'Número máximo de cambios de ejecutor por ejecución.', 'entero entre 0 y 20', 'reduce el valor para limitar los cambios durante una tarea.', '    '));
+  lines.push('  // },');
+
   lines.push('', '  // ── Política ──');
   if (!user) {
     const defaults = POLICY;

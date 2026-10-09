@@ -5,6 +5,8 @@ export const SETTING_ALIASES = Object.freeze({
   'executor.thinking': 'executor.thinking', 'executor.timeoutSeconds': 'executor.timeoutSeconds',
   'executor.apiFallback': 'executor.apiFallback',
   'validation.timeoutSeconds': 'validation.timeoutSeconds',
+  routing: 'routing.mode', 'routing.mode': 'routing.mode',
+  'routing.maxSwitches': 'routing.maxSwitches',
 });
 
 export function canonicalSetting(key) { return SETTING_ALIASES[key] || null; }
@@ -26,6 +28,17 @@ export function parseSettingValue(key, value) {
   if (canonical === 'executor.apiFallback') {
     if (!/^(true|false)$/i.test(value.trim())) throw new Error('executor.apiFallback debe ser true o false.');
     return { value: value.trim().toLowerCase() === 'true' };
+  }
+  if (canonical === 'routing.mode') {
+    const normalized = value.trim().toLocaleLowerCase('es');
+    if (['off', 'no', 'desactivado'].includes(normalized)) return { value: 'off' };
+    if (['auto', 'automatico', 'automático'].includes(normalized)) return { value: 'auto' };
+    throw new Error('routing.mode debe ser off o auto.');
+  }
+  if (canonical === 'routing.maxSwitches') {
+    const normalized = value.trim();
+    if (!/^\d+$/.test(normalized) || Number(normalized) > 20) throw new Error('routing.maxSwitches debe ser un entero entre 0 y 20.');
+    return { value: Number(normalized) };
   }
   if (canonical === 'executor.thinking') {
     const normalized = value.trim().toLocaleLowerCase('es');

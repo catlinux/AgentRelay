@@ -100,12 +100,45 @@ test('valida estrictamente las familias de opciones y señala el archivo y la cl
       [{ policy: { requireValidation: 1 } }, 'policy.requireValidation'],
       [{ policy: { selfReview: { normal: 'high' } } }, 'policy.selfReview.normal'],
       [{ policy: { skipPassMaxFiles: -1 } }, 'policy.skipPassMaxFiles'],
+      [{ routing: [] }, 'routing'],
+      [{ routing: { mode: 'manual' } }, 'routing.mode'],
+      [{ routing: { paidOrder: ['openai:model'] } }, 'routing.paidOrder'],
+      [{ routing: { paidOrder: ['codex:'] } }, 'routing.paidOrder'],
+      [{ routing: { maxSwitches: 21 } }, 'routing.maxSwitches'],
     ];
     for (const [value, key] of invalidValues) {
       writeFileSync(file, JSON.stringify(value));
       assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), (error) => error.message.includes(file) && error.message.includes(key), key);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('routing tiene valores predeterminados y acepta valores válidos', () => {
+  const dir = temp(), file = path.join(dir, 'agentrelay.config.json');
+  try {
+    const defaults = loadConfig({ cwd: dir, home: path.join(dir, 'home') }).config.routing;
+    assert.deepEqual(defaults, {
+      mode: 'off',
+      paidOrder: ['opencode:deepseek/deepseek-flash', 'codex-api:gpt-6-luna', 'opencode:deepseek/deepseek-v4-pro'],
+      maxSwitches: 5,
+    });
+    writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'cline:deepseek/model'], maxSwitches: 0 } }));
+    const result = loadConfig({ cwd: dir, home: path.join(dir, 'home') });
+    assert.deepEqual(result.config.routing, {
+      mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'cline:deepseek/model'], maxSwitches: 0,
+    });
+    assert.ok(!result.warnings.some((warning) => warning.includes('routing')));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('la plantilla comentada documenta routing', () => {
+  const template = configTemplate({ scope: 'project' });
+  assert.deepEqual(parseJsonc(template), {});
+  assert.match(template, /"routing": \{/);
+  assert.match(template, /"mode": "off",/);
+  assert.match(template, /"paidOrder": \[/);
+  assert.match(template, /"maxSwitches": 5,/);
+  assert.match(template, /executor\.apiFallback/);
 });
 
 test('plantillas comentadas parsean a objeto vacío y documentan cada hoja predeterminada', () => {
