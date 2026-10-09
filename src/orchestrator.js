@@ -276,6 +276,11 @@ const SWITCH_REASONS = { quota: 'cuota agotada', credentials: 'sin credenciales'
 
 const routeQuotaAvailable = (quotaId) => quotaAvailable(quotaId, new Date(), { home: agentrelayHome() });
 
+// Solo para tests: sustituyen la lista de entradas y la comprobación de instalación/sesión,
+// que dependen de los ejecutores reales de la máquina.
+export const routerHooks = { entries: null, usable: null };
+const usableEntry = (entry, base) => (routerHooks.usable ?? entryUsable)(entry, base);
+
 /**
  * Marca la entrada actual de la ruta y pasa a la siguiente utilizable. No consume reintentos.
  * Devuelve la nueva entrada, o null si no queda ninguna o se alcanzó routing.maxSwitches.
@@ -294,7 +299,7 @@ async function switchRoute(ctx, result, errorKind) {
   if (route.switches.length >= (state.config.routing?.maxSwitches ?? 5)) { saveState(root, state); return null; }
   const { entry, skipped } = await pickEntry(route.entries, {
     isAvailable: routeQuotaAvailable,
-    isUsable: (candidate) => entryUsable(candidate, state.config.executor),
+    isUsable: (candidate) => usableEntry(candidate, state.config.executor),
     exclude: route.failed,
   });
   route.skipped.push(...skipped);
@@ -334,10 +339,11 @@ async function entryUsable(entry, base) {
 
 /** Elige la primera entrada utilizable de una ejecución nueva con routing.mode = "auto". */
 async function startRoute(config, task) {
-  const entries = routeEntries({ config, checks: loadChecks(), effort: task.effort ?? config.executor.thinking });
+  const effort = task.effort ?? config.executor.thinking;
+  const entries = routerHooks.entries?.({ config, effort }) ?? routeEntries({ config, checks: loadChecks(), effort });
   const { entry, skipped } = await pickEntry(entries, {
     isAvailable: routeQuotaAvailable,
-    isUsable: (candidate) => entryUsable(candidate, config.executor),
+    isUsable: (candidate) => usableEntry(candidate, config.executor),
   });
   if (!entry) {
     const detail = skipped.map(({ key, reason }) => `${key}: ${reason}`).join('; ');
