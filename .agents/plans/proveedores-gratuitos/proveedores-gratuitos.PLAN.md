@@ -33,7 +33,7 @@ Ejecutor por defecto: AgentRelay (`agentrelay run`), un objetivo por tarea. En t
   - Tokens de entrada: OpenCode 1,5-2 mil por tarea; Cline 32-88 mil (el contador de Cline suma el contexto acumulado de cada paso; no es comparable tal cual). Coste estimado: Flash 0,0005-0,0012 USD y Pro 0,0024-0,0054 USD por OpenCode; Cline lo informa a 0 (Flash) o 0,0018-0,0023 USD (Pro).
   - Decisión: rinden igual, así que **se retira Cline** (paso 8 desbloqueado). Ejecutor global sin cambiar (las pruebas usaron configuración local en el repo temporal).
 
-### Paso 1 — Catálogo de proveedores · AgentRelay, medio · [ ]
+### Paso 1 — Catálogo de proveedores · AgentRelay, medio · [x]
 - Archivos: nuevo `src/free-providers.js` + test.
 - Entradas `{ id, name, env, signupUrl, tier: 'free'|'paid', limits, resetRule, trainsOnData, notes }` para: opencode (Zen), nvidia, groq, google, mistral, openrouter, zai, deepseek (paid). Ids y variables verificados en `https://models.dev/api.json`.
 - `connectedProviders({ env, opencodeAuth })`: conectado si existe la variable o la credencial de OpenCode.
