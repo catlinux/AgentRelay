@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createOutput } from '../src/output.js';
-import { FAKE_CLINE, FAKE_OPENCODE, git, makeRepo, fakePlan, baseTask } from './helpers.js';
+import { FAKE_OPENCODE, git, makeRepo, fakePlan, baseTask } from './helpers.js';
 import { GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js';
 import { commandsSourceDir, commandsTargetDir, listCommands, MANAGED_MARK } from '../src/claude-commands.js';
 
@@ -110,12 +110,13 @@ test('doctor quieto omite información sana y deja visibles problemas', () => {
       mkdirSync(path.dirname(target), { recursive: true });
       writeFileSync(target, command.content);
     }
-    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline', command: [process.execPath, FAKE_CLINE] } }));
-    const healthy = cli(['--cwd', dir, 'doctor', '-q', '--claude-dir', claude], dir, { AGENTRELAY_HOME: path.join(dir, 'home') });
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'opencode', command: [process.execPath, FAKE_OPENCODE], model: 'opencode/nemotron-3-ultra-free' } }));
+    const fakeEnv = { ...fakeOpenCodeEnv({ logFile: path.join(dir, 'calls.log') }), FAKE_OPENCODE_STORED: '1', AGENTRELAY_HOME: path.join(dir, 'home') };
+    const healthy = cli(['--cwd', dir, 'doctor', '-q', '--claude-dir', claude], dir, fakeEnv);
     assert.equal(healthy.status, 0); assert.equal(healthy.stdout, '');
-    const verbose = cli(['--cwd', dir, 'doctor', '-v', '--claude-dir', path.join(dir, 'claude')], dir, { AGENTRELAY_HOME: path.join(dir, 'home') });
+    const verbose = cli(['--cwd', dir, 'doctor', '-v', '--claude-dir', path.join(dir, 'claude')], dir, fakeEnv);
     assert.equal(verbose.status, 0); assert.match(verbose.stdout, /Archivos de configuración:/); assert.match(verbose.stdout, /        /);
-    const broken = cli(['--cwd', dir, 'doctor', '-q', '--config', 'missing.json', '--claude-dir', path.join(dir, 'claude')], dir, { AGENTRELAY_HOME: path.join(dir, 'home') });
+    const broken = cli(['--cwd', dir, 'doctor', '-q', '--config', 'missing.json', '--claude-dir', path.join(dir, 'claude')], dir, fakeEnv);
     assert.equal(broken.status, 1); assert.match(broken.stdout, /\[fallo\]/); assert.doesNotMatch(broken.stdout, /\[ok\]/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

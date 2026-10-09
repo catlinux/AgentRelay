@@ -120,10 +120,10 @@ test('doctor ofrece crear una cuenta gratuita cuando no hay sesiÃ³n', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('login no muestra sugerencia de cuenta para Cline', () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-login-cline-'));
+test('login no muestra sugerencia de cuenta para OpenCode', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-login-opencode-'));
   try {
-    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline' } }));
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'opencode' } }));
     const res = cli(dir, ['login']);
     assert.equal(res.status, 0, res.stderr);
     assert.equal(res.stdout.includes('https://chatgpt.com'), false);

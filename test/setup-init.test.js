@@ -170,7 +170,7 @@ test('setup con sesión activa la reconoce sin ejecutar login', () => {
 test('setup omite el login para un ejecutor que no lo ofrece', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-setup-login-'));
   try {
-    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline' } }));
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'opencode' } }));
     const result = run(['setup', '--yes', '--claude-dir', dir], dir);
     assert.equal(result.status, 0, result.stderr);
     assert.doesNotMatch(result.stdout, /Conectar ahora|Sesión activa|Puedes hacerlo más tarde/);

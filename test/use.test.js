@@ -94,7 +94,6 @@ test('use --list muestra los modelos de Codex con su esfuerzo y marca el que est
     assert.match(result.stdout, /Codex \(OpenAI\) \(codex\) · instalado · cuenta de ChatGPT · en uso/);
     assert.match(result.stdout, /● gpt-6-luna {2}bajo\* alto/);
     assert.match(result.stdout, / {3}gpt-5\.5 {2}medio\*/);
-    assert.match(result.stdout, /Cline \(cline\) · no instalado · clave de API/);
     assert.match(result.stdout, /agentrelay use <ejecutor> <modelo>/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -204,7 +203,7 @@ test('use interactivo ofrece los modelos de OpenCode en el orden del ranquing', 
   }));
   let output = '';
   process.stdout.write = (chunk) => { output += chunk; return true; };
-  const answers = ['3', '1', '1', ''];
+  const answers = ['2', '1', '1', ''];
   try {
     const code = await main(['use', '--cwd', dir], { ask: async (question) => {
       output += question;
@@ -226,13 +225,22 @@ test('use avisa cuando el archivo del proyecto vuelve a fijar el ejecutor o el m
   try {
     spawnSync('git', ['init', '-q'], { cwd: dir });
     writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'codex', model: 'gpt-6-luna' } }, null, 2));
-    const changed = run(['use', 'cline', 'deepseek-v4-flash'], dir);
+    const changed = run(['use', 'opencode', 'deepseek/deepseek-flash'], dir);
     assert.equal(changed.status, 0, changed.stderr);
     assert.match(changed.stdout, /Ojo: este cambio NO tiene efecto en este proyecto/);
     assert.match(changed.stdout, /type, model/);
     assert.match(changed.stdout, /agentrelay use --local/);
-    const local = run(['use', '--local', 'cline', 'deepseek-v4-flash'], dir);
+    const local = run(['use', '--local', 'opencode', 'deepseek/deepseek-flash'], dir);
     assert.equal(local.status, 0, local.stderr);
     assert.doesNotMatch(local.stdout, /Ojo: este cambio NO tiene efecto/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('use cline devuelve un error con una sugerencia de OpenCode', () => {
+  const dir = temp();
+  try {
+    const retired = run(['use', 'cline'], dir);
+    assert.equal(retired.status, 1);
+    assert.match(retired.stderr, /Ejecutor desconocido: cline[\s\S]*Cline se retiró; usa: agentrelay use opencode deepseek\/deepseek-flash/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

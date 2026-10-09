@@ -8,7 +8,6 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runProcess } from '../proc.js';
-import { commandParts as clineCommandParts } from './cline.js';
 
 /** Carpeta de los ejecutores opcionales (AGENTRELAY_EXECUTORS_DIR la sustituye). */
 export function executorsDir(env = process.env, home = os.homedir()) {
@@ -24,16 +23,6 @@ export const CATALOG = [
     cost: 'cuenta de ChatGPT',
     npmPackage: null,
     connect: 'agentrelay login',
-  },
-  {
-    name: 'cline',
-    title: 'Cline',
-    description: 'Con cualquier proveedor que Cline soporte (p. ej. DeepSeek con clave de API).',
-    bundled: false,
-    cost: 'clave de API',
-    // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).
-    npmPackage: 'cline@3',
-    connect: 'npx --prefix <executorsDir> cline auth --provider deepseek --apikey TU_CLAVE --modelid deepseek-v4-pro',
   },
   {
     name: 'opencode',
@@ -78,9 +67,7 @@ export async function isInstalled(name, options = {}) {
     if ((options.exists || existsSync)(link)) return true;
     return Boolean(findOnPath(entry.name, options));
   }
-  const parts = clineCommandParts('cline', { executorsDir: dir, exists: options.exists || existsSync });
-  const candidate = parts.length > 1 && parts[0] === process.execPath ? parts[1] : parts[0];
-  return (options.exists || existsSync)(candidate);
+  return false;
 }
 
 export async function installExecutor(name, { dir = executorsDir(), run = runProcess, out = () => {} } = {}) {

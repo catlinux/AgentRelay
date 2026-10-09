@@ -44,16 +44,15 @@ export function configTemplate({ scope } = {}) {
   if (user) {
     lines.push('', '  // ── Ejecutor: el agente que hace el trabajo ──');
     lines.push('  // codex (por defecto) usa tu cuenta de ChatGPT: conéctala una vez con "agentrelay login".');
-    lines.push('  // cline se instala con "agentrelay executors add cline" y usa el proveedor que configures.');
     lines.push('  // "executor": {');
     lines.push(...option('apiFallback', DEFAULT_CONFIG.executor.apiFallback, 'Permite usar el perfil de API de pago si se agota la cuota gratuita de ChatGPT.', 'booleano', 'desactívalo con agentrelay set executor.apiFallback false si no quieres este respaldo.', '    '));
-    lines.push(...option('type', DEFAULT_CONFIG.executor.type, 'Tipo de ejecutor: codex usa la cuenta ChatGPT; cline permite configurar proveedor y modelo.', 'codex o cline', 'usa codex para iniciar sesión con agentrelay login.', '    '));
+    lines.push(...option('type', DEFAULT_CONFIG.executor.type, 'Tipo de ejecutor: codex usa la cuenta ChatGPT y opencode permite elegir proveedor y modelo.', 'codex u opencode', 'usa codex para iniciar sesión con agentrelay login.', '    '));
     lines.push(...option('command', DEFAULT_CONFIG.executor.command, 'Comando ejecutable del proveedor seleccionado.', 'texto o lista de textos', 'usa una lista cuando el ejecutable requiera argumentos.', '    '));
-    lines.push(...option('provider', DEFAULT_CONFIG.executor.provider, 'Proveedor del modelo, principalmente para Cline.', 'texto o null', 'elige el proveedor configurado en Cline.', '    '));
+    lines.push(...option('provider', DEFAULT_CONFIG.executor.provider, 'Proveedor del modelo cuando el ejecutor lo necesita.', 'texto o null', 'elige el proveedor configurado para el modelo.', '    '));
     lines.push(...option('model', DEFAULT_CONFIG.executor.model, 'Identificador del modelo; Codex usa gpt-6-luna por defecto.', 'texto o null', 'ajústalo solo si quieres otro modelo disponible.', '    '));
-    lines.push(...option('thinking', DEFAULT_CONFIG.executor.thinking, 'Esfuerzo de razonamiento enviado al ejecutor.', 'null, low, medium, high, xhigh o max; none (Cline; Codex lo ignora)', 'bajo = low, medio = medium, alto = high, extremo = xhigh; max es el máximo. null conserva el esfuerzo predeterminado del ejecutor. Usa low en tareas sencillas y high en tareas difíciles.', '    '));
+    lines.push(...option('thinking', DEFAULT_CONFIG.executor.thinking, 'Esfuerzo de razonamiento enviado al ejecutor.', 'null, low, medium, high, xhigh o max', 'bajo = low, medio = medium, alto = high, extremo = xhigh; max es el máximo. null conserva el esfuerzo predeterminado del ejecutor. Usa low en tareas sencillas y high en tareas difíciles.', '    '));
     lines.push(...option('timeoutSeconds', DEFAULT_CONFIG.executor.timeoutSeconds, 'Tiempo máximo de ejecución del agente, en segundos.', 'número positivo', 'auméntalo para tareas largas.', '    '));
-    lines.push(...option('network', DEFAULT_CONFIG.executor.network, 'Permite al ejecutor Codex acceder a internet desde su sandbox (consultar páginas y APIs).', 'booleano', 'desactívalo con agentrelay set executor.network false si no quieres que el ejecutor use la red. Cline no tiene sandbox y no lo necesita.', '    '));
+    lines.push(...option('network', DEFAULT_CONFIG.executor.network, 'Permite al ejecutor Codex acceder a internet desde su sandbox (consultar páginas y APIs).', 'booleano', 'desactívalo con agentrelay set executor.network false si no quieres que el ejecutor use la red.', '    '));
     lines.push(...option('extraArgs', DEFAULT_CONFIG.executor.extraArgs, 'Argumentos adicionales enviados al comando del ejecutor.', 'lista de textos', 'añade solo opciones que admita el ejecutor.', '    '));
     lines.push('  // },');
   }
@@ -61,7 +60,7 @@ export function configTemplate({ scope } = {}) {
   lines.push('', '  // ── Enrutado de ejecutores ──');
   lines.push('  // "routing": {');
   lines.push(...option('mode', DEFAULT_CONFIG.routing.mode, 'El modo off conserva el ejecutor configurado. En auto, cada tarea empieza por el primer ejecutor disponible: primero Codex con la cuota gratuita de ChatGPT y los modelos gratuitos aptos del ranking; después se usan los de pago en paidOrder. Si se agota la cuota a media tarea, continúa con la siguiente entrada. El respaldo executor.apiFallback de Codex no se usa en este modo.', 'off o auto', 'usa auto para continuar con otro ejecutor cuando se agote la cuota.', '    '));
-  lines.push(...option('paidOrder', DEFAULT_CONFIG.routing.paidOrder, 'Entradas de pago en formato tipo:modelo; los tipos admitidos son opencode, codex, codex-api (Codex con la clave de agentrelay login --api) y cline. Se usan sin tope de gasto al agotarse los gratuitos; edita la lista directamente en el archivo.', 'lista de entradas tipo:modelo', 'ordena los ejecutores de pago según tu preferencia.', '    '));
+  lines.push(...option('paidOrder', DEFAULT_CONFIG.routing.paidOrder, 'Entradas de pago en formato tipo:modelo; los tipos admitidos son opencode, codex y codex-api (Codex con la clave de agentrelay login --api). Se usan sin tope de gasto al agotarse los gratuitos; edita la lista directamente en el archivo.', 'lista de entradas tipo:modelo', 'ordena los ejecutores de pago según tu preferencia.', '    '));
   lines.push(...option('maxSwitches', DEFAULT_CONFIG.routing.maxSwitches, 'Número máximo de cambios de ejecutor por ejecución.', 'entero entre 0 y 20', 'reduce el valor para limitar los cambios durante una tarea.', '    '));
   lines.push('  // },');
 

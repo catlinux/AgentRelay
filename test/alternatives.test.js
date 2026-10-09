@@ -6,9 +6,9 @@ const lastLine = 'Cuando se renueve la cuota puedes volver con agentrelay use <e
 
 test('propone añadir OpenCode si no está instalado y omite el ejecutor actual', () => {
   const hint = alternativesHint({
-    current: { type: 'cline', model: 'deepseek-v4-flash' },
+    current: { type: 'opencode', model: 'deepseek/deepseek-flash' },
     checks: { models: {} },
-    installed: { opencode: false, cline: false },
+    installed: { opencode: false },
   });
 
   assert.deepEqual(hint.split('\n'), [
@@ -32,7 +32,7 @@ test('incluye hasta tres modelos según el ranquing guardado', () => {
         { id: 'vendor/failed-free', score: 0 },
       ],
     } },
-    installed: { opencode: true, cline: true },
+    installed: { opencode: true },
   });
 
   assert.deepEqual(hint.split('\n'), [
@@ -40,7 +40,7 @@ test('incluye hasta tres modelos según el ranquing guardado', () => {
     '- OpenCode gratis (nº 1 del ranquing): agentrelay use opencode vendor/newest-free',
     '- OpenCode gratis (nº 2 del ranquing): agentrelay use opencode vendor/fourth-free',
     '- OpenCode gratis (nº 3 del ranquing): agentrelay use opencode vendor/middle-free',
-    '- DeepSeek de pago (Flash): agentrelay use cline deepseek-v4-flash (necesita su clave de API)',
+    '- DeepSeek de pago (Flash): agentrelay use opencode deepseek/deepseek-flash (necesita su clave de API)',
     lastLine,
   ]);
 });
@@ -60,7 +60,7 @@ test('el ranquing omite el modelo actual y los agotados conservando su posición
         ],
       },
     },
-    installed: { opencode: true, cline: true },
+    installed: { opencode: true },
   });
 
   assert.match(hint, /OpenCode gratis \(nº 3 del ranquing\): agentrelay use opencode vendor\/remaining-free/);
@@ -77,7 +77,7 @@ test('propone otro modelo de OpenCode tras agotar el actual', () => {
         { id: 'vendor/alternative-free', score: 1 },
       ],
     } },
-    installed: { opencode: true, cline: true },
+    installed: { opencode: true },
   });
 
   assert.match(hint, /OpenCode gratis \(nº 2 del ranquing\): agentrelay use opencode vendor\/alternative-free/);
@@ -88,7 +88,7 @@ test('sin ranquing mantiene las sugerencias de modelos aprobados', () => {
   const hint = alternativesHint({
     current: { type: 'codex', model: 'gpt-6-luna' },
     checks: { models: { 'vendor/approved-free': { status: 'approved', checkedAt: new Date().toISOString() } } },
-    installed: { opencode: true, cline: true },
+    installed: { opencode: true },
   });
 
   assert.match(hint, /OpenCode gratis, probado: agentrelay use opencode vendor\/approved-free/);
@@ -98,13 +98,13 @@ test('sin modelos aprobados ofrece probar modelos nuevos y omite OpenCode actual
   const hint = alternativesHint({
     current: { type: 'opencode', model: 'vendor/model-free' },
     checks: { models: { 'vendor/model-free': { status: 'failed', checkedAt: '2026-03-01T00:00:00Z' } } },
-    installed: { opencode: true, cline: true },
+    installed: { opencode: true },
   });
 
   assert.deepEqual(hint.split('\n'), [
     'Alternativas (no se cambia nada solo; elige una):',
     '- Codex (cuenta de ChatGPT, cuota gratuita por cuenta): agentrelay use codex',
-    '- DeepSeek de pago (Flash): agentrelay use cline deepseek-v4-flash (necesita su clave de API)',
+    '- DeepSeek de pago (Flash): agentrelay use opencode deepseek/deepseek-flash (necesita su clave de API)',
     lastLine,
   ]);
 });

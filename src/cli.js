@@ -941,7 +941,7 @@ async function cmdExecutors(positionals, values) {
   const name = positionals[1];
   const entry = getCatalogEntry(name, dir);
   if (!entry) {
-    process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}\n`);
+    process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}.${name === 'cline' ? ' Cline se retiró; usa: agentrelay use opencode deepseek/deepseek-flash' : ''}\n`);
     return 1;
   }
   if (entry.bundled) {
@@ -1266,7 +1266,7 @@ async function cmdSetup(values) {
     for (const name of requested) {
       const entry = getCatalogEntry(name, dir);
       if (!entry) {
-        process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}\n`);
+        process.stderr.write(`Ejecutor desconocido: ${name}. Disponibles: ${CATALOG.map((item) => item.name).join(', ')}.${name === 'cline' ? ' Cline se retiró; usa: agentrelay use opencode deepseek/deepseek-flash' : ''}\n`);
         return 1;
       }
       if (entry.bundled) {

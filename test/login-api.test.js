@@ -66,7 +66,7 @@ test('login --api --remove elimina solo el perfil y permite repetirlo', () => {
     assert.match(repeated.stdout, /No había respaldo por API/);
     mkdirSync(context.apiHome, { recursive: true });
     writeFileSync(path.join(context.apiHome, 'auth.json'), '{}');
-    writeFileSync(path.join(context.dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'cline' } }));
+    writeFileSync(path.join(context.dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'opencode' } }));
     const removedWithOtherExecutor = cli(context, ['login', '--api', '--remove']);
     assert.equal(removedWithOtherExecutor.status, 0, removedWithOtherExecutor.stderr);
     assert.equal(existsSync(context.apiHome), false);
