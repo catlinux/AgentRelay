@@ -305,6 +305,8 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
     const until = exhaustedRecord()?.until;
     return Number.isFinite(Date.parse(until)) ? new Date(until).toISOString() : undefined;
   };
+  // El enrutador elige él mismo entre la cuota gratuita y la API (routing.mode = "auto").
+  if (executor.forceApi) return runCodex(true);
   if (quotaExhausted) {
     const apiResult = await runCodex(true);
     const resetAt = quotaResetAt();
