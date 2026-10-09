@@ -23,7 +23,16 @@ Cada comando se llama igual en el terminal (`agentrelay <comando>`) y en el chat
 
 ## Modelos gratuitos
 
-La revisión diaria (`executors check`, lanzada en segundo plano el primer uso de cada día) calcula con `src/model-rank.js` el ranquing de los modelos gratuitos que la cuenta de OpenCode lista (dos pruebas sintéticas por modelo, clasificación de fallos por cuota o no disponible). Los gratuitos se detectan por los precios de models.dev (`src/free-models.js`), no solo por el sufijo `-free`. `src/free-ranking.js` ordena los utilizables y marca los agotados hasta el día siguiente. Nunca se cambia de ejecutor ni de modelo sin que lo decida el usuario, y nunca se envía código del usuario a un modelo gratuito: solo tareas de ejemplo.
+La revisión diaria (`executors check`, lanzada en segundo plano el primer uso de cada día) evalúa con tres pruebas los modelos gratuitos de todos los proveedores conectados de `src/free-providers.js`. El inventario está en `src/free-models.js`; `src/model-rank.js` calcula el ranquing y `src/free-ranking.js` ordena los utilizables. `src/quota-state.js` guarda la cuota agotada hasta la hora indicada por el error o reintenta a los 10, 30 y 60 minutos. Las pruebas usan tareas de ejemplo, nunca código del usuario. El cambio automático de ejecutor solo ocurre si el usuario activa `routing.mode: "auto"`.
+
+## Enrutado
+
+Con `routing.mode: "auto"`, `src/router.js` ordena primero Luna con cuota gratuita y los gratuitos aptos por nivel y nota; después añade las de pago de `routing.paidOrder`, sin tope de gasto.
+`src/orchestrator.js` puede cambiar de entrada a mitad de tarea sin consumir reintentos, hasta `routing.maxSwitches` cambios.
+Credenciales o un modelo no disponible también hacen pasar a la siguiente entrada, solo para esa ejecución.
+Cada tarea nueva vuelve a probar las entradas gratuitas desde el principio.
+El aviso de privacidad solo informa; no altera el orden.
+Se usa una cuenta por proveedor: se rota entre proveedores, nunca entre cuentas del mismo proveedor.
 
 ## Configuración, plataformas y versiones
 
