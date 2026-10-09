@@ -68,7 +68,7 @@ Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `hi
 | Ejecutor | Qué necesita | Cómo se conecta |
 |---|---|---|
 | `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita) o clave de API de OpenAI. Viene incluido. | `agentrelay login` |
-| `opencode` | Modelos gratuitos y de pago de OpenCode. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre su asistente; elige OpenCode Zen y pega tu clave; no hace falta tener `opencode` en el PATH) |
+| `opencode` | Modelos gratuitos y de pago de OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter, Z.AI y DeepSeek. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre el asistente de OpenCode para elegir proveedor; también puedes conectar con su variable de entorno) |
 | `cline` | Una clave de API, por ejemplo de DeepSeek. Se instala con `agentrelay executors add cline`. | El comando que muestra al instalarlo |
 
 AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
@@ -87,7 +87,7 @@ La clave se guarda en un perfil propio de AgentRelay (`~/.agentrelay/codex-api/`
 - Cada tarea prueba **primero la cuota gratuita**. Solo si se agota (el error de límite de uso de ChatGPT) repite ese intento con la API de pago y lo avisa en el informe.
 - Lee del error la hora de restablecimiento y guarda en `model-checks.json` cuándo se agotó y cuándo se restableció. Mientras no llegue esa hora usa la API; al llegar, **vuelve a la gratuita** sin que hagas nada. Si el error no da la hora, la vuelve a probar cada 10 minutos.
 - `agentrelay doctor` muestra si el respaldo está configurado y, si la cuota está agotada, hasta cuándo. Sin respaldo no cambia nada: el aviso de cuota te propone alternativas.
-- Se desactiva con `agentrelay set executor.apiFallback false --local`. Solo se gasta dinero si tú has guardado la clave.
+- Se desactiva con `agentrelay set executor.apiFallback false --local`. Con el enrutado automático no se usa este respaldo: Luna por API ya está en la lista. Solo se gasta dinero si tú has guardado la clave.
 
 ### Acceso a internet del ejecutor
 Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de Wowhead). Codex corre en un sandbox que por defecto tiene la red cerrada: AgentRelay la abre con `sandbox_workspace_write.network_access=true`. Cline no tiene sandbox y no necesita nada. Se desactiva con `agentrelay set executor.network false`.
@@ -96,15 +96,29 @@ Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de W
 - Wowhead: `https://nether.wowhead.com/tooltip/item/<id>` devuelve JSON (también `spell`, `npc`, `quest`…). Las páginas normales responden a peticiones simples, pero un navegador automatizado (Playwright) recibe un 403: no hace falta navegador.
 - Comprobado con Luna y con Cline/DeepSeek en Windows. En Linux no está comprobado todavía.
 
-### Modelos gratuitos de OpenCode
-Cambian a menudo, así que AgentRelay los vigila por ti. **El primer uso de cada día** (`run` o `start`), en segundo plano, prueba con dos tareas de ejemplo los modelos gratuitos que tu cuenta lista, los ordena de mejor a peor y escribe `.agentrelay/EJECUTORES.md` (saldos, estado de cada IA y los mejores gratuitos de hoy). Solo se envía una tarea de ejemplo, nunca tu código.
+### Proveedores y modelos gratuitos de OpenCode
+`agentrelay providers` (o `/ar:providers`) muestra si cada proveedor está conectado, su nivel, los límites conocidos y un aviso de privacidad. Solo informa: no bloquea. La lista incluye OpenCode Zen, NVIDIA, Groq, Google, Mistral, OpenRouter y Z.AI (gratuitos), y DeepSeek (de pago). Límites conocidos: NVIDIA, unas 40 peticiones/min; Groq, unas 1.000/día; modelos `:free` de OpenRouter, unas 50/día. Google puede usar los prompts para entrenar; la política de datos de los demás no está verificada.
 
-- `agentrelay use` y `use --list` muestran esos gratuitos **en orden** y con su tiempo; los que fallaron no aparecen (`--all` los muestra todos).
-- Los gratuitos se detectan con los precios de [models.dev](https://models.dev), la misma fuente que usa OpenCode, así que también salen los que no llevan `-free` en el nombre.
-- La cuota restante no se puede consultar: se deduce de las pruebas. Si una tarea real se queda sin cuota con un modelo, queda marcado como agotado hasta mañana y el aviso te propone los siguientes del ranquing. **Nunca se cambia de modelo solo.**
-- `agentrelay rank` enseña el último ranquing; `rank --run` lo recalcula (también los modelos que models.dev da por gratuitos aunque tu cuenta no los liste, que salen como «no disponible»).
-- Saldos: DeepSeek se consulta si defines `DEEPSEEK_API_KEY` (AgentRelay solo la lee de ahí); OpenAI no ofrece ninguna API de saldo, así que el informe enlaza a su panel.
-- Se desactiva con la variable de entorno `AGENTRELAY_NO_MODEL_CHECK=1`.
+Conecta un proveedor con `agentrelay login opencode` y elige uno en el asistente de OpenCode, o configura su variable de entorno (por ejemplo, `GROQ_API_KEY`). AgentRelay no guarda esas claves. Si el ejecutor es OpenCode, `agentrelay doctor` muestra los proveedores conectados.
+
+La lista se mantiene al día así:
+
+- Metadatos de [models.dev](https://models.dev) (precio, herramientas y contexto) en caché durante 24 horas. En cada evaluación se lee la lista real de tu cuenta (`opencode models`), así los modelos retirados salen del ranquing.
+- Una vez al día, en segundo plano al primer `run` o `start`, se evalúan todos los proveedores conectados. `agentrelay rank --run` inicia la evaluación manualmente. Cada modelo se vuelve a evaluar tras 7 días; `--force` lo repite antes. Los errores 410/404 indican que el modelo ya no está disponible.
+- Solo se envían tareas de ejemplo, nunca tu código. Desactiva la evaluación con `AGENTRELAY_NO_MODEL_CHECK=1`.
+
+Se prueban solo modelos gratuitos que admiten herramientas y tienen al menos 64k de contexto: tres tareas (fácil, media y difícil; esta última usa varios archivos y un test que arreglar). Apto significa superar las pruebas media y difícil. Nivel A: apto y cada prueba dura 150 s o menos; nivel B: apto y más lento. `--max N` limita cuántos se prueban por proveedor y las pruebas se intercalan entre proveedores. Las revisiones desempatan la nota: `agentrelay review` suma con `accept` y resta con `fix`, `reject` o `escalate`. `agentrelay rank` muestra las columnas Prueba 1-3 y Nivel.
+
+La cuota no se puede consultar. Cuando un modelo indica que se agotó, queda marcado hasta la hora indicada por el error; si no da una hora, se reintenta a los 10, 30 y 60 minutos. Un éxito restablece la marca.
+
+### Enrutado automático
+Está desactivado por defecto (`routing.mode: "off"`): se usa siempre el ejecutor configurado. Actívalo con `agentrelay set routing auto` (o `--local` para un proyecto). Cada tarea empieza por el primer candidato disponible, en este orden:
+
+1. Luna con la cuota gratuita de ChatGPT. Si Codex usa una clave de API en vez de la cuenta de ChatGPT, se omite porque es de pago.
+2. Modelos gratuitos aptos del ranquing. Con esfuerzo alto o extremo, solo se consideran los de nivel A.
+3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek Flash → Luna por API (`agentrelay login --api`) → DeepSeek Pro. No hay tope de gasto.
+
+Si durante una tarea se agota la cuota, faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.
 
 ## 4. Revisar y decidir
 
