@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -536,4 +536,24 @@ test('opencode: el mensaje de error se lee de event.error.message', () => {
   assert.deepEqual(opencodeParseOutput(line).errors, ['Model unavailable: opencode/x-free']);
   assert.deepEqual(opencodeToActivity({ type: 'error', error: { message: 'boom' } }, '.'), { kind: 'error', message: 'boom' });
   assert.deepEqual(opencodeParseOutput('{"type":"error"}').errors, ['error desconocido']);
+});
+
+test('opencode run fija PWD a la carpeta de trabajo y usa --standalone solo si la versión lo admite', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-pwd-'));
+  const executor = { command: [process.execPath, FAKE_OPENCODE], model: 'x/y', timeoutSeconds: 30, extraArgs: [] };
+  process.env.FAKE_OPENCODE_ECHO = '1';
+  try {
+    const old = await opencodeRun({ executor, cwd: dir, promptFile: '.prompt.md' });
+    assert.ok(old.text.startsWith(`${dir}|`), old.text);
+    assert.doesNotMatch(old.text, /--standalone/);
+    const copy = path.join(dir, 'fake-opencode-copy.mjs');
+    copyFileSync(FAKE_OPENCODE, copy);
+    process.env.FAKE_OPENCODE_STANDALONE = '1';
+    const recent = await opencodeRun({ executor: { ...executor, command: [process.execPath, copy] }, cwd: dir, promptFile: '.prompt.md' });
+    assert.match(recent.text, /run --standalone --auto/);
+  } finally {
+    delete process.env.FAKE_OPENCODE_ECHO;
+    delete process.env.FAKE_OPENCODE_STANDALONE;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

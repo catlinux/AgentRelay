@@ -115,6 +115,8 @@ if (args[0] === 'auth' && args[1] === 'list') {
   process.stdout.write('OpenCode Console Personal stored\n');
 } else if (args[0] === 'models') {
   process.stdout.write('opencode/alpha-free\nopencode/beta-free\nopencode/gamma-free\n');
+} else if (args[0] === 'run' && args.includes('--help')) {
+  process.stdout.write('FLAGS\n  --auto\n');
 } else if (args[0] === 'run') {
   appendFileSync(process.env.FAKE_OPENCODE_LOG, args[args.indexOf('-m') + 1] + '\n');
   writeFileSync(path.join(process.cwd(), 'sumar.js'), 'export const sumar = (a, b) => a + b;\nexport const restar = (a, b) => a - b;\n');
