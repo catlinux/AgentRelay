@@ -46,9 +46,10 @@ test('implementa, valida y queda pendiente de revisión', async () => {
     assert.match(readFileSync(path.join(dir, 'report.md'), 'utf8'), /pendiente de revisión/);
     assert.match(readFileSync(path.join(dir, 'diff.patch'), 'utf8'), /\+hi/);
 
-    // Argumentos reales que recibe Cline.
+    // Argumentos reales que recibe OpenCode.
     const [call] = repo.calls();
-    assert.deepEqual(call.args.slice(0, 8), ['--json', '--auto-approve', 'true', '-P', 'fake', '-m', 'fake-model', '-t']);
+    assert.deepEqual(call.args.slice(0, 6), ['run', '--auto', '--format', 'json', '-m', 'fake-model']);
+    assert.match(call.args[6], /^Read the file .* in the working directory and carry out the task it describes exactly\./);
 
     // AgentRelay no toca el índice ni crea commits en el repositorio del usuario.
     assert.equal(git(repo.dir, 'status', '--porcelain').trim(), '?? hello.txt');
@@ -71,14 +72,14 @@ test('normaliza effort y model opcionales de la tarea', () => {
 test('usa effort y model de la tarea solo para esa ejecución', async () => {
   const repo = makeRepo();
   try {
-    const config = testConfig({ executor: { thinking: 'low', model: 'modelo-config' } });
+    const config = testConfig({ executor: { thinking: 'low', model: 'fake-model' } });
     const state = await run(repo, {
       task: { effort: 'high', model: 'modelo-tarea' }, config, plan: { implement: GOOD },
     });
     const [call] = repo.calls();
     assert.ok(call.args.includes('modelo-tarea'));
-    assert.ok(call.args.includes('high'));
-    assert.equal(config.executor.model, 'modelo-config');
+    assert.equal(state.task.effort, 'high');
+    assert.equal(config.executor.model, 'fake-model');
     assert.equal(config.executor.thinking, 'low');
   } finally {
     repo.cleanup();
@@ -181,7 +182,7 @@ test('reintenta cuando el ejecutor falla', async () => {
   const repo = makeRepo();
   try {
     const state = await run(repo, {
-      plan: { implement: { finishReason: 'error', exitCode: 1, report: null }, fix: GOOD },
+      plan: { implement: { error: 'network timeout', report: null }, fix: GOOD },
     });
     assert.equal(state.attempts[0].ok, false);
     assert.deepEqual(state.attempts.map((a) => a.kind), ['implement', 'fix']);
@@ -292,6 +293,8 @@ test('la revisión no registra modelos de otros ejecutores', async () => {
   process.env.AGENTRELAY_HOME = home;
   try {
     const state = await run(repo, { plan: { implement: GOOD } });
+    state.config.executor.type = 'codex';
+    saveState(repo.dir, state);
     await applyReview({ root: repo.dir, id: state.id, decision: 'reject' });
     assert.equal(loadChecks(home).reviews, undefined);
   } finally {
@@ -319,14 +322,14 @@ test('falla antes de crear una ejecución si el modelo no está disponible', asy
   const repo = makeRepo();
   try {
     await assert.rejects(
-      run(repo, { config: { executor: { provider: 'deepseek', model: 'deepseek-v4-imposible' } }, plan: { implement: GOOD } }),
-      /deepseek-v4-imposible.*agentrelay use cline/,
+      run(repo, { config: { executor: { model: 'missing-model' } }, plan: { implement: GOOD } }),
+      /missing-model.*agentrelay use opencode/,
     );
     assert.deepEqual(listRunIds(repo.dir), []);
     assert.equal(existsSync(path.join(repo.dir, '.agentrelay')), false);
 
     const state = await run(repo, {
-      config: { executor: { provider: 'deepseek', model: 'deepseek-v4-flash' } },
+      config: { executor: { model: 'fake-model' } },
       plan: { implement: GOOD },
     });
     assert.equal(state.status, 'awaiting_review');
@@ -355,7 +358,7 @@ test('registra eventos estructurados en events.ndjson y los emite en orden', asy
     );
     const tool = events.find((e) => e.type === 'activity' && e.kind === 'tool');
     assert.ok(tool);
-    assert.equal(tool.detail, './hello.txt');
+    assert.equal(tool.detail, 'hello.txt');
     assert.equal(received.length, events.length);
   } finally {
     repo.cleanup();

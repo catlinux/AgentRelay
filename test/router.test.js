@@ -19,7 +19,7 @@ test('routeEntries ordena Codex gratuito, gratuitos aptos y entradas de pago sin
   const entries = routeEntries({
     config: {
       executor: { type: 'codex', model: 'gpt-custom' },
-      routing: { paidOrder: ['cline:paid-a', 'cline:paid-a', 'codex:gpt-custom', 'codex-api:gpt-paid', 'opencode:provider/paid'] },
+      routing: { paidOrder: ['opencode:fake/paid-a', 'opencode:fake/paid-a', 'codex:gpt-custom', 'codex-api:gpt-paid', 'opencode:provider/paid'] },
     },
     checks: rankingChecks,
   });
@@ -30,7 +30,7 @@ test('routeEntries ordena Codex gratuito, gratuitos aptos y entradas de pago sin
     'opencode:provider/a2',
     'opencode:provider/b',
     'opencode:provider/c',
-    'cline:paid-a',
+    'opencode:fake/paid-a',
     'codex-api:gpt-paid',
     'opencode:provider/paid',
   ]);
@@ -41,13 +41,13 @@ test('routeEntries ordena Codex gratuito, gratuitos aptos y entradas de pago sin
 test('routeEntries con esfuerzo alto solo incluye gratuitos de nivel A', () => {
   for (const effort of ['high', 'xhigh']) {
     const entries = routeEntries({
-      config: { executor: { type: 'cline', model: 'configured' }, routing: { paidOrder: ['cline:paid-a'] } },
+      config: { executor: { type: 'opencode', model: 'configured' }, routing: { paidOrder: ['opencode:fake/paid-a'] } },
       checks: rankingChecks,
       effort,
     });
 
     assert.deepEqual(entries.map((entry) => entry.key), [
-      'codex:gpt-6-luna', 'opencode:provider/a', 'opencode:provider/a2', 'cline:paid-a',
+      'codex:gpt-6-luna', 'opencode:provider/a', 'opencode:provider/a2', 'opencode:fake/paid-a',
     ]);
   }
 });
@@ -95,13 +95,13 @@ test('pickEntry descarta cuotas agotadas y entradas no utilizables, y respeta ex
 
 test('executorFor conserva los ajustes del mismo tipo y usa los valores por defecto al cambiar', () => {
   const base = {
-    type: 'cline', command: ['node', 'fake-cline.mjs'], provider: 'fake', model: 'configured',
+    type: 'opencode', command: ['node', 'fake-opencode.mjs'], provider: null, model: 'configured',
     thinking: 'high', timeoutSeconds: 45, network: false, extraArgs: ['--custom'],
   };
-  const sameType = executorFor({ type: 'cline', model: 'free-a', api: false }, base);
+  const sameType = executorFor({ type: 'opencode', model: 'fake/free-a', api: false }, base);
   assert.deepEqual(sameType.command, base.command);
-  assert.equal(sameType.model, 'free-a');
-  assert.equal(sameType.provider, 'fake');
+  assert.equal(sameType.model, 'fake/free-a');
+  assert.equal(sameType.provider, null);
   assert.deepEqual(sameType.extraArgs, ['--custom']);
 
   const codexApi = executorFor({ type: 'codex', model: 'gpt-paid', api: true }, base);

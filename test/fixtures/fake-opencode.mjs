@@ -3,6 +3,8 @@
 //
 // FAKE_OPENCODE_DELAY: milisegundos que duerme antes de salir (para el timeout).
 
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const args = process.argv.slice(2);
@@ -24,10 +26,64 @@ if (args[0] === 'auth' && args[1] === 'login') {
   process.exit(0);
 }
 if (args[0] === 'models') {
-  process.stdout.write('opencode/nemotron-3-ultra-free\nopencode/gpt-oss-120b-free\n');
+  const models = process.env.FAKE_OPENCODE_MODELS?.split(',').map((model) => model.trim()).filter(Boolean)
+    ?? ['opencode/nemotron-3-ultra-free', 'opencode/gpt-oss-120b-free'];
+  process.stdout.write(`${models.join('\n')}\n`);
   process.exit(0);
 }
 
+if (args[0] !== 'run') process.exit(0);
+
+if (process.env.FAKE_OPENCODE_PLAN !== undefined) {
+  const instruction = args[args.length - 1];
+  const promptFile = /Read the file (\S+) in the working directory/.exec(instruction)?.[1];
+  const prompt = readFileSync(path.resolve(process.cwd(), promptFile), 'utf8');
+  const phase = /^AgentRelay-Phase: (\S+)/m.exec(prompt)[1];
+  const modelIndex = args.indexOf('-m');
+  const model = modelIndex < 0 ? null : args[modelIndex + 1];
+  const plan = JSON.parse(process.env.FAKE_OPENCODE_PLAN || '{}');
+  const modelSteps = plan.byModel?.[model]?.[phase];
+  const logFile = process.env.FAKE_OPENCODE_LOG;
+  const previous = logFile && existsSync(logFile)
+    ? readFileSync(logFile, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+      .filter((call) => call.phase === phase && (modelSteps === undefined || call.model === model)).length
+    : 0;
+  if (logFile) appendFileSync(logFile, `${JSON.stringify({ phase, model, args, promptFile })}\n`);
+
+  const steps = modelSteps ?? plan[phase];
+  const action = (Array.isArray(steps) ? steps[Math.min(previous, steps.length - 1)] : steps) || {};
+  for (const [file, content] of Object.entries(action.write || {})) {
+    const target = path.resolve(process.cwd(), file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
+
+  const report = action.report === null ? null : {
+    status: 'done', summary: `fake ${phase}`, filesChanged: Object.keys(action.write || {}),
+    checks: [], issues: [], questions: [], needsEscalation: false, ...(action.report || {}),
+  };
+  const text = action.text ?? (report ? `Done.\n\n\`\`\`json\n${JSON.stringify(report, null, 2)}\n\`\`\`` : 'Done.');
+  const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  emit({ type: 'step_start', part: { type: 'step-start' } });
+  for (const [file, content] of Object.entries(action.write || {})) {
+    emit({
+      type: 'tool_use',
+      part: {
+        type: 'tool', tool: 'write',
+        state: { status: 'completed', input: { path: file, content }, output: `Created file successfully: ${file}`, title: 'write' },
+      },
+    });
+  }
+  emit({ type: 'step_finish', part: { type: 'step-finish', reason: 'tool-calls', cost: 0, tokens: { input: 1000, output: 100, reasoning: 0, cache: { read: 0, write: 0 } } } });
+  emit({ type: 'text', part: { type: 'text', text } });
+
+  if (action.error) {
+    process.stderr.write(`${action.error}\n`);
+    emit({ type: 'error', error: { name: 'UnknownError', data: { message: action.error } } });
+  }
+  if (process.env.FAKE_OPENCODE_DELAY) await sleep(Number(process.env.FAKE_OPENCODE_DELAY));
+  process.exitCode = action.exitCode ?? (action.error ? 1 : 0);
+} else {
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
 emit({ type: 'step_start', part: { type: 'step-start' } });
 emit({
@@ -42,3 +98,4 @@ emit({ type: 'text', part: { type: 'text', text: 'Done.\n```json\n{"status":"don
 
 if (process.env.FAKE_OPENCODE_DELAY) await sleep(Number(process.env.FAKE_OPENCODE_DELAY));
 process.exit(0);
+}
