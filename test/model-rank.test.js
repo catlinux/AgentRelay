@@ -426,3 +426,20 @@ test('el detalle del fallo conserva las letras y quita los colores ANSI', async 
   const result = await rankModels({ candidates: [{ id: 'm', reason: 'sufijo', listed: true }], executor: {}, adapter, probes: { basic: probe, hard: probe } });
   assert.equal(result.entries[0].detail, 'Error: registry does not support tools');
 });
+
+test('rankModels conserva las entradas anteriores de los candidatos que un límite deja sin probar', async () => {
+  const home = temp();
+  const now = new Date('2026-10-09T12:00:00.000Z');
+  const kept = savedRankEntry('opencode/guardado', '2026-10-01T12:00:00.000Z');
+  const gone = savedRankEntry('opencode/retirado', '2026-10-08T12:00:00.000Z');
+  try {
+    saveChecks({ lastRun: null, models: {}, ranking: { entries: [kept, gone] } }, home);
+    const result = await rankModels({
+      candidates: [candidate('opencode/nuevo'), candidate(kept.id)], executor: {}, adapter: {}, home, now, maxPerProvider: 1,
+      probes: fakeProbes(),
+    });
+    assert.deepEqual(result.entries.map(({ id }) => id).sort(), [kept.id, 'opencode/nuevo'].sort());
+    assert.deepEqual(result.skipped, [kept.id]);
+    assert.equal(result.entries.some(({ id }) => id === gone.id), false);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
