@@ -41,7 +41,7 @@ test('providers --json muestra conexiones y recomendaciones sin credenciales', a
     const envNames = [...new Set(PROVIDERS.flatMap(({ env }) => env))];
     const savedEnv = new Map(envNames.map((name) => [name, process.env[name]]));
     for (const name of envNames) process.env[name] = '';
-    process.env.GROQ_API_KEY = 'api-secret-value';
+    process.env.MISTRAL_API_KEY = 'api-secret-value';
     const savedSettings = new Map(['AGENTRELAY_HOME', 'AGENTRELAY_NO_MIGRATE', 'AGENTRELAY_NO_STATE']
       .map((name) => [name, process.env[name]]));
     process.env.AGENTRELAY_HOME = path.join(cwd, 'home');
@@ -66,13 +66,13 @@ test('providers --json muestra conexiones y recomendaciones sin credenciales', a
     assert.equal(providers.find(({ id }) => id === 'opencode').connection.command, 'agentrelay login opencode');
     assert.equal(providers.find(({ id }) => id === 'deepseek').status, 'no conectado');
     assert.equal(providers.find(({ id }) => id === 'zai').connected, false);
-    assert.equal(providers.find(({ id }) => id === 'groq').connected, true);
-    assert.equal(providers.find(({ id }) => id === 'groq').freeTier, true);
+    assert.equal(providers.find(({ id }) => id === 'mistral').connected, true);
+    assert.equal(providers.find(({ id }) => id === 'mistral').freeTier, true);
     assert.equal(providers.find(({ id }) => id === 'nvidia').freeTier, false);
     assert.equal(providers.find(({ id }) => id === 'google').dataNotice, 'puede usar tus prompts para entrenar');
     assert.equal(providers.find(({ id }) => id === 'mistral').dataNotice, 'política de datos sin verificar');
-    assert.equal(providers.find(({ id }) => id === 'mistral').connection.env[0], 'MISTRAL_API_KEY');
-    assert.equal(providers.find(({ id }) => id === 'mistral').connection.signupUrl, 'https://console.mistral.ai/api-keys/');
+    assert.equal(providers.find(({ id }) => id === 'google').connection.env[0], 'GOOGLE_API_KEY');
+    assert.equal(providers.find(({ id }) => id === 'google').connection.signupUrl, 'https://aistudio.google.com/app/apikey');
     assert.doesNotMatch(output, /api-secret-value|stored/);
   } finally {
     rmSync(cwd, { recursive: true, force: true });

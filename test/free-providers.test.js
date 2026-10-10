@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { connectedProviders, getProvider } from '../src/free-providers.js';
 
 test('connectedProviders detecta una variable de entorno definida', () => {
-  assert.deepEqual(connectedProviders({ env: { GROQ_API_KEY: 'key' } }).map(({ id }) => id), ['groq']);
+  assert.deepEqual(connectedProviders({ env: { MISTRAL_API_KEY: 'key' } }).map(({ id }) => id), ['mistral']);
 });
 
 test('connectedProviders detecta autenticación de OpenCode', () => {
@@ -15,7 +15,7 @@ test('connectedProviders omite proveedores sin credenciales', () => {
 });
 
 test('connectedProviders omite variables vacías o con espacios', () => {
-  assert.deepEqual(connectedProviders({ env: { GROQ_API_KEY: '  ' } }), []);
+  assert.deepEqual(connectedProviders({ env: { MISTRAL_API_KEY: '  ' } }), []);
 });
 
 test('getProvider devuelve null para un proveedor desconocido', () => {

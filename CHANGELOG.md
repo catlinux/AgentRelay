@@ -38,6 +38,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Eliminado
 
+- **Groq sale del catálogo de proveedores.** Su plan gratuito admite entre 2.000 y 8.000 tokens por minuto por modelo y el prompt de un agente ocupa unos 8.500, así que ninguno de sus modelos puede usarse (`Request too large … tokens per minute`); el resto no existe para la cuenta probada.
 - Los nombres en castellano de los comandos del chat (`/ar:estado`, `usar`, `ayuda`, `lista`, `ver`, `actualizar`, `iniciar`, `ranquing`, `ranquing-nuevo`): ahora se llaman como en el terminal (`/ar:status`, `use`, `help`, `list`, `show`, `update`, `start`, `rank`). `agentrelay setup` los retira.
 - La antigua revisión diaria de 5 modelos nuevos, `executors rank` (ahora `rank`) y los documentos `docs/PLAN.md` y `docs/MODELOS.md`.
 
