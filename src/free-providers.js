@@ -26,18 +26,6 @@ export const PROVIDERS = [
     notes: '',
   },
   {
-    id: 'groq',
-    name: 'Groq',
-    env: ['GROQ_API_KEY'],
-    signupUrl: 'https://console.groq.com/keys',
-    tier: 'free',
-    freeTier: true,
-    limits: 'Aproximadamente 1000 peticiones al día.',
-    resetRule: null,
-    trainsOnData: null,
-    notes: '',
-  },
-  {
     id: 'google',
     name: 'Google',
     env: ['GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY'],
