@@ -284,7 +284,7 @@ const COMMANDS = {
       ['agentrelay rank', 'Muestra el último ranquing guardado.'],
       ['agentrelay rank --run', 'Calcula y guarda el ranquing ahora.'],
       ['agentrelay rank --run --max 4', 'Prueba como máximo cuatro modelos por proveedor.'],
-      ['agentrelay rank --run --provider nvidia,google --max 6', 'Prueba modelos de NVIDIA y Google, como máximo seis por proveedor.'],
+      ['agentrelay rank --run --provider mistral,zai --max 6', 'Prueba modelos de Mistral y Z.AI, como máximo seis por proveedor.'],
       ['agentrelay rank --run --force', 'Repite las pruebas recientes.'],
       ['agentrelay rank --detach', 'Inicia el cálculo en segundo plano.'],
     ],

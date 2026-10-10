@@ -7,7 +7,7 @@ test('connectedProviders detecta una variable de entorno definida', () => {
 });
 
 test('connectedProviders detecta autenticación de OpenCode', () => {
-  assert.deepEqual(connectedProviders({ env: {}, opencodeAuth: ['nvidia'] }).map(({ id }) => id), ['nvidia']);
+  assert.deepEqual(connectedProviders({ env: {}, opencodeAuth: ['zai'] }).map(({ id }) => id), ['zai']);
 });
 
 test('connectedProviders omite proveedores sin credenciales', () => {

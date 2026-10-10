@@ -68,11 +68,10 @@ test('providers --json muestra conexiones y recomendaciones sin credenciales', a
     assert.equal(providers.find(({ id }) => id === 'zai').connected, false);
     assert.equal(providers.find(({ id }) => id === 'mistral').connected, true);
     assert.equal(providers.find(({ id }) => id === 'mistral').freeTier, true);
-    assert.equal(providers.find(({ id }) => id === 'nvidia').freeTier, false);
-    assert.equal(providers.find(({ id }) => id === 'google').dataNotice, 'puede usar tus prompts para entrenar');
+    assert.equal(providers.find(({ id }) => id === 'zai').freeTier, false);
     assert.equal(providers.find(({ id }) => id === 'mistral').dataNotice, 'política de datos sin verificar');
-    assert.equal(providers.find(({ id }) => id === 'google').connection.env[0], 'GOOGLE_API_KEY');
-    assert.equal(providers.find(({ id }) => id === 'google').connection.signupUrl, 'https://aistudio.google.com/app/apikey');
+    assert.equal(providers.find(({ id }) => id === 'openrouter').connection.env[0], 'OPENROUTER_API_KEY');
+    assert.equal(providers.find(({ id }) => id === 'openrouter').connection.signupUrl, 'https://openrouter.ai/settings/keys');
     assert.doesNotMatch(output, /api-secret-value|stored/);
   } finally {
     rmSync(cwd, { recursive: true, force: true });

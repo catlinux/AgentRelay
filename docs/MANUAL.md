@@ -68,7 +68,7 @@ Esfuerzos: `bajo`, `medio`, `alto`, `extremo`, `máximo` (o `low`, `medium`, `hi
 | Ejecutor | Qué necesita | Cómo se conecta |
 |---|---|---|
 | `codex` (por defecto) | Cuenta de ChatGPT (vale la gratuita) o clave de API de OpenAI. Viene incluido. | `agentrelay login` |
-| `opencode` | Modelos gratuitos y de pago de OpenCode Zen, NVIDIA, Google, Mistral, OpenRouter, Z.AI y DeepSeek. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre el asistente de OpenCode para elegir proveedor; también puedes conectar con su variable de entorno) |
+| `opencode` | Modelos gratuitos y de pago de OpenCode Zen, Mistral, OpenRouter, Z.AI y DeepSeek. Se instala con `agentrelay executors add opencode`. | `agentrelay login opencode` (abre el asistente de OpenCode para elegir proveedor; también puedes conectar con su variable de entorno) |
 
 AgentRelay comprueba antes de cada tarea que el modelo existe para el ejecutor elegido (`agentrelay doctor` también): así un modelo de DeepSeek con Codex falla al instante con un mensaje claro y no gasta intentos.
 
@@ -96,7 +96,7 @@ Los ejecutores pueden consultar páginas y APIs (por ejemplo, extraer datos de W
 - Comprobado con Luna y con OpenCode/DeepSeek en Windows. En Linux no está comprobado todavía.
 
 ### Proveedores y modelos gratuitos de OpenCode
-`agentrelay providers` (o `/ar:providers`) muestra si cada proveedor está conectado, su nivel, los límites conocidos y un aviso de privacidad. Solo informa: no bloquea. La lista incluye OpenCode Zen, NVIDIA, Google, Mistral, OpenRouter y Z.AI (gratuitos), y DeepSeek (de pago). Límites conocidos: NVIDIA, unas 40 peticiones/min; modelos `:free` de OpenRouter, unas 50/día. Groq se descartó: su plan gratuito admite menos tokens por minuto (hasta 8.000) de los que ocupa el prompt de un agente (~8.500). Google puede usar los prompts para entrenar; la política de datos de los demás no está verificada.
+`agentrelay providers` (o `/ar:providers`) muestra si cada proveedor está conectado, su nivel, los límites conocidos y un aviso de privacidad. Solo informa: no bloquea. La lista incluye OpenCode Zen, Mistral, OpenRouter y Z.AI (gratuitos), y DeepSeek (de pago). Límite conocido: los modelos `:free` de OpenRouter, unas 50 peticiones/día. La política de datos de los proveedores no está verificada. Se descartaron tras probarlos: Groq (su plan gratuito admite menos tokens por minuto, hasta 8.000, de los que ocupa el prompt de un agente, ~8.500), NVIDIA (la mayoría de sus modelos agotan el tiempo de las pruebas) y Google (sus modelos gratuitos no superan la prueba difícil).
 
 Conecta un proveedor con `agentrelay login opencode` y elige uno en el asistente de OpenCode, o configura su variable de entorno (por ejemplo, `MISTRAL_API_KEY`). AgentRelay no guarda esas claves. Si el ejecutor es OpenCode, `agentrelay doctor` muestra los proveedores conectados.
 
