@@ -15,6 +15,8 @@ They do the steps of option B for you: Node.js and Git if missing, repository cl
 | Windows | `installer\windows\install.ps1` and an Inno Setup wizard (`agentrelay.iss`) | `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` shows what it would do without installing anything; remove `-DryRun` to install (`-InstallDir`, `-Executors opencode`, `-Login`). The `.exe`: `winget install JRSoftware.InnoSetup` and `ISCC.exe /DAppVersion=<version> installer\windows\agentrelay.iss` (output in `.agentrelay\installer\`). |
 | Debian / Ubuntu | `installer/debian/install.sh`, a windowed wizard (`install-gui.sh`, needs Zenity) and `build-deb.sh` | `bash installer/debian/install.sh --dry-run` shows the steps; `--install-deps` allows installing Git and Node.js with `sudo`; also `--executors` and `--login`. It adds `~/.local/bin` to the PATH permanently (in `~/.profile`, `~/.bashrc` and `~/.zshrc`; `--no-path` avoids it): open a new terminal afterwards. `build-deb.sh` builds the wizard's `.deb` package. |
 
+**Windows, the easiest:** download `AgentRelay-Setup.exe` from the [latest release](https://github.com/catlinux/AgentRelay/releases/latest) and open it (Windows will warn that it is unsigned: "More info" → "Run anyway"). A GitHub Actions workflow builds it whenever a version is published.
+
 AgentRelay is always installed as a git clone in your home folder, so `agentrelay update` keeps working.
 
 ## Option B: manual
