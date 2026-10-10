@@ -117,3 +117,18 @@ test('executorFor conserva los ajustes del mismo tipo y usa los valores por defe
   assert.equal(codexFree.apiFallback, false);
   assert.equal(codexFree.forceApi, false);
 });
+
+test('los modelos con la cuota agotada siguen en la lista y se descartan al elegir con su motivo', async () => {
+  const now = new Date('2026-10-10T12:00:00.000Z');
+  const checks = {
+    ...rankingChecks,
+    exhausted: { 'provider/a': { at: now.toISOString(), until: '2026-10-10T12:10:00.000Z', reason: 'cuota agotada' } },
+  };
+  const entries = routeEntries({ config: { executor: { type: 'opencode' }, routing: { paidOrder: [] } }, checks, now });
+  assert.ok(entries.some((entry) => entry.model === 'provider/a'));
+  const { entry, skipped } = await pickEntry(entries.filter((candidate) => candidate.type === 'opencode'), {
+    isAvailable: (quotaId) => quotaId !== 'provider/a',
+  });
+  assert.equal(entry.model, 'provider/a2');
+  assert.deepEqual(skipped.map((item) => item.reason), ['cuota agotada']);
+});

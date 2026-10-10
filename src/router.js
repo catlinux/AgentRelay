@@ -49,7 +49,7 @@ export function routeEntries({ config, checks, now = new Date(), effort = null }
     quotaId: CODEX_FREE_QUOTA, tier: 'A', trainsOnData: false, label: `${codexModel} (cuota gratuita de ChatGPT)`,
   });
   const highEffort = HIGH_EFFORTS.has(effort);
-  for (const model of rankedFree(checks, { now })) {
+  for (const model of rankedFree(checks, { now, includeExhausted: true })) {
     if (model.apt !== true || (highEffort && model.tier !== 'A')) continue;
     entries.push({
       key: `opencode:${model.id}`, type: 'opencode', model: model.id, api: false, paid: false,
