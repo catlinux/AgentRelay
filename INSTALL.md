@@ -12,7 +12,7 @@ Hacen por ti los pasos de la opción B: Node.js y Git si faltan, clon del reposi
 
 | Sistema | Qué hay | Cómo |
 |---|---|---|
-| Windows | `installer\windows\install.ps1` y un asistente de Inno Setup (`agentrelay.iss`) | `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` muestra lo que haría sin instalar nada; quita `-DryRun` para instalar (`-InstallDir`, `-Executors cline,opencode`, `-Login`). El `.exe`: `winget install JRSoftware.InnoSetup` y `ISCC.exe /DAppVersion=<versión> installer\windows\agentrelay.iss` (queda en `.agentrelay\installer\`). |
+| Windows | `installer\windows\install.ps1` y un asistente de Inno Setup (`agentrelay.iss`) | `powershell -ExecutionPolicy Bypass -File installer\windows\install.ps1 -DryRun` muestra lo que haría sin instalar nada; quita `-DryRun` para instalar (`-InstallDir`, `-Executors opencode`, `-Login`). El `.exe`: `winget install JRSoftware.InnoSetup` y `ISCC.exe /DAppVersion=<versión> installer\windows\agentrelay.iss` (queda en `.agentrelay\installer\`). |
 | Debian / Ubuntu | `installer/debian/install.sh`, un asistente con ventanas (`install-gui.sh`, necesita Zenity) y `build-deb.sh` | `bash installer/debian/install.sh --dry-run` muestra los pasos; `--install-deps` permite instalar Git y Node.js con `sudo`; también `--executors` y `--login`. Deja `~/.local/bin` en el PATH de forma permanente (en `~/.profile`, `~/.bashrc` y `~/.zshrc`; `--no-path` lo evita): abre una terminal nueva después. `build-deb.sh` genera el paquete `.deb` del asistente. |
 
 AgentRelay se instala siempre como un clon de git en tu carpeta personal, así que `agentrelay update` sigue funcionando.
@@ -33,7 +33,7 @@ AgentRelay se instala siempre como un clon de git en tu carpeta personal, así q
 cd ~          # en Windows: cd $HOME\Documents
 git clone https://github.com/catlinux/AgentRelay.git
 cd AgentRelay
-npm install
+npm ci
 npm link
 ```
 
