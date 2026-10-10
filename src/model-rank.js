@@ -270,7 +270,7 @@ function kindPriority(kind) {
   return ({ fail: 0, timeout: 1, unavailable: 2, quota: 3, credentials: 4 })[kind] ?? 5;
 }
 
-function rankingOrder(a, b) {
+export function rankingOrder(a, b) {
   if (a.apt !== b.apt) return Number(b.apt) - Number(a.apt);
   const tierPriority = (tier) => ({ A: 0, B: 1, null: 2 })[tier] ?? 2;
   if (tierPriority(a.tier) !== tierPriority(b.tier)) return tierPriority(a.tier) - tierPriority(b.tier);
@@ -292,6 +292,14 @@ async function safelyProbe(probe, options, now) {
 function providerOf(candidate) {
   const slash = candidate.id.indexOf('/');
   return slash === -1 ? 'opencode' : candidate.id.slice(0, slash);
+}
+
+export function mergeRankEntries(previousEntries = [], updatedEntries = [], replacedProviders = []) {
+  const replaced = new Set(replacedProviders);
+  return [
+    ...previousEntries.filter((entry) => typeof entry?.id !== 'string' || !replaced.has(providerOf(entry))),
+    ...updatedEntries,
+  ].sort(rankingOrder);
 }
 
 function interleaveProviders(candidates, maxPerProvider) {
