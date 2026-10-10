@@ -103,14 +103,14 @@ export function reviewNet(checks, id) {
 }
 
 // Devuelve una lista con .at y .stale no enumerables para conservar el contrato de array.
-export function rankedFree(checks, { now = new Date(), max = Infinity, minScore = 1 } = {}) {
+export function rankedFree(checks, { now = new Date(), max = Infinity, minScore = 1, includeExhausted = false } = {}) {
   const ranking = checks?.ranking;
   const entries = Array.isArray(ranking?.entries) ? ranking.entries : [];
   const models = entries
     .map((entry, index) => ({ entry, index }))
     .filter(({ entry }) => entry && typeof entry.id === 'string'
       && Number.isFinite(entry.score) && entry.score >= minScore
-      && !isExhausted(checks, entry.id, now))
+      && (includeExhausted || !isExhausted(checks, entry.id, now)))
     .sort((a, b) => Number(b.entry.apt === true) - Number(a.entry.apt === true)
       || (a.entry.tier === 'A' ? 0 : a.entry.tier === 'B' ? 1 : 2)
         - (b.entry.tier === 'A' ? 0 : b.entry.tier === 'B' ? 1 : 2)
