@@ -37,9 +37,9 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
-import { isDue, loadChecks, markDay, startDailyCheck } from './model-check.js';
+import { isDue, loadChecks, markDay, saveChecks, startDailyCheck } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels, discoverProviderModels } from './free-models.js';
-import { rankModels, renderRanking } from './model-rank.js';
+import { mergeRankEntries, rankModels, renderRanking } from './model-rank.js';
 import { isExhausted, lastQuotaEvent } from './free-ranking.js';
 import { connectedProviders, PROVIDERS } from './free-providers.js';
 import { reportPath, writeReport } from './executors-report.js';
@@ -65,7 +65,7 @@ Uso:
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
-  agentrelay rank [--run] [--detach] [--max <N>] [--force] [--json]  Muestra o calcula el ranquing de modelos gratuitos
+  agentrelay rank [--run] [--detach] [--provider <id[,id]>] [--max <N>] [--force] [--json]  Muestra o calcula el ranquing de modelos gratuitos
   agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
@@ -145,6 +145,7 @@ const OPTIONS = {
   all: { type: 'boolean' },
   background: { type: 'boolean' },
   max: { type: 'string' },
+  provider: { type: 'string' },
   detach: { type: 'boolean' },
   run: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
@@ -751,6 +752,14 @@ export function discoverRankCandidates({ listed = [], metadata = {}, source = 's
   return [...zenCandidates, ...providerCandidates];
 }
 
+export function filterRankCandidates(candidates, providers) {
+  const selected = new Set(providers);
+  return candidates.filter(({ id }) => {
+    const slash = id.indexOf('/');
+    return selected.has(slash === -1 ? 'opencode' : id.slice(0, slash));
+  });
+}
+
 /** Proveedores gratuitos conectados además de OpenCode Zen (que se descubre aparte). */
 async function freeProvidersConnected(executor) {
   const opencodeAuth = await connectedProviderIds(executor);
@@ -761,7 +770,17 @@ async function freeProvidersConnected(executor) {
 
 async function cmdRank(positionals, values) {
   if (positionals.length) {
-    process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--max <N>] [--force] [--json]\n');
+    process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--provider <id[,id]>] [--max <N>] [--force] [--json]\n');
+    return 1;
+  }
+  const selectedProviders = values.provider === undefined ? null : [...new Set(values.provider.split(',').map((id) => id.trim()).filter(Boolean))];
+  if (values.provider !== undefined && selectedProviders.length === 0) {
+    process.stderr.write(`Indica al menos un proveedor con --provider. Disponibles: ${PROVIDERS.map(({ id }) => id).join(', ')}.\n`);
+    return 1;
+  }
+  const unknownProvider = selectedProviders?.find((id) => !PROVIDERS.some((provider) => provider.id === id));
+  if (unknownProvider) {
+    process.stderr.write(`Proveedor desconocido: ${unknownProvider}. Disponibles: ${PROVIDERS.map(({ id }) => id).join(', ')}.\n`);
     return 1;
   }
   const max = values.max === undefined ? Infinity : Number(values.max);
@@ -807,6 +826,7 @@ async function cmdRank(positionals, values) {
     const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
     const args = [entry, 'rank', '--run', '--background'];
     if (values.max !== undefined) args.push('--max', String(max));
+    if (selectedProviders) args.push('--provider', selectedProviders.join(','));
     if (values.force) args.push('--force');
     const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true });
     child.unref();
@@ -816,8 +836,9 @@ async function cmdRank(positionals, values) {
   const listed = await adapter.listModels(executor);
   const metadata = await loadFreeMetadata({ home });
   const connected = await freeProvidersConnected(executor);
-  const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, freeTierProviders: freeTierProviderIds() });
-  if (!candidates.length) {
+  let candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, freeTierProviders: freeTierProviderIds() });
+  if (selectedProviders) candidates = filterRankCandidates(candidates, selectedProviders);
+  if (!candidates.length && !selectedProviders) {
     if (!values.background) {
       const message = 'No hay modelos gratuitos disponibles en tu cuenta de OpenCode.';
       if (values.json) {
@@ -840,6 +861,8 @@ async function cmdRank(positionals, values) {
     process.stdout.write(`Metadatos: ${metadata.source}\n`);
   }
   const now = new Date();
+  const previousRanking = selectedProviders ? loadChecks(home).ranking : null;
+  const previousEntries = Array.isArray(previousRanking?.entries) ? previousRanking.entries : [];
   let result;
   try {
     result = await rankModels({
@@ -850,9 +873,20 @@ async function cmdRank(positionals, values) {
     if (values.background) return 0;
     throw error;
   }
+  if (selectedProviders) {
+    result.entries = mergeRankEntries(previousEntries, result.entries, selectedProviders);
+    result.tested = result.entries.length;
+    const checks = loadChecks(home);
+    checks.ranking = {
+      at: now.toISOString(),
+      stoppedBy: result.stoppedBy,
+      entries: result.entries.map((item) => ({ ...item })),
+    };
+    saveChecks(checks, home);
+  }
   if (!values.background) {
     if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    else process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: candidates.length })}\n`);
+    else process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: result.entries.length + result.skipped.length })}\n`);
   }
   return 0;
 }

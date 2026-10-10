@@ -5,7 +5,8 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { discoverRankCandidates } from '../src/cli.js';
+import { discoverRankCandidates, filterRankCandidates } from '../src/cli.js';
+import { mergeRankEntries } from '../src/model-rank.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
@@ -98,6 +99,39 @@ test('rank --run rechaza --max 0', () => {
     assert.equal(result.status, 1);
     assert.match(result.stderr, /--max debe ser un entero mayor o igual que 1/);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
+});
+
+test('rank --provider filtra candidatos por proveedor', () => {
+  const candidates = [
+    { id: 'opencode/zen-free' },
+    { id: 'nvidia/nemotron-free' },
+    { id: 'google/gemini-free' },
+  ];
+  assert.deepEqual(filterRankCandidates(candidates, ['nvidia']).map(({ id }) => id), ['nvidia/nemotron-free']);
+  assert.deepEqual(filterRankCandidates(candidates, ['opencode', 'google']).map(({ id }) => id), ['opencode/zen-free', 'google/gemini-free']);
+});
+
+test('rank --provider rechaza un proveedor desconocido', () => {
+  const context = setup();
+  try {
+    const result = cli(context, ['--run', '--provider', 'unknown']);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Proveedor desconocido: unknown\. Disponibles: opencode, nvidia, google, mistral, openrouter, zai, deepseek\./);
+  } finally { rmSync(context.root, { recursive: true, force: true }); }
+});
+
+test('rank --provider conserva las entradas guardadas de otros proveedores', () => {
+  const previous = [
+    { id: 'nvidia/anterior', apt: false, tier: null, score: 1, kind: 'parcial', seconds: 5 },
+    { id: 'google/conservado', apt: true, tier: 'A', score: 3, kind: 'ok', seconds: 2 },
+  ];
+  const updated = [
+    { id: 'nvidia/nuevo', apt: true, tier: 'B', score: 3, kind: 'ok', seconds: 4 },
+  ];
+  const merged = mergeRankEntries(previous, updated, ['nvidia']);
+  assert.deepEqual(merged.map(({ id }) => id), ['google/conservado', 'nvidia/nuevo']);
+  assert.equal(merged[0], previous[1]);
+  assert.equal(merged.some(({ id }) => id === 'nvidia/anterior'), false);
 });
 
 test('rank convierte los modelos listados de proveedores conectados en candidatos', async () => {
