@@ -433,9 +433,15 @@ export async function rankModels({ candidates = [], executor, adapter, max = Inf
 
   // Una cuota alcanzada cuenta como detención aunque otros proveedores terminen sus pruebas.
   const stoppedBy = stoppedProviders.size ? 'cuota' : null;
-  entries.sort(rankingOrder);
   const testedIds = new Set(entries.map((entry) => entry.id));
   const skipped = orderedCandidates.filter((candidate) => !testedIds.has(candidate.id)).map((candidate) => candidate.id);
+  // Un límite como --max no debe borrar lo ya evaluado: se conservan las entradas anteriores de los
+  // candidatos que siguen existiendo pero no se han probado en esta pasada.
+  for (const id of skipped) {
+    const previous = previousEntries.get(id);
+    if (previous) entries.push(previous);
+  }
+  entries.sort(rankingOrder);
 
   if (home) {
     lastChecks.ranking = {
