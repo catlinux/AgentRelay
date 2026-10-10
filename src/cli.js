@@ -773,7 +773,7 @@ async function cmdRank(positionals, values) {
     process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--provider <id[,id]>] [--max <N>] [--force] [--json]\n');
     return 1;
   }
-  const selectedProviders = values.provider === undefined ? null : [...new Set(values.provider.split(',').map((id) => id.trim()).filter(Boolean))];
+  const selectedProviders = values.provider === undefined ? null : [...new Set(values.provider.split(/[,\s]+/).map((id) => id.trim()).filter(Boolean))];
   if (values.provider !== undefined && selectedProviders.length === 0) {
     process.stderr.write(`Indica al menos un proveedor con --provider. Disponibles: ${PROVIDERS.map(({ id }) => id).join(', ')}.\n`);
     return 1;

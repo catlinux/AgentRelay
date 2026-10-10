@@ -111,6 +111,17 @@ test('rank --provider filtra candidatos por proveedor', () => {
   assert.deepEqual(filterRankCandidates(candidates, ['opencode', 'google']).map(({ id }) => id), ['opencode/zen-free', 'google/gemini-free']);
 });
 
+test('rank --provider acepta la lista separada por comas o por espacios', () => {
+  for (const list of ['nvidia,desconocido', 'nvidia desconocido']) {
+    const context = setup();
+    try {
+      const result = cli(context, ['--run', '--provider', list]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Proveedor desconocido: desconocido./);
+    } finally { rmSync(context.root, { recursive: true, force: true }); }
+  }
+});
+
 test('rank --provider rechaza un proveedor desconocido', () => {
   const context = setup();
   try {
