@@ -112,7 +112,7 @@ test('rank --provider filtra candidatos por proveedor', () => {
 });
 
 test('rank --provider acepta la lista separada por comas o por espacios', () => {
-  for (const list of ['nvidia,desconocido', 'nvidia desconocido']) {
+  for (const list of ['zai,desconocido', 'zai desconocido']) {
     const context = setup();
     try {
       const result = cli(context, ['--run', '--provider', list]);
@@ -127,7 +127,7 @@ test('rank --provider rechaza un proveedor desconocido', () => {
   try {
     const result = cli(context, ['--run', '--provider', 'unknown']);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Proveedor desconocido: unknown\. Disponibles: opencode, nvidia, google, mistral, openrouter, zai, deepseek\./);
+    assert.match(result.stderr, /Proveedor desconocido: unknown\. Disponibles: opencode, mistral, openrouter, zai, deepseek\./);
   } finally { rmSync(context.root, { recursive: true, force: true }); }
 });
 
@@ -148,8 +148,8 @@ test('rank --provider conserva las entradas guardadas de otros proveedores', () 
 test('rank convierte los modelos listados de proveedores conectados en candidatos', async () => {
   const adapter = { listModels: async () => [
     { id: 'opencode/zen-free' },
-    { id: 'google/gemini-free' },
-    { id: 'google/gemini-limited' },
+    { id: 'mistral/gemini-free' },
+    { id: 'mistral/gemini-limited' },
     { id: 'groq/llama-free' },
   ] };
   const metadata = {
@@ -157,9 +157,9 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
       'zen-free': { name: 'Zen', cost: { input: 0, output: 0 }, limit: { context: 128000 }, reasoning: true, tool_call: true },
     },
     providers: {
-      google: {
-        'gemini-free': { name: 'Gemini', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2026-01-01' },
-        'gemini-limited': { name: 'Gemini Limited', cost: { input: 0.1, output: 0.2 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2025-01-01' },
+      mistral: {
+        'gemini-free': { name: 'Ministral', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2026-01-01' },
+        'gemini-limited': { name: 'Ministral Limited', cost: { input: 0.1, output: 0.2 }, limit: { context: 100000 }, reasoning: true, tool_call: true, release_date: '2025-01-01' },
       },
       groq: {
         'llama-free': { name: 'Llama', cost: { input: 0, output: 0 }, limit: { context: 100000 }, reasoning: false, tool_call: true },
@@ -167,7 +167,7 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
     },
   };
   const listed = await adapter.listModels({});
-  const candidates = discoverRankCandidates({ listed, metadata, source: 'red', connected: ['google'] });
+  const candidates = discoverRankCandidates({ listed, metadata, source: 'red', connected: ['mistral'] });
   assert.deepEqual(candidates.map(({ id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate, freeTier, cost }) => ({
     id, free, listed: isListed, reason, name, context, reasoning, toolCall, releaseDate, freeTier, cost,
   })), [
@@ -176,18 +176,18 @@ test('rank convierte los modelos listados de proveedores conectados en candidato
       reasoning: true, toolCall: true, releaseDate: null, freeTier: undefined, cost: undefined,
     },
     {
-      id: 'google/gemini-free', free: true, listed: true, reason: 'metadatos', name: 'Gemini', context: 100000,
+      id: 'mistral/gemini-free', free: true, listed: true, reason: 'metadatos', name: 'Ministral', context: 100000,
       reasoning: true, toolCall: true, releaseDate: '2026-01-01', freeTier: true, cost: { input: 0, output: 0 },
     },
     {
-      id: 'google/gemini-limited', free: true, listed: true, reason: 'nivel gratuito con límites', name: 'Gemini Limited', context: 100000,
+      id: 'mistral/gemini-limited', free: true, listed: true, reason: 'nivel gratuito con límites', name: 'Ministral Limited', context: 100000,
       reasoning: true, toolCall: true, releaseDate: '2025-01-01', freeTier: true, cost: { input: 0.1, output: 0.2 },
     },
   ]);
 
   const zenOnly = await { listModels: async () => [{ id: 'opencode/zen-free' }] }.listModels({});
   assert.deepEqual(
-    discoverRankCandidates({ listed: zenOnly, metadata, source: 'red', connected: ['google'] }).map(({ id }) => id),
+    discoverRankCandidates({ listed: zenOnly, metadata, source: 'red', connected: ['mistral'] }).map(({ id }) => id),
     ['opencode/zen-free'],
   );
 });
