@@ -47,6 +47,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- `INSTALL.md` e `INSTALL.en.md` aún ofrecían Cline en el instalador de Windows y usaban `npm install` (que puede reescribir `package-lock.json` y hacer fallar `agentrelay update`); ahora indican OpenCode y `npm ci`.
 - **Modelos inservibles para un agente.** Un error `Request too large … tokens per minute` (el plan gratuito permite menos tokens por minuto de los que ocupa el prompt del agente, p. ej. 2.000 frente a ~8.000 en `groq/gpt-oss-safeguard-20b`) se clasifica como modelo no disponible y ya no cuenta como cuota agotada; los modelos que generan imágenes o audio no se evalúan.
 - **El informe del enrutado explica los modelos saltados por cuota agotada** (antes solo salían los no instalados o sin sesión).
 - **`rank --max` ya no borra lo evaluado antes.** Los modelos que el límite deja sin probar conservan su entrada anterior en el ranquing (antes desaparecían y se perdían, por ejemplo, los de nivel A).
