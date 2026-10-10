@@ -86,10 +86,9 @@ En el informe, la sección **Enrutado** dice con qué empezó, los cambios, los 
 agentrelay doctor          # comprueba el entorno; con --fix arregla lo seguro
 agentrelay update --yes    # actualiza AgentRelay (hazlo en cada equipo, uno a uno)
 agentrelay setup           # tras actualizar, si quieres los comandos nuevos en Claude Code (/ar:...)
-agentrelay usage           # consumo y coste de las ejecuciones del proyecto
 ```
 
-`update` se niega si la copia instalada tiene cambios locales; no modifica nada.
+El gasto de cada ejecución (tokens y coste estimado) está en su informe, en la tabla de intentos. `update` se niega si la copia instalada tiene cambios locales; no modifica nada.
 
 ## Si algo no va
 
