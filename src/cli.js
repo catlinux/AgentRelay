@@ -16,7 +16,7 @@ import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatu
 import { canonicalSetting, parseSettingValue } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
-import { applyBlockToFile, blockStatus, executorInstructionsNotice, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
+import { applyBlockToFile, blockStatus, EXECUTOR_BLOCK, executorInstructionsNotice, GLOBAL_BLOCK, hasExecutorBlock, projectBlockStatus, projectRulesForExecutor, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository, scanFolder } from './prepare.js';
@@ -1438,10 +1438,24 @@ function writeConfigIfRequested(root, values) {
   }
 }
 
-function initInstructionFiles(dir) {
+/** Tipo del ejecutor configurado, o null si la configuración no se puede leer. */
+function configuredExecutorType(dir, values) {
+  try {
+    return loadConfig({ cwd: dir, configPath: values.config }).config.executor.type;
+  } catch {
+    return null;
+  }
+}
+
+function initInstructionFiles(dir, executorType = null) {
   const claudeFile = path.join(dir, 'CLAUDE.md');
   const agentsFile = path.join(dir, 'AGENTS.md');
+  // El ejecutor no lee CLAUDE.md: su AGENTS.md remite a él (y se mantiene así en los siguientes init).
+  const executorAgents = { file: agentsFile, block: EXECUTOR_BLOCK, executor: true };
   if (!existsSync(agentsFile)) {
+    if (existsSync(claudeFile) && executorType && projectRulesForExecutor(dir, executorType)) {
+      return [{ file: claudeFile, block: PROJECT_BLOCK }, executorAgents];
+    }
     if (!existsSync(claudeFile)) {
       return [
         { file: agentsFile, block: PROJECT_BLOCK },
@@ -1451,6 +1465,7 @@ function initInstructionFiles(dir) {
     return [{ file: claudeFile, block: PROJECT_BLOCK }];
   }
 
+  if (hasExecutorBlock(readFileSync(agentsFile, 'utf8'))) return [{ file: claudeFile, block: PROJECT_BLOCK }, executorAgents];
   const claude = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8') : '';
   if (/^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)) return [{ file: agentsFile, block: PROJECT_BLOCK }];
   return [{ file: claudeFile, block: PROJECT_BLOCK }, { file: agentsFile, block: PROJECT_BLOCK }];
@@ -1490,7 +1505,7 @@ function projectInstructionStatus(dir) {
   const files = /^[ \t]*@AGENTS\.md[ \t]*\r?$/m.test(claude)
     ? [agentsFile]
     : [claudeFile, ...(existsSync(agentsFile) ? [agentsFile] : [])];
-  const statuses = files.map((file) => blockStatus(file, PROJECT_BLOCK));
+  const statuses = files.map((file) => projectBlockStatus(file));
   const existingStatuses = statuses.filter((status) => status !== 'nofile');
   if (existingStatuses.length && existingStatuses.every((status) => status === 'current')) return 'current';
   if (statuses.includes('outdated')) return 'outdated';
@@ -1535,9 +1550,9 @@ async function cmdInit(values) {
 
     ensureProjectConfigIgnored(dir);
 
-    const instructionFiles = initInstructionFiles(dir);
+    const instructionFiles = initInstructionFiles(dir, configuredExecutorType(dir, values));
     for (const instruction of instructionFiles) {
-      if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined })}\n`);
+      if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined, executor: instruction.executor === true })}\n`);
       let action;
       if (instruction.content !== undefined) {
         writeFileSync(instruction.file, `${instruction.content}\n`);
@@ -1560,7 +1575,7 @@ async function cmdInit(values) {
     return 1;
   }
 
-  const instructionFiles = initInstructionFiles(root);
+  const instructionFiles = initInstructionFiles(root, configuredExecutorType(root, values));
 
   // Estado del repositorio antes de tocar nada.
   const wasClean = await isClean(root);
@@ -1570,7 +1585,7 @@ async function cmdInit(values) {
 
   const changedFiles = [];
   for (const instruction of instructionFiles) {
-    if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined })}\n`);
+    if (!values.quiet) process.stdout.write(`${initExplanation(instruction.file, { importOnly: instruction.content !== undefined, executor: instruction.executor === true })}\n`);
     let action;
     if (instruction.content !== undefined) {
       writeFileSync(instruction.file, `${instruction.content}\n`);

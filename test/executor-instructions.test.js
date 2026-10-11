@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { executorInstructionsNotice, PROJECT_BLOCK, projectRulesForExecutor } from '../src/instructions.js';
+import { EXECUTOR_BLOCK, executorInstructionsNotice, PROJECT_BLOCK, projectRulesForExecutor } from '../src/instructions.js';
 import { collectProjectState, renderProjectState } from '../src/project-state.js';
 import { buildFixPrompt, buildImplementPrompt, buildSelfReviewPrompt } from '../src/prompts.js';
 import { applyReview, startRun } from '../src/orchestrator.js';
@@ -152,18 +152,54 @@ test('status avisa de que Codex no lee CLAUDE.md y no hay AGENTS.md', async () =
   }
 });
 
-test('init con Codex y un CLAUDE.md existente avisa y no crea AGENTS.md', () => {
+
+function runInit(repo, home) {
+  return spawnSync(process.execPath, [BIN, 'init', '--yes'], {
+    cwd: repo.dir, encoding: 'utf8',
+    env: { ...process.env, AGENTRELAY_HOME: home, AGENTRELAY_NO_MIGRATE: '1' },
+  });
+}
+
+test('init con Codex y un CLAUDE.md existente crea un AGENTS.md que remite a él y es idempotente', async () => {
   const repo = makeRepo();
+  const originalHome = process.env.AGENTRELAY_HOME;
+  const home = path.join(repo.dir, 'home');
   try {
     writeFileSync(path.join(repo.dir, 'CLAUDE.md'), 'Normas propias\n');
-    const r = spawnSync(process.execPath, [BIN, 'init', '--yes'], {
-      cwd: repo.dir, encoding: 'utf8',
-      env: { ...process.env, AGENTRELAY_HOME: path.join(repo.dir, 'home'), AGENTRELAY_NO_MIGRATE: '1' },
-    });
+    const first = runInit(repo, home);
+    assert.equal(first.status, 0, first.stderr);
+    assert.doesNotMatch(first.stdout, /Aviso/);
+    const claude = readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8');
+    const agents = readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8');
+    assert.equal(claude, `Normas propias\n\n${PROJECT_BLOCK}\n`);
+    assert.equal(agents, `${EXECUTOR_BLOCK}\n`);
+    assert.doesNotMatch(agents, /agentrelay run/);
+
+    const second = runInit(repo, home);
+    assert.equal(second.status, 0, second.stderr);
+    assert.match(second.stdout, /sin cambios .*AGENTS\.md/);
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), agents);
+    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), claude);
+
+    process.env.AGENTRELAY_HOME = home;
+    const state = await collectProjectState(repo.dir);
+    assert.equal(state.instructions.agents, 'current');
+    assert.equal(state.instructions.executorNotice, null);
+  } finally {
+    if (originalHome === undefined) delete process.env.AGENTRELAY_HOME;
+    else process.env.AGENTRELAY_HOME = originalHome;
+    repo.cleanup();
+  }
+});
+
+test('init no sustituye un AGENTS.md existente con contenido propio por el bloque de ejecutor', () => {
+  const repo = makeRepo();
+  try {
+    writeFileSync(path.join(repo.dir, 'CLAUDE.md'), 'Normas de Claude\n');
+    writeFileSync(path.join(repo.dir, 'AGENTS.md'), 'Normas compartidas\n');
+    const r = runInit(repo, path.join(repo.dir, 'home'));
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /Aviso: El ejecutor codex no lee CLAUDE\.md y no hay AGENTS\.md/);
-    assert.equal(readFileSync(path.join(repo.dir, 'CLAUDE.md'), 'utf8'), `Normas propias\n\n${PROJECT_BLOCK}\n`);
-    assert.throws(() => readFileSync(path.join(repo.dir, 'AGENTS.md')));
+    assert.equal(readFileSync(path.join(repo.dir, 'AGENTS.md'), 'utf8'), `Normas compartidas\n\n${PROJECT_BLOCK}\n`);
   } finally {
     repo.cleanup();
   }
