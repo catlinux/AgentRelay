@@ -151,7 +151,7 @@ AgentRelay **nunca** hace commits ni push: los cambios quedan en tu carpeta. Si 
 | En Windows, errores de `sed`, `dirname` o `uname` | Usa `agentrelay.cmd` |
 | Ejecutor no instalado | `agentrelay executors add <nombre>` |
 | El ejecutor no puede acceder a internet | Comprueba `executor.network` (debe ser `true`); en Windows pídele Node `fetch`, no `curl` |
-| Codex falla en Windows con «apply deny-read ACLs» | Añade `-c windows.sandbox=unelevated` a `executor.extraArgs` |
+| Codex falla en Windows con «apply deny-read ACLs» | Ya no debería ocurrir: AgentRelay lanza Codex con `windows.sandbox=unelevated`. Si aparece, `agentrelay update` |
 
 Con una clave de API en Codex se **sustituye la sesión de ChatGPT**: para volver a la cuenta, `agentrelay login`.
 

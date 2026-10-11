@@ -149,7 +149,7 @@ export function commandParts(command) {
  * Argumentos de `codex exec`. El proveedor se ignora: Codex usa la sesión de
  * ChatGPT del usuario.
  */
-export function buildArgs(executor, instruction, schemaFile) {
+export function buildArgs(executor, instruction, schemaFile, platform = process.platform) {
   const args = ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', schemaFile];
   if (executor.model) args.push('-m', executor.model);
   // Sin comillas: proc.js rechaza comillas dobles en los argumentos de cmd.exe
@@ -158,7 +158,11 @@ export function buildArgs(executor, instruction, schemaFile) {
   if (executor.thinking && executor.thinking !== 'none') args.push('-c', `model_reasoning_effort=${executor.thinking}`);
   // El sandbox de Codex corta la red por defecto; sin esto el ejecutor no puede consultar páginas ni APIs.
   if (executor.network !== false) args.push('-c', 'sandbox_workspace_write.network_access=true');
-  args.push(...(executor.extraArgs || []), instruction);
+  // El sandbox elevado de Windows falla en algunos equipos («apply deny-read ACLs») y Codex no puede crear ningún
+  // proceso; el no elevado funciona en todos. Solo se omite si el usuario ya fija windows.sandbox en extraArgs.
+  const extra = executor.extraArgs || [];
+  if (platform === 'win32' && !extra.some((a) => String(a).startsWith('windows.sandbox'))) args.push('-c', 'windows.sandbox=unelevated');
+  args.push(...extra, instruction);
   return args;
 }
 
