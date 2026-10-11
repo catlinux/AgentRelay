@@ -88,10 +88,18 @@ function header(phase, title) {
   return `AgentRelay-Phase: ${phase}\n\n# ${title}\n`;
 }
 
-export function buildImplementPrompt(task, { validationCommands, selfReview }) {
+// Normas del proyecto que el ejecutor no leería por sí solo (ver projectRulesForExecutor).
+function projectRulesSection(rules) {
+  return rules
+    ? `# Project instructions (from ${rules.source})\nFollow these project rules while working on the task.\n\n${rules.text}\n`
+    : '';
+}
+
+export function buildImplementPrompt(task, { validationCommands, selfReview, projectRules }) {
   return [
     header('implement', `Delegated task: ${task.title}`),
     'You are the executor of a delegated software development task. Work directly in the current repository.\n',
+    projectRulesSection(projectRules),
     taskSections(task, validationCommands),
     RULES,
     selfReview === 'none' ? '' : INLINE_SELF_REVIEW,
@@ -99,7 +107,7 @@ export function buildImplementPrompt(task, { validationCommands, selfReview }) {
   ].join('\n');
 }
 
-export function buildFixPrompt(task, { validationCommands, selfReview, feedback, validations, scopeViolations }) {
+export function buildFixPrompt(task, { validationCommands, selfReview, feedback, validations, scopeViolations, projectRules }) {
   const problems = [
     feedback ? feedback.trim() : '',
     scopeViolations?.length
@@ -112,6 +120,7 @@ export function buildFixPrompt(task, { validationCommands, selfReview, feedback,
     'A previous attempt at this task needs corrections. Its changes are still in the working tree: build on them instead of starting over.\n',
     section('Problems to fix', problems),
     section('Failing validations', formatValidations(validations || [], { onlyFailed: true })),
+    projectRulesSection(projectRules),
     '# Original task\n',
     taskSections(task, validationCommands),
     RULES,
@@ -120,12 +129,13 @@ export function buildFixPrompt(task, { validationCommands, selfReview, feedback,
   ].join('\n');
 }
 
-export function buildSelfReviewPrompt(task, { validationCommands, changedFiles, diff, validations }) {
+export function buildSelfReviewPrompt(task, { validationCommands, changedFiles, diff, validations, projectRules }) {
   const truncated = diff.length > SELF_REVIEW_DIFF_CHARS;
   const diffText = truncated ? `${diff.slice(0, SELF_REVIEW_DIFF_CHARS)}\n... (diff truncated; read the files for the rest)` : diff;
   return [
     header('self-review', `Self-review of task: ${task.title}`),
     'You implemented the task below. Before it is handed over for acceptance, review the result critically.\n',
+    projectRulesSection(projectRules),
     '# Original task\n',
     taskSections(task, validationCommands),
     section('Changed files', bullets(changedFiles.map((f) => `${f.status} ${f.path}`))),

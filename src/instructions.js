@@ -210,6 +210,42 @@ export function removeBlockFromFile(file) {
   return { action };
 }
 
+// Cuántos caracteres de CLAUDE.md se incluyen como máximo en el prompt de una tarea.
+const PROJECT_RULES_MAX_CHARS = 20000;
+
+// Ejecutores que, sin AGENTS.md, recurren a CLAUDE.md por su cuenta (OpenCode
+// lo hace; Codex solo lee AGENTS.md).
+const READS_CLAUDE_MD = new Set(['opencode']);
+
+/**
+ * Normas del proyecto que el ejecutor no vería por sí solo: el contenido propio
+ * de CLAUDE.md (sin el bloque de AgentRelay ni la línea `@AGENTS.md`) cuando no
+ * existe AGENTS.md y el ejecutor no lee CLAUDE.md. Devuelve `null` si no hay
+ * nada que aportar; en otro caso `{ source, text }`.
+ */
+export function projectRulesForExecutor(root, executorType) {
+  const agentsFile = path.join(root, 'AGENTS.md');
+  const claudeFile = path.join(root, 'CLAUDE.md');
+  if (READS_CLAUDE_MD.has(executorType) || existsSync(agentsFile) || !existsSync(claudeFile)) return null;
+  let text = readFileSync(claudeFile, 'utf8');
+  try {
+    text = removeBlock(text).text;
+  } catch {
+    // Marcas incoherentes: se usa el texto tal cual antes que perder las normas.
+  }
+  text = text.replace(/^[ \t]*@AGENTS\.md[ \t]*\r?$/gm, '').replace(/^﻿/, '').trim();
+  if (text === '') return null;
+  const truncated = text.length > PROJECT_RULES_MAX_CHARS;
+  return { source: 'CLAUDE.md', text: truncated ? `${text.slice(0, PROJECT_RULES_MAX_CHARS)}\n... (truncated; read CLAUDE.md for the rest)` : text };
+}
+
+/** Aviso para el usuario cuando AgentRelay tiene que inyectar CLAUDE.md en las tareas; `null` si no hace falta. */
+export function executorInstructionsNotice(root, executorType) {
+  const rules = projectRulesForExecutor(root, executorType);
+  if (!rules) return null;
+  return `El ejecutor ${executorType} no lee CLAUDE.md y no hay AGENTS.md: AgentRelay incluirá el contenido de CLAUDE.md en el prompt de cada tarea. Si prefieres que el ejecutor lo lea de AGENTS.md, créalo tú.`;
+}
+
 /** Ruta del archivo de instrucciones global a partir del directorio .claude. */
 export function globalInstructionsPath(claudeDir) {
   return path.join(claudeDir ?? path.join(os.homedir(), '.claude'), 'CLAUDE.md');

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import path from 'node:path';
 import { loadConfig } from './config.js';
 import { isClean, pendingChanges } from './git.js';
-import { blockStatus, PROJECT_BLOCK } from './instructions.js';
+import { blockStatus, executorInstructionsNotice, PROJECT_BLOCK } from './instructions.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
 import { runProcess } from './proc.js';
 import { listRunIds, loadState, workspaceDir } from './store.js';
@@ -31,6 +31,7 @@ export async function collectProjectState(root, { now = new Date() } = {}) {
   const instructions = {
     agents: blockStatus(agentsFile, PROJECT_BLOCK),
     claude: claudeText === '@AGENTS.md' ? 'importa AGENTS.md' : blockStatus(claudeFile, PROJECT_BLOCK),
+    executorNotice: executorInstructionsNotice(absoluteRoot, loaded.config.executor.type),
   };
   const recent = [...allRuns].reverse().slice(0, 5).map(({ id, state, interrupted: isInterrupted }) => ({
     id,
@@ -93,6 +94,7 @@ export function renderProjectState(state) {
     `# Estado de ${state.name}`, '', `Actualizado: ${date}`, '', '## Resumen', '',
     `- Carpeta: ${state.root}`, `- Git: ${git}`, `- Ejecutor: ${executor}`,
     `- Instrucciones: AGENTS.md ${esBlock(state.instructions.agents)}; CLAUDE.md ${esBlock(state.instructions.claude)}`,
+    ...(state.instructions.executorNotice ? [`- Instrucciones del ejecutor: ${state.instructions.executorNotice}`] : []),
     `- Ejecuciones: ${runs}`, '', '## Últimas ejecuciones', '',
   ];
   if (state.runs.recent.length) {

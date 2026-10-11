@@ -10,6 +10,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import { getExecutor } from './executors/index.js';
+import { projectRulesForExecutor } from './instructions.js';
 import { diffFromBase, head, pendingChanges } from './git.js';
 import { buildFixPrompt, buildImplementPrompt, buildSelfReviewPrompt } from './prompts.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from './policy.js';
@@ -75,7 +76,9 @@ function normalizeRepoPath(file) {
 async function attempt(ctx, kind, { feedback, check } = {}) {
   const { state, task, config, root } = ctx;
   const n = state.attempts.length + 1;
-  const common = { validationCommands: ctx.validationCommands, selfReview: state.selfReview.mode };
+  const configured = currentExecutor(state);
+  const projectRules = projectRulesForExecutor(root, configured.type);
+  const common = { validationCommands: ctx.validationCommands, selfReview: state.selfReview.mode, projectRules };
 
   let prompt;
   if (kind === 'implement') prompt = buildImplementPrompt(task, common);
@@ -85,13 +88,12 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     });
   } else {
     prompt = buildSelfReviewPrompt(task, {
-      validationCommands: ctx.validationCommands, changedFiles: check.files, diff: check.patch, validations: check.validations,
+      validationCommands: ctx.validationCommands, changedFiles: check.files, diff: check.patch, validations: check.validations, projectRules,
     });
   }
 
   const base = `attempt-${n}-${kind}`;
   writeRunFile(root, state.id, `${base}.prompt.md`, prompt);
-  const configured = currentExecutor(state);
   const executor = {
     ...configured,
     thinking: task.effort ?? configured.thinking,
