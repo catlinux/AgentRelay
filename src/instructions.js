@@ -72,6 +72,28 @@ export const PROJECT_BLOCK = [
   '<!-- agentrelay:end -->',
 ].join('\n');
 
+// Bloque del AGENTS.md que crea `init` cuando el ejecutor no lee CLAUDE.md: remite a
+// CLAUDE.md en lugar de copiar sus normas, que así nunca quedan anticuadas.
+export const EXECUTOR_HEADING = '## Normas del proyecto para el ejecutor (AgentRelay)';
+export const EXECUTOR_BLOCK = [
+  START_MARK,
+  EXECUTOR_HEADING,
+  '',
+  'Las normas de este proyecto están en `CLAUDE.md`. Léelo entero antes de empezar y síguelo. Ignora en él la sección «Delegación con AgentRelay»: tú eres el ejecutor, no el orquestador; haz solo la tarea que te han dado y no ejecutes `agentrelay`.',
+  END_MARK,
+].join('\n');
+
+/** True si el texto lleva el bloque de ejecutor (el que remite a CLAUDE.md) en lugar del de orquestación. */
+export function hasExecutorBlock(text) {
+  return text.includes(EXECUTOR_HEADING);
+}
+
+/** Estado del bloque que corresponde a ese archivo: el de ejecutor si lo lleva, y si no el de orquestación. */
+export function projectBlockStatus(file) {
+  const executor = existsSync(file) && hasExecutorBlock(readFileSync(file, 'utf8'));
+  return blockStatus(file, executor ? EXECUTOR_BLOCK : PROJECT_BLOCK);
+}
+
 /**
  * Estado del bloque de AgentRelay en un archivo, sin modificarlo:
  * 'nofile' (no existe el archivo), 'missing' (sin bloque), 'outdated' (el bloque
@@ -243,7 +265,7 @@ export function projectRulesForExecutor(root, executorType) {
 export function executorInstructionsNotice(root, executorType) {
   const rules = projectRulesForExecutor(root, executorType);
   if (!rules) return null;
-  return `El ejecutor ${executorType} no lee CLAUDE.md y no hay AGENTS.md: AgentRelay incluirá el contenido de CLAUDE.md en el prompt de cada tarea. Si prefieres que el ejecutor lo lea de AGENTS.md, créalo tú.`;
+  return `El ejecutor ${executorType} no lee CLAUDE.md y no hay AGENTS.md: AgentRelay incluirá el contenido de CLAUDE.md en el prompt de cada tarea. Si prefieres que el ejecutor lo lea de AGENTS.md, ejecuta agentrelay init para crear un AGENTS.md que remita a CLAUDE.md.`;
 }
 
 /** Ruta del archivo de instrucciones global a partir del directorio .claude. */
@@ -271,7 +293,10 @@ export function setupExplanation(file, removing = false) {
 }
 
 /** Explica la instalación del bloque de instrucciones de AgentRelay en un proyecto. */
-export function initExplanation(file, { importOnly = false } = {}) {
+export function initExplanation(file, { importOnly = false, executor = false } = {}) {
+  if (executor) {
+    return `Se creará o actualizará ${file} con un bloque que remite a CLAUDE.md (entre ${START_MARK} y ${END_MARK}; el resto del archivo se conserva) para que el ejecutor, que no lee CLAUDE.md, siga las normas del proyecto.`;
+  }
   if (importOnly) {
     return `Se creará ${file} con la línea @AGENTS.md para que Claude Code utilice las instrucciones compartidas de AGENTS.md.`;
   }

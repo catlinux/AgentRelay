@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import path from 'node:path';
 import { loadConfig } from './config.js';
 import { isClean, pendingChanges } from './git.js';
-import { blockStatus, executorInstructionsNotice, PROJECT_BLOCK } from './instructions.js';
+import { blockStatus, executorInstructionsNotice, PROJECT_BLOCK, projectBlockStatus } from './instructions.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
 import { runProcess } from './proc.js';
 import { listRunIds, loadState, workspaceDir } from './store.js';
@@ -29,7 +29,7 @@ export async function collectProjectState(root, { now = new Date() } = {}) {
   const claudeFile = path.join(absoluteRoot, 'CLAUDE.md');
   const claudeText = existsSync(claudeFile) ? readFileSync(claudeFile, 'utf8').trim() : '';
   const instructions = {
-    agents: blockStatus(agentsFile, PROJECT_BLOCK),
+    agents: projectBlockStatus(agentsFile),
     claude: claudeText === '@AGENTS.md' ? 'importa AGENTS.md' : blockStatus(claudeFile, PROJECT_BLOCK),
     executorNotice: executorInstructionsNotice(absoluteRoot, loaded.config.executor.type),
   };
