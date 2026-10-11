@@ -16,7 +16,7 @@ import { commandsStatus, commandsTargetDir, installCommands, legacyCommandsStatu
 import { canonicalSetting, parseSettingValue } from './settings.js';
 import { CATALOG, executorsDir, getCatalogEntry, installExecutor, isInstalled } from './executors/catalog.js';
 import { commitAll, commitPaths, isClean, isIgnored, repoRoot } from './git.js';
-import { applyBlockToFile, blockStatus, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
+import { applyBlockToFile, blockStatus, executorInstructionsNotice, GLOBAL_BLOCK, globalInstructionsPath, initExplanation, PROJECT_BLOCK, removeBlockFromFile, setupExplanation } from './instructions.js';
 import { applyReview, DECISIONS, recheck, startRun } from './orchestrator.js';
 import { confirm } from './prompt.js';
 import { prepareRepository, scanFolder } from './prepare.js';
@@ -1456,6 +1456,17 @@ function initInstructionFiles(dir) {
   return [{ file: claudeFile, block: PROJECT_BLOCK }, { file: agentsFile, block: PROJECT_BLOCK }];
 }
 
+/** Avisa si el ejecutor configurado no leerá las normas del proyecto y AgentRelay tiene que inyectarlas. */
+function printExecutorInstructionsNotice(root, values) {
+  try {
+    const { config } = loadConfig({ cwd: root, configPath: values.config });
+    const notice = executorInstructionsNotice(root, config.executor.type);
+    if (notice) process.stdout.write(`Aviso: ${notice}\n`);
+  } catch {
+    // Sin configuración legible no se puede saber el ejecutor; el aviso es solo informativo.
+  }
+}
+
 function ensureProjectConfigIgnored(root) {
   const file = path.join(root, '.gitignore');
   const requiredEntries = [CONFIG_FILE, '.agentrelay/'];
@@ -1537,6 +1548,7 @@ async function cmdInit(values) {
       const label = action === 'created' ? 'creado' : action === 'added' ? 'añadido' : action === 'updated' ? 'actualizado' : 'sin cambios';
       process.stdout.write(`${label} ${instruction.file}\n`);
     }
+    printExecutorInstructionsNotice(dir, values);
 
     const res = await commitAll(dir, 'Estado inicial (AgentRelay)');
     if (res.ok) {
@@ -1570,6 +1582,7 @@ async function cmdInit(values) {
     process.stdout.write(`${label} ${instruction.file}\n`);
     if (action !== 'unchanged') changedFiles.push(instruction.file);
   }
+  printExecutorInstructionsNotice(root, values);
   const gitignoreChanged = ensureProjectConfigIgnored(root);
   if (gitignoreChanged) process.stdout.write(`Añadido ${CONFIG_FILE} a .gitignore\n`);
   const hasImportFile = instructionFiles.some(({ content }) => content !== undefined);
