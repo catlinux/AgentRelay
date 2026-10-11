@@ -70,21 +70,25 @@ test('codex: recoge los errores (turn.failed, error suelto y líneas no válidas
 
 test('codex: argumentos de línea de comandos', () => {
   assert.deepEqual(
-    codexBuildArgs({ provider: null, model: null, thinking: null, extraArgs: [] }, 'instr', 'run/codex-report.schema.json'),
+    codexBuildArgs({ provider: null, model: null, thinking: null, extraArgs: [] }, 'instr', 'run/codex-report.schema.json', 'linux'),
     ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 'run/codex-report.schema.json', '-c', 'sandbox_workspace_write.network_access=true', 'instr'],
   );
   assert.deepEqual(
-    codexBuildArgs({ provider: 'openai', model: 'gpt-6-luna', thinking: 'high', extraArgs: ['--skip-git-repo-check'] }, 'instr', 's.json'),
+    codexBuildArgs({ provider: 'openai', model: 'gpt-6-luna', thinking: 'high', extraArgs: ['--skip-git-repo-check'] }, 'instr', 's.json', 'linux'),
     ['exec', '--json', '--ephemeral', '-s', 'workspace-write', '--output-schema', 's.json', '-m', 'gpt-6-luna', '-c', 'model_reasoning_effort=high', '-c', 'sandbox_workspace_write.network_access=true', '--skip-git-repo-check', 'instr'],
   );
   // Sin modelo, sin thinking y sin extraArgs: solo el esquema, la red y la instrucción.
-  const args = codexBuildArgs({}, 'hola', 's.json');
+  const args = codexBuildArgs({}, 'hola', 's.json', 'linux');
   assert.deepEqual(args.slice(-4), ['s.json', '-c', 'sandbox_workspace_write.network_access=true', 'hola']);
   assert.equal(args.includes('-m'), false);
   assert.equal(args.includes('model_reasoning_effort=high'), false);
   // La red se permite por defecto y solo se omite con network: false.
   assert.equal(args.includes('sandbox_workspace_write.network_access=true'), true);
-  assert.equal(codexBuildArgs({ network: false }, 'i', 's.json').includes('-c'), false);
+  assert.equal(codexBuildArgs({ network: false }, 'i', 's.json', 'linux').includes('-c'), false);
+  // En Windows se fuerza el sandbox no elevado, salvo que el usuario ya fije windows.sandbox; en Linux no se toca.
+  assert.deepEqual(codexBuildArgs({}, 'i', 's.json', 'win32').slice(-3), ['-c', 'windows.sandbox=unelevated', 'i']);
+  assert.equal(codexBuildArgs({}, 'i', 's.json', 'linux').includes('windows.sandbox=unelevated'), false);
+  assert.equal(codexBuildArgs({ extraArgs: ['-c', 'windows.sandbox=elevated'] }, 'i', 's.json', 'win32').includes('windows.sandbox=unelevated'), false);
   // El proveedor se ignora: Codex usa la sesión de ChatGPT.
   assert.equal(codexBuildArgs({ provider: 'deepseek' }, 'i', 's.json').includes('-P'), false);
 
