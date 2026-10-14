@@ -113,6 +113,25 @@ test('si se agota una cuota durante la tarea, cambia a fix con el nuevo modelo s
   });
 });
 
+test('con routing, un límite de velocidad salta al siguiente modelo y deja el actual en espera', async () => {
+  const first = routeEntry('fake/free-a');
+  const second = routeEntry('fake/free-b');
+  await withRun({
+    entries: [first, second],
+    plan: {
+      byModel: {
+        'fake/free-a': { implement: { error: 'Upstream request failed: Rate limit exceeded. Please try again later.', exitCode: 1, report: null } },
+        'fake/free-b': { fix: GOOD },
+      },
+    },
+  }, ({ state, home }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(state.attempts[1].model.id, 'fake/free-b');
+    assert.equal(state.retriesUsed, 0);
+    assert.equal(isAvailable(first.quotaId, new Date(), { home }), false);
+  });
+});
+
 test('una ejecución nueva vuelve a elegir una cuota gratuita cuyo agotamiento ya caducó', async () => {
   const first = routeEntry('fake/free-a');
   await withRun({

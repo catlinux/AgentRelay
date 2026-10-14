@@ -53,6 +53,17 @@ export function classifyExecutorError(text) {
   return null;
 }
 
+/**
+ * Límite de velocidad o saturación del proveedor ("Rate limit exceeded", 429). No es cuota agotada y fuera del
+ * enrutado se reintenta; con routing auto reintentar el mismo modelo no sirve, así que se trata como cuota.
+ */
+export function isRateLimitError(text) {
+  const value = String(text ?? '').toLowerCase();
+  return /\brate[\s_-]*limit(?:ed)?\b[\s\S]{0,60}\b(?:exceeded|reached|hit)\b/.test(value)
+    || /\btoo many requests\b/.test(value)
+    || /\b(?:status|http|error|code)[^a-z0-9]{0,3}429\b/.test(value);
+}
+
 /** Extrae del error de cuota el instante a partir del que se puede reintentar. */
 export function parseQuotaReset(text, now = new Date()) {
   const value = String(text ?? '');
