@@ -76,7 +76,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Terminado: `grep -ri "rank\|ranquing\|model-checks\|executors check\|informe diario"` en `src/`, `test/`, `assets/` solo devuelve lo que pertenece a `evaluar` (aún inexistente) o nada; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo medio. Si agota el tiempo, dividir en 4a (cli/help/assets) y 4b (borrados y pruebas).
 
-### Paso 5 — `doctor` y el archivo antiguo — [ ]
+### Paso 5 — `doctor` y el archivo antiguo — [x]
 - Archivos: `src/cli.js` (doctor), su prueba.
 - Hacer: si existe `~/.agentrelay/model-checks.json`, `doctor` avisa («archivo del ranquing antiguo, ya no se usa») y `doctor --fix` lo borra. Ninguna otra ruta lo borra.
 - Ejecutor: AgentRelay, esfuerzo bajo.

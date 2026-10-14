@@ -69,6 +69,24 @@ test('doctor sin --fix avisa del arreglo disponible sin modificar archivos', () 
   }
 });
 
+test('doctor avisa del archivo del ranquing antiguo y solo --fix lo borra', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-doctor-old-checks-'));
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: dir });
+    const claudeDir = path.join(dir, 'claude');
+    const oldFile = path.join(dir, 'home', 'model-checks.json');
+    mkdirSync(path.dirname(oldFile), { recursive: true });
+    writeFileSync(oldFile, '{}');
+    const warned = doctor(dir, claudeDir);
+    assert.match(warned.stdout, /archivo del ranquing antiguo y ya no se usa/);
+    assert.equal(existsSync(oldFile), true);
+    doctor(dir, claudeDir, ['--fix', '--yes']);
+    assert.equal(existsSync(oldFile), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('doctor avisa cuando las instrucciones del orquestador faltan o están desactualizadas', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-doctor-blocks-'));
   try {

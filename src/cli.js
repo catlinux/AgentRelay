@@ -500,6 +500,11 @@ async function cmdDoctor(values, rerun = false) {
       fixes.push({ text: 'Instalar o actualizar el hook de delegación de Claude Code.', apply: () => cmdSetup({ ...values, yes: true }) });
     }
   }
+  const oldChecksFile = path.join(agentrelayHome(), 'model-checks.json');
+  if (existsSync(oldChecksFile)) {
+    warn(`${oldChecksFile} es un archivo del ranquing antiguo y ya no se usa.`);
+    fixes.push({ text: `Borrar ${oldChecksFile} (archivo del ranquing antiguo, ya no se usa).`, apply: async () => { rmSync(oldChecksFile, { force: true }); return 0; } });
+  }
   if (root) {
     const interrupted = listRunIds(root).filter((id) => { const state = loadState(root, id); return state.status === 'interrupted' || isOrphaned(state, { lastEventMs: lastActivityMs(root, id) }); });
     if (interrupted.length) warn(`Hay ${interrupted.length} ejecución(es) interrumpida(s): ${interrupted.join(', ')}. Ejecuta "agentrelay recover".`);
