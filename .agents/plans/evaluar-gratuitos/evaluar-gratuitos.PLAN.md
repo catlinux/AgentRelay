@@ -81,7 +81,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Hacer: si existe `~/.agentrelay/model-checks.json`, `doctor` avisa («archivo del ranquing antiguo, ya no se usa») y `doctor --fix` lo borra. Ninguna otra ruta lo borra.
 - Ejecutor: AgentRelay, esfuerzo bajo.
 
-### Paso 6 — Fixture y pruebas ocultas de la evaluación (delicado) — [ ]
+### Paso 6 — Fixture y pruebas ocultas de la evaluación (delicado) — [x]
 - Archivos: nuevo `src/evaluar-tareas.js` (fixture como objeto `{ ruta: contenido }`, las 4 tareas con su JSON de tarea y sus pruebas ocultas como archivos `node:test`), nuevo `test/evaluar-tareas.test.js`.
 - Hacer: exactamente las tareas de la sección anterior. La prueba del repo comprueba que el fixture base **suspende** las pruebas ocultas de 1-3 y que una solución de referencia (incluida en el test, no en el módulo) las **aprueba**.
 - Ejecutor: AgentRelay, esfuerzo alto. Revisión del orquestador: que las pruebas ocultas no se filtren al prompt.
