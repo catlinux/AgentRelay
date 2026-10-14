@@ -326,7 +326,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   const errorText = `${result.error ?? ''} ${result.rawError ?? ''}`;
   const reset = parseQuotaReset(errorText, now);
   const delayMs = reset
-    ? Math.min(8 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, reset.getTime() - now.getTime() + 60 * 1000))
+    ? Math.min(31 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, reset.getTime() - now.getTime() + 60 * 1000))
     : 10 * 60 * 1000;
   const until = new Date(now.getTime() + delayMs);
   try {
