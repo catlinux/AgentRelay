@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  buildProbe, checksFile, evaluateProbe, isDue, isFreeModel, loadChecks, markDay, saveChecks, startDailyCheck,
+  buildProbe, checksFile, evaluateProbe, isFreeModel, loadChecks, markDay, saveChecks,
 } from '../src/model-check.js';
 import { reportPath } from '../src/executors-report.js';
 import { fileURLToPath } from 'node:url';
@@ -25,38 +25,12 @@ test('loadChecks tolera archivo ausente e inválido y saveChecks crea el JSON es
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
-test('isFreeModel e isDue identifican modelos gratuitos y el día de revisión', () => {
-  const today = new Date(2026, 9, 4, 10);
+test('isFreeModel identifica modelos gratuitos', () => {
   assert.equal(isFreeModel('vendor/model-free'), true);
   assert.equal(isFreeModel('vendor/model'), false);
   assert.equal(isFreeModel('vendor/model', new Set(['vendor/model'])), true);
   assert.equal(isFreeModel('vendor/other', new Set(['vendor/model'])), false);
   assert.equal(isFreeModel('vendor/model-free', new Set()), true);
-  assert.equal(isDue({ lastRun: '2026-10-03' }, today), true);
-  assert.equal(isDue({ lastRun: '2026-10-04' }, today), false);
-});
-
-test('startDailyCheck respeta las condiciones restantes y lanza sin OpenCode', async () => {
-  const home = temp();
-  const now = new Date('2026-10-04T12:00:00Z');
-  const calls = [];
-  const spawnFn = (...args) => { calls.push(args); return { unref() { calls.push('unref'); } }; };
-  const options = { executor: {}, home, now, spawnFn, env: {} };
-  try {
-    assert.equal(await startDailyCheck({ ...options, env: { AGENTRELAY_NO_MODEL_CHECK: '1' } }), false);
-    assert.equal(await startDailyCheck({ ...options, env: { NODE_TEST_CONTEXT: 'child-v8' } }), false);
-    saveChecks({ lastRun: '2026-10-04', models: {} }, home);
-    assert.equal(await startDailyCheck(options), false);
-    saveChecks({ lastRun: null, models: {} }, home);
-    const warnings = [];
-    assert.equal(await startDailyCheck({ ...options, log: (line) => warnings.push(line) }), true);
-    assert.deepEqual(calls[0][0], process.execPath);
-    assert.deepEqual(calls[0][1].slice(-3), ['executors', 'check', '--background']);
-    assert.deepEqual(calls[0][2], { detached: true, stdio: 'ignore', windowsHide: true });
-    assert.equal(calls[1], 'unref');
-    assert.equal(warnings.length, 1);
-    assert.equal(warnings[0], 'Actualizando en segundo plano el ranquing de modelos gratuitos de OpenCode y el informe diario (solo se usan tareas de ejemplo, nunca tu código).');
-  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
 test('markDay actualiza la fecha local y conserva los modelos', () => {
@@ -69,7 +43,7 @@ test('markDay actualiza la fecha local y conserva los modelos', () => {
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
-test('executors check genera informe sin OpenCode y no repite el informe el mismo día', () => {
+test('executors check vuelve a generar el informe sin OpenCode al invocarse el mismo día', () => {
   const cwd = temp();
   const home = path.join(cwd, 'home');
   const executors = path.join(cwd, 'executors');
@@ -88,10 +62,8 @@ test('executors check genera informe sin OpenCode y no repite el informe el mism
     assert.match(first.stdout, new RegExp(`Informe: ${reportPath(reports).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
     const second = run();
     assert.equal(second.status, 0, second.stderr);
-    assert.match(second.stdout, /Ya se hizo hoy \(usa --force para repetirlo\)/);
-    const forced = run(['--force']);
-    assert.equal(forced.status, 0, forced.stderr);
-    assert.match(forced.stdout, /Informe:/);
+    assert.match(second.stdout, /Informe:/);
+    assert.doesNotMatch(second.stdout, /Ya se hizo hoy/);
   } finally { rmSync(cwd, { recursive: true, force: true }); }
 });
 
@@ -187,7 +159,8 @@ if (args[0] === 'auth' && args[1] === 'list') {
     assert.doesNotMatch(dailyReport, /opencode\/beta-free —/);
     const second = run();
     assert.equal(second.status, 0, second.stderr);
-    assert.match(second.stdout, /Ya se hizo hoy \(usa --force para repetirlo\)/);
+    assert.match(second.stdout, /Informe:/);
+    assert.doesNotMatch(second.stdout, /Ya se hizo hoy/);
     assert.equal(readFileSync(runLog, 'utf8').trim().split(/\r?\n/).length, 4);
     const forced = run(['--force']);
     assert.equal(forced.status, 0, forced.stderr);
