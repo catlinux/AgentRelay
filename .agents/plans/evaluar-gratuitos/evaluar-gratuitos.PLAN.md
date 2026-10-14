@@ -86,7 +86,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Hacer: exactamente las tareas de la sección anterior. La prueba del repo comprueba que el fixture base **suspende** las pruebas ocultas de 1-3 y que una solución de referencia (incluida en el test, no en el módulo) las **aprueba**.
 - Ejecutor: AgentRelay, esfuerzo alto. Revisión del orquestador: que las pruebas ocultas no se filtren al prompt.
 
-### Paso 7 — Ejecución, puntuación e informe (delicado) — [ ]
+### Paso 7 — Ejecución, puntuación e informe (delicado) — [ ] (7a hecho: descubrimiento, sondeo y clasificación; falta 7b)
 - Archivos: nuevo `src/evaluar.js`, nuevo `test/evaluar.test.js` (con el `FAKE_OPENCODE` de `test/helpers.js`).
 - Hacer:
   - Descubrimiento: `opencode models` filtrado a `opencode-go/*-free`; comparar con el catálogo público `https://opencode.ai/inference/go/v1/models` (solo ids, solo para avisar de nuevos o retirados; si falla la red, se dice y se sigue) y con el último informe (nuevos, retirados).
