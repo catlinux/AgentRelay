@@ -3,51 +3,44 @@ import assert from 'node:assert/strict';
 import { EXECUTOR_DEFAULTS } from '../src/config.js';
 import { CODEX_FREE_QUOTA, executorFor, parsePaidEntry, pickEntry, routeEntries } from '../src/router.js';
 
-const rankingChecks = {
-  ranking: {
-    entries: [
-      { id: 'provider/c', score: 3, apt: true, tier: 'B' },
-      { id: 'provider/not-apt', score: 99, apt: false, tier: 'A' },
-      { id: 'provider/a', score: 2, apt: true, tier: 'A' },
-      { id: 'provider/b', score: 10, apt: true, tier: 'B' },
-      { id: 'provider/a2', score: 1, apt: true, tier: 'A' },
-    ],
-  },
-};
-
-test('routeEntries ordena Codex gratuito, gratuitos aptos y entradas de pago sin duplicados', () => {
+test('routeEntries ordena Luna gratis, freeOrder y entradas de pago sin duplicados', () => {
   const entries = routeEntries({
     config: {
       executor: { type: 'codex', model: 'gpt-custom' },
-      routing: { paidOrder: ['opencode:fake/paid-a', 'opencode:fake/paid-a', 'codex:gpt-custom', 'codex-api:gpt-paid', 'opencode:provider/paid'] },
+      routing: {
+        freeOrder: ['opencode:provider/free-a', 'opencode:provider/free-b', 'opencode:provider/free-a'],
+        paidOrder: ['opencode:provider/free-a', 'opencode:fake/paid-a', 'opencode:fake/paid-a', 'codex:gpt-custom', 'codex-api:gpt-paid', 'opencode:provider/paid'],
+      },
     },
-    checks: rankingChecks,
   });
 
   assert.deepEqual(entries.map((entry) => entry.key), [
     'codex:gpt-custom',
-    'opencode:provider/a',
-    'opencode:provider/a2',
-    'opencode:provider/b',
-    'opencode:provider/c',
+    'opencode:provider/free-a',
+    'opencode:provider/free-b',
     'opencode:fake/paid-a',
     'codex-api:gpt-paid',
     'opencode:provider/paid',
   ]);
   assert.equal(entries[0].quotaId, CODEX_FREE_QUOTA);
-  assert.equal(entries.some((entry) => entry.key === 'opencode:provider/not-apt'), false);
+  assert.deepEqual(entries[1], {
+    key: 'opencode:provider/free-a', type: 'opencode', model: 'provider/free-a', api: false, paid: false,
+    quotaId: 'provider/free-a', tier: null, trainsOnData: null, label: 'provider/free-a (gratis)',
+  });
 });
 
-test('routeEntries con esfuerzo alto solo incluye gratuitos de nivel A', () => {
-  for (const effort of ['high', 'xhigh']) {
+test('routeEntries con esfuerzo alto omite freeOrder y conserva Luna y las entradas de pago', () => {
+  for (const effort of ['high', 'xhigh', 'max']) {
     const entries = routeEntries({
-      config: { executor: { type: 'opencode', model: 'configured' }, routing: { paidOrder: ['opencode:fake/paid-a'] } },
-      checks: rankingChecks,
+      config: {
+        executor: { type: 'opencode', model: 'configured' },
+        routing: { freeOrder: ['opencode:provider/free-a'], paidOrder: ['opencode:fake/paid-a'] },
+      },
       effort,
     });
 
     assert.deepEqual(entries.map((entry) => entry.key), [
-      'codex:gpt-6-luna', 'opencode:provider/a', 'opencode:provider/a2', 'opencode:fake/paid-a',
+      'codex:gpt-6-luna', 'opencode:fake/paid-a',
     ]);
   }
 });
@@ -118,13 +111,13 @@ test('executorFor conserva los ajustes del mismo tipo y usa los valores por defe
   assert.equal(codexFree.forceApi, false);
 });
 
-test('los modelos con la cuota agotada siguen en la lista y se descartan al elegir con su motivo', async () => {
-  const now = new Date('2026-10-10T12:00:00.000Z');
-  const checks = {
-    ...rankingChecks,
-    exhausted: { 'provider/a': { at: now.toISOString(), until: '2026-10-10T12:10:00.000Z', reason: 'cuota agotada' } },
-  };
-  const entries = routeEntries({ config: { executor: { type: 'opencode' }, routing: { paidOrder: [] } }, checks, now });
+test('los modelos con cuota agotada siguen en la lista y se descartan al elegir con su motivo', async () => {
+  const entries = routeEntries({
+    config: {
+      executor: { type: 'opencode' },
+      routing: { freeOrder: ['opencode:provider/a', 'opencode:provider/a2'], paidOrder: [] },
+    },
+  });
   assert.ok(entries.some((entry) => entry.model === 'provider/a'));
   const { entry, skipped } = await pickEntry(entries.filter((candidate) => candidate.type === 'opencode'), {
     isAvailable: (quotaId) => quotaId !== 'provider/a',

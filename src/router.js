@@ -7,7 +7,6 @@
 
 import { EXECUTOR_DEFAULTS } from './config.js';
 import { getProvider } from './free-providers.js';
-import { rankedFree } from './free-ranking.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
 const HIGH_EFFORTS = new Set(['high', 'xhigh', 'max']);
@@ -37,28 +36,41 @@ export function parsePaidEntry(spec) {
 
 /**
  * Entradas en orden de preferencia, sin filtrar por cuota:
- * Luna con la cuota gratuita de ChatGPT, los gratuitos aptos del ranquing y los de pago.
- * Con esfuerzo alto solo entran los gratuitos de nivel A (Luna incluida) y los de pago.
+ * Luna con la cuota gratuita de ChatGPT, los gratuitos de freeOrder y los de pago.
+ * Con esfuerzo alto solo entran Luna y las entradas de pago.
  */
-export function routeEntries({ config, checks, now = new Date(), effort = null } = {}) {
+export function routeEntries({ config, effort = null } = {}) {
   const entries = [];
+  const keys = new Set();
   const codexModel = config.executor.type === 'codex' && config.executor.model
     ? config.executor.model : EXECUTOR_DEFAULTS.codex.model;
-  entries.push({
+  const luna = {
     key: `codex:${codexModel}`, type: 'codex', model: codexModel, api: false, paid: false,
     quotaId: CODEX_FREE_QUOTA, tier: 'A', trainsOnData: false, label: `${codexModel} (cuota gratuita de ChatGPT)`,
-  });
+  };
+  entries.push(luna);
+  keys.add(luna.key);
   const highEffort = HIGH_EFFORTS.has(effort);
-  for (const model of rankedFree(checks, { now, includeExhausted: true })) {
-    if (model.apt !== true || (highEffort && model.tier !== 'A')) continue;
-    entries.push({
-      key: `opencode:${model.id}`, type: 'opencode', model: model.id, api: false, paid: false,
-      quotaId: model.id, tier: model.tier, trainsOnData: trainsOnDataFor('opencode', model.id), label: `${model.id} (gratis)`,
-    });
+  if (!highEffort) {
+    for (const spec of config.routing?.freeOrder ?? []) {
+      const match = /^opencode:(\S+)$/.exec(String(spec));
+      if (!match) continue;
+      const [, model] = match;
+      const key = `opencode:${model}`;
+      if (keys.has(key)) continue;
+      entries.push({
+        key, type: 'opencode', model, api: false, paid: false,
+        quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,
+      });
+      keys.add(key);
+    }
   }
   for (const spec of config.routing?.paidOrder ?? []) {
     const entry = parsePaidEntry(spec);
-    if (entry && !entries.some((other) => other.key === entry.key)) entries.push(entry);
+    if (entry && !keys.has(entry.key)) {
+      entries.push(entry);
+      keys.add(entry.key);
+    }
   }
   return entries;
 }

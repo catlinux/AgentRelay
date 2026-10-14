@@ -102,6 +102,8 @@ test('valida estrictamente las familias de opciones y señala el archivo y la cl
       [{ policy: { skipPassMaxFiles: -1 } }, 'policy.skipPassMaxFiles'],
       [{ routing: [] }, 'routing'],
       [{ routing: { mode: 'manual' } }, 'routing.mode'],
+      [{ routing: { freeOrder: ['codex:model'] } }, 'routing.freeOrder'],
+      [{ routing: { freeOrder: ['opencode:'] } }, 'routing.freeOrder'],
       [{ routing: { paidOrder: ['openai:model'] } }, 'routing.paidOrder'],
       [{ routing: { paidOrder: ['codex:'] } }, 'routing.paidOrder'],
       [{ routing: { maxSwitches: 21 } }, 'routing.maxSwitches'],
@@ -119,15 +121,18 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     const defaults = loadConfig({ cwd: dir, home: path.join(dir, 'home') }).config.routing;
     assert.deepEqual(defaults, {
       mode: 'off',
-      paidOrder: ['opencode:deepseek/deepseek-flash', 'codex-api:gpt-6-luna', 'opencode:deepseek/deepseek-v4-pro'],
+      freeOrder: ['opencode:opencode-go/cat-jam-free', 'opencode:opencode-go/longcat-2.5-preview-free'],
+      paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash', 'opencode:opencode-go/deepseek-v4-pro', 'codex-api:gpt-6-luna'],
       maxSwitches: 5,
     });
-    writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'opencode:deepseek/deepseek-flash'], maxSwitches: 0 } }));
+    writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', freeOrder: ['opencode:provider/free'], paidOrder: ['codex:gpt-6-luna', 'opencode:provider/paid'], maxSwitches: 0 } }));
     const result = loadConfig({ cwd: dir, home: path.join(dir, 'home') });
     assert.deepEqual(result.config.routing, {
-      mode: 'auto', paidOrder: ['codex:gpt-6-luna', 'opencode:deepseek/deepseek-flash'], maxSwitches: 0,
+      mode: 'auto', freeOrder: ['opencode:provider/free'], paidOrder: ['codex:gpt-6-luna', 'opencode:provider/paid'], maxSwitches: 0,
     });
     assert.ok(!result.warnings.some((warning) => warning.includes('routing')));
+    writeFileSync(file, JSON.stringify({ routing: { freeOrder: ['codex:model'] } }));
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.freeOrder debe ser una lista de entradas opencode:modelo válidas/);
     writeFileSync(file, JSON.stringify({ routing: { paidOrder: ['cline:deepseek/model'] } }));
     assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.paidOrder debe ser una lista de entradas tipo:modelo válidas/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -180,6 +185,7 @@ test('la plantilla comentada documenta routing', () => {
   assert.deepEqual(parseJsonc(template), {});
   assert.match(template, /"routing": \{/);
   assert.match(template, /"mode": "off",/);
+  assert.match(template, /"freeOrder": \[/);
   assert.match(template, /"paidOrder": \[/);
   assert.match(template, /"maxSwitches": 5,/);
   assert.match(template, /executor\.apiFallback/);
