@@ -122,7 +122,7 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     assert.deepEqual(defaults, {
       mode: 'off',
       freeOrder: ['opencode:opencode-go/cat-jam-free', 'opencode:opencode-go/longcat-2.5-preview-free'],
-      paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash', 'opencode:opencode-go/deepseek-v4-pro', 'codex-api:gpt-6-luna'],
+      paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'],
       maxSwitches: 5,
     });
     writeFileSync(file, JSON.stringify({ routing: { mode: 'auto', freeOrder: ['opencode:provider/free'], paidOrder: ['codex:gpt-6-luna', 'opencode:provider/paid'], maxSwitches: 0 } }));

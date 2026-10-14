@@ -2,8 +2,8 @@
 //
 //   agentrelay orden                          muestra el orden actual
 //   agentrelay orden gratis <a> [<b> …]       gratuitos de OpenCode Go, en ese orden
-//   agentrelay orden pago <nombre>            pone esa IA como la principal de pago (las demás siguen detrás)
-//   agentrelay orden pago <a> <b> …           lista de pago exacta, en ese orden
+//   agentrelay orden pago <nombre>            la IA de pago (por defecto, DeepSeek Flash de Go)
+//   agentrelay orden pago <a> <b> …           varias, en ese orden (si falla la última, se detiene y pregunta)
 //   agentrelay orden reset                    vuelve al orden por defecto
 
 import path from 'node:path';
@@ -42,8 +42,8 @@ function mostrar(loaded, out, now = new Date()) {
   out('');
   out('Cambiar:');
   out('  agentrelay orden gratis <modelo> [<modelo> …]   gratuitos de OpenCode Go (p. ej. cat-jam longcat-2.5-preview step-5-preview)');
-  out('  agentrelay orden pago <nombre>                  la IA de pago principal; las demás siguen detrás');
-  out('  agentrelay orden pago <a> <b> …                 lista de pago exacta, en ese orden');
+  out('  agentrelay orden pago <nombre>                  la IA de pago (si falla, la tarea se detiene y se pregunta qué hacer)');
+  out('  agentrelay orden pago <a> <b> …                 varias de pago, en ese orden');
   out('  agentrelay orden reset                          orden por defecto');
   out('Nombres de pago: ' + CATALOGO.filter((item) => item.ruta).map((item) => item.id).join(', '));
 }
@@ -80,14 +80,7 @@ export function cmdOrden(positionals, values, runtime = {}) {
       claves = ['routing.freeOrder'];
     } else if (accion === 'pago') {
       if (!nombres.length) throw new Error('Uso: agentrelay orden pago <nombre> [<nombre> …]');
-      const elegidos = [...new Set(nombres.map(resolverPago))];
-      let lista = elegidos;
-      if (elegidos.length === 1) {
-        // Una sola: pasa a ser la principal y las demás siguen detrás, para no quedarse sin respaldo.
-        const actual = loadConfig(opts).config.routing.paidOrder;
-        lista = [elegidos[0], ...actual.filter((spec) => spec !== elegidos[0])];
-      }
-      edits = [['routing.paidOrder', lista]];
+      edits = [['routing.paidOrder', [...new Set(nombres.map(resolverPago))]]];
       claves = ['routing.paidOrder'];
     } else {
       throw new Error(`No entiendo "${accion}". Uso: agentrelay orden [gratis <modelos> | pago <nombres> | reset]`);

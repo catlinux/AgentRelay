@@ -27,7 +27,7 @@ Cada comando se llama igual en el terminal (`agentrelay <comando>`) y en el chat
 
 ## Enrutado
 
-Con `routing.mode: "auto"`, `src/router.js` ordena primero Luna con cuota gratuita, después los gratuitos de `routing.freeOrder` (lista que mantiene el usuario o actualiza `agentrelay evaluar`, sin depender del esfuerzo de la tarea) y por último las de pago de `routing.paidOrder` (por defecto DeepSeek V4.1 Flash y V4 Pro de OpenCode Go y Luna por API, esta sin tope de gasto).
+Con `routing.mode: "auto"`, `src/router.js` ordena primero Luna con cuota gratuita, después los gratuitos de `routing.freeOrder` (lista que mantiene el usuario o actualiza `agentrelay evaluar`, sin depender del esfuerzo de la tarea) y por último la de pago de `routing.paidOrder` (por defecto solo DeepSeek V4.1 Flash de OpenCode Go; se cambia con `agentrelay orden pago`). Una gratuita se prueba dos veces seguidas si falla por cuota, saldo o límite de velocidad, y salta a la siguiente a la segunda (o enseguida si el error da la hora de reinicio); la de pago no se reintenta. Cuando falla la última entrada, la tarea se detiene con un mensaje que pide al orquestador preguntar al usuario qué IA usar.
 `src/orchestrator.js` puede cambiar de entrada a mitad de tarea sin consumir reintentos, hasta `routing.maxSwitches` cambios.
 Credenciales o un modelo no disponible también hacen pasar a la siguiente entrada, solo para esa ejecución.
 Cada tarea nueva vuelve a probar las entradas gratuitas desde el principio.
