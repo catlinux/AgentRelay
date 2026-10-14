@@ -64,6 +64,17 @@ export function isRateLimitError(text) {
     || /\b(?:status|http|error|code)[^a-z0-9]{0,3}429\b/.test(value);
 }
 
+/**
+ * Fallo pasajero de conexión o saturación del proveedor (red caída, 502/503/504, "overloaded"). Merece un reintento tras una pausa;
+ * no incluye el tiempo máximo del propio ejecutor, que ya es una tarea larga.
+ */
+export function isTransientError(text) {
+  const value = String(text ?? '').toLowerCase();
+  return /\b(?:econnreset|econnrefused|enotfound|etimedout|eai_again|epipe)\b/.test(value)
+    || /\b(?:socket hang up|fetch failed|network (?:error|timeout|is unreachable)|service unavailable|bad gateway|gateway time-?out|overloaded|temporarily unavailable)\b/.test(value)
+    || /\b(?:status|http|error|code)[^a-z0-9]{0,3}50[234]\b/.test(value);
+}
+
 /** Extrae del error de cuota el instante a partir del que se puede reintentar. */
 export function parseQuotaReset(text, now = new Date()) {
   const value = String(text ?? '');

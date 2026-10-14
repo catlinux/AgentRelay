@@ -21,7 +21,7 @@ import {
 } from './store.js';
 import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
-import { classifyExecutorError, isRateLimitError, maskSecrets, parseQuotaReset } from './executors/common.js';
+import { classifyExecutorError, isRateLimitError, isTransientError, maskSecrets, parseQuotaReset } from './executors/common.js';
 import { CATALOGO } from './catalogo-ia.js';
 import { isInstalled } from './executors/catalog.js';
 import { alternativesHint } from './alternatives.js';
@@ -213,12 +213,18 @@ async function continueCycle(ctx, result) {
 
     if (!result.ok) {
       const errorText = `${result.error ?? ''} ${result.rawError ?? ''}`;
-      // Con routing auto, un límite de velocidad persistente salta al siguiente modelo y deja al actual en espera.
-      const errorKind = classifyExecutorError(errorText) ?? (state.route && isRateLimitError(errorText) ? 'quota' : null);
-      if (errorKind === 'quota' && state.route && shouldRetrySameEntry(state.route, errorText)) {
-        state.route.strikes = (state.route.strikes ?? 0) + 1;
+      // Con routing auto, un límite de velocidad o un fallo pasajero se reintenta tras una pausa y, si persiste, salta (o se detiene).
+      const errorKind = classifyExecutorError(errorText)
+        ?? (state.route && isRateLimitError(errorText) ? 'quota' : null)
+        ?? (state.route && isTransientError(errorText) ? 'transient' : null);
+      const retry = state.route && errorKind ? retryPlan(state.route, errorKind, errorText) : null;
+      if (retry) {
+        state.route.strikes = retry.failures;
         saveState(ctx.root, state);
-        ctx.emit({ type: 'route_retry', entry: state.route.current.key, strike: state.route.strikes, of: FREE_ATTEMPTS });
+        ctx.emit({
+          type: 'route_retry', entry: state.route.current.key, failures: retry.failures, of: retry.allowed, pauseSeconds: retry.pauseMs / 1000,
+        });
+        await (routerHooks.sleep ?? sleep)(retry.pauseMs);
         result = await attempt(ctx, 'fix', { feedback: RETRY_FEEDBACK, check });
         continue;
       }
@@ -231,7 +237,9 @@ async function continueCycle(ctx, result) {
           ? 'problema de credenciales del ejecutor: revisa con `agentrelay doctor` y vuelve a configurar la sesión con `agentrelay login` o la clave de API del proveedor'
           : errorKind === 'unavailable'
             ? 'el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use'
-            : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
+            : errorKind === 'transient'
+              ? 'el proveedor ha fallado varias veces seguidas (conexión o saturación): vuelve a intentarlo más tarde o elige otra IA.'
+              : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
         if (state.route) reason += `\n${routeStoppedMessage(state.route)}`;
         if (errorKind === 'quota' && !state.route) {
           if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
@@ -282,16 +290,32 @@ async function continueCycle(ctx, result) {
 const SWITCH_FEEDBACK = 'The previous executor stopped before finishing (quota, credentials or model not available). '
   + 'The working tree keeps its partial changes: review them and continue the task from there until it is complete.';
 
-// Una entrada gratuita se prueba FREE_ATTEMPTS veces seguidas antes de saltar a la siguiente; la de pago no se reintenta.
+// Intentos seguidos sobre la misma entrada antes de saltar a la siguiente (gratuita) o de detenerse y preguntar (de pago).
+// Entre intentos se espera para no insistir en pleno fallo pasajero.
 const FREE_ATTEMPTS = 2;
-const RETRY_FEEDBACK = 'The previous attempt stopped before finishing because of a provider quota or rate-limit error. '
+const PAID_ATTEMPTS = 3;
+const FREE_PAUSES_MS = [5000];
+const PAID_PAUSES_MS = [5000, 15000];
+const RETRY_FEEDBACK = 'The previous attempt stopped before finishing because of a temporary provider error (quota, rate limit or connection). '
   + 'The working tree keeps its partial changes: review them and continue the task from there until it is complete.';
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-/** Reintenta la misma entrada solo si es gratuita, aún no ha agotado sus intentos y el error no da una hora de reinicio (esperar no sirve). */
-function shouldRetrySameEntry(route, errorText) {
-  if (route.current.paid) return false;
-  if ((route.strikes ?? 0) + 1 >= FREE_ATTEMPTS) return false;
-  return !parseQuotaReset(errorText);
+/**
+ * Decide si se reintenta la misma entrada. Gratuita: cuota, saldo, límite o fallo pasajero (2 intentos), salvo que el error dé
+ * la hora de reinicio. De pago: solo límite de velocidad o fallo pasajero (3 intentos); saldo, credenciales o modelo inexistente
+ * son definitivos y detienen la tarea sin insistir.
+ */
+function retryPlan(route, errorKind, errorText) {
+  const paid = route.current.paid;
+  const allowed = paid ? PAID_ATTEMPTS : FREE_ATTEMPTS;
+  const failures = (route.strikes ?? 0) + 1;
+  if (failures >= allowed) return null;
+  let retryable = false;
+  if (errorKind === 'transient') retryable = true;
+  else if (errorKind === 'quota' && !parseQuotaReset(errorText)) retryable = paid ? isRateLimitError(errorText) : true;
+  if (!retryable) return null;
+  const pauses = paid ? PAID_PAUSES_MS : FREE_PAUSES_MS;
+  return { failures, allowed, pauseMs: pauses[Math.min(failures - 1, pauses.length - 1)] };
 }
 
 /** Mensaje cuando el enrutado se detiene: nunca se sigue con otra IA sin que el usuario la elija. */
@@ -301,13 +325,13 @@ function routeStoppedMessage(route) {
     + `No se continúa con otra sin tu decisión: PREGUNTA al usuario qué IA usar. Opciones: agentrelay orden pago <${names}> y volver a lanzar la tarea (agentrelay orden muestra el orden actual). Mira la sección Enrutado del informe.`;
 }
 
-const SWITCH_REASONS = { quota: 'cuota agotada', credentials: 'sin credenciales', unavailable: 'modelo no disponible' };
+const SWITCH_REASONS = { quota: 'cuota agotada', credentials: 'sin credenciales', unavailable: 'modelo no disponible', transient: 'fallos repetidos del proveedor' };
 
 const routeQuotaAvailable = (quotaId) => quotaAvailable(quotaId, new Date(), { home: agentrelayHome() });
 
 // Solo para tests: sustituyen la lista de entradas y la comprobación de instalación/sesión,
 // que dependen de los ejecutores reales de la máquina.
-export const routerHooks = { entries: null, usable: null };
+export const routerHooks = { entries: null, usable: null, sleep: null };
 const usableEntry = (entry, base) => (routerHooks.usable ?? entryUsable)(entry, base);
 
 /**

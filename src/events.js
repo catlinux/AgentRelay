@@ -202,7 +202,7 @@ export function formatEvent(event, startedAtMs, options = {}) {
       return fmt(`  · ${parts.join(' · ')}`);
     }
     case 'retry': return fmt(`↻ Corrección automática ${event.n}/${event.max}`, { tone: '33' });
-    case 'route_retry': return fmt(`↻ ${event.entry} sigue sin responder (cuota o límite): segundo intento ${event.strike + 1}/${event.of}`, { tone: '33' });
+    case 'route_retry': return fmt(`↻ ${event.entry} ha fallado (${event.failures}/${event.of}): se reintenta en ${event.pauseSeconds} s`, { tone: '33' });
     case 'route_switch': {
       const details = [
         event.paid ? 'de pago' : '',
