@@ -37,12 +37,12 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
-import { isDue, loadChecks, markDay, saveChecks, startDailyCheck } from './model-check.js';
+import { loadChecks, markDay, saveChecks } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels, discoverProviderModels } from './free-models.js';
 import { mergeRankEntries, rankModels, renderRanking } from './model-rank.js';
 import { isExhausted, lastQuotaEvent } from './free-ranking.js';
 import { connectedProviders, PROVIDERS } from './free-providers.js';
-import { reportPath, writeReport } from './executors-report.js';
+import { writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 import { commandParts as opencodeCommandParts, connectedProviderIds } from './executors/opencode.js';
 import { apiProfileDir, commandParts as codexCommandParts, hasApiProfile } from './executors/codex.js';
@@ -233,9 +233,6 @@ async function cmdRun(positionals, values) {
   }
   const root = await resolveRoot(values);
   const { config, warnings = [] } = loadConfig({ cwd: root, configPath: values.config });
-  const checkExecutor = config.executor.type === 'opencode'
-    ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-  void startDailyCheck({ executor: checkExecutor }).catch(() => {});
   for (const warning of warnings) process.stderr.write(`[aviso] ${warning}\n`);
   const onEvent = eventPrinter(values, root);
   const state = await startRun({ root, task, config, allowDirty: values['allow-dirty'], onEvent });
@@ -950,10 +947,6 @@ async function cmdExecutors(positionals, values) {
       ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
     const adapter = getExecutor('opencode');
     const home = agentrelayHome();
-    if (!values.force && !isDue(loadChecks(home))) {
-      if (!values.background) process.stdout.write(`Ya se hizo hoy (usa --force para repetirlo). Informe: ${reportPath(process.env.AGENTRELAY_REPORT_ROOT || undefined)}\n`);
-      return 0;
-    }
     markDay(home);
     if (await isInstalled('opencode', { dir })) {
       const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
@@ -1684,12 +1677,6 @@ async function cmdStart(values) {
   process.stdout.write('\nMensaje para tu orquestador (pégalo en su chat):\n');
   process.stdout.write('Lee AGENTS.md y .agentrelay/ESTADO.md, ejecuta git status --short y agentrelay list, y continúa con lo pendiente. Eres el orquestador: no escribas código tú, delégalo con agentrelay run (en Windows usa agentrelay.cmd), en tareas pequeñas, y revisa cada resultado. Si tienes dudas, pregúntame antes de empezar.\n');
   process.stdout.write('\nSigue lo que hace el ejecutor con: agentrelay watch (en otra terminal, en esta carpeta).\n');
-  try {
-    const { config } = loadConfig({ cwd: root, configPath: values.config });
-    const executor = config.executor.type === 'opencode'
-      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-    void startDailyCheck({ executor }).catch(() => {});
-  } catch { /* La revisión diaria nunca altera start. */ }
   return doctorStatus === 0 && treeClean ? 0 : 1;
 }
 

@@ -8,8 +8,6 @@ import { getExecutor } from './executors/index.js';
 import { buildImplementPrompt } from './prompts.js';
 import { normalizeTask } from './task.js';
 import { runProcess } from './proc.js';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 
 export const MAX_SECONDS = 300;
 const EMPTY_CHECKS = () => ({ lastRun: null, models: {} });
@@ -38,25 +36,10 @@ function localDate(now) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export function isDue(checks, now = new Date()) { return checks?.lastRun !== localDate(now); }
-
 export function markDay(home = agentrelayHome(), now = new Date()) {
   const checks = loadChecks(home);
   checks.lastRun = localDate(now);
   saveChecks(checks, home);
-}
-
-export async function startDailyCheck({ executor, env = process.env, home, now = new Date(), spawnFn = spawn, log = (line) => process.stderr.write(`${line}\n`) }) {
-  try {
-    if (env.AGENTRELAY_NO_MODEL_CHECK === '1' || env.NODE_TEST_CONTEXT !== undefined || !isDue(loadChecks(home), now)) return false;
-    const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
-    const child = spawnFn(process.execPath, [entry, 'executors', 'check', '--background'], {
-      detached: true, stdio: 'ignore', windowsHide: true,
-    });
-    child.unref();
-    log('Actualizando en segundo plano el ranquing de modelos gratuitos de OpenCode y el informe diario (solo se usan tareas de ejemplo, nunca tu código).');
-    return true;
-  } catch { return false; }
 }
 
 export function buildProbe(baseDir = os.tmpdir()) {
