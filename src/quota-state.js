@@ -4,7 +4,7 @@ import { agentrelayHome } from './config.js';
 import { parseQuotaReset } from './executors/common.js';
 
 const MIN_DELAY_MS = 60 * 1000;
-const MAX_DELAY_MS = 31 * 24 * 60 * 60 * 1000;
+const MAX_DELAY_MS = 14 * 24 * 60 * 60 * 1000;
 const BACKOFF_MS = [10 * 60 * 1000, 30 * 60 * 1000, 60 * 60 * 1000];
 
 const QUOTA_LOG_LIMIT = 30;

@@ -67,7 +67,7 @@ export function isRateLimitError(text) {
 /** Extrae del error de cuota el instante a partir del que se puede reintentar. */
 export function parseQuotaReset(text, now = new Date()) {
   const value = String(text ?? '');
-  const maxDelay = 31 * 24 * 60 * 60 * 1000;
+  const maxDelay = 14 * 24 * 60 * 60 * 1000;
   const valid = (date) => {
     if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return null;
     const delay = date.getTime() - now.getTime();
