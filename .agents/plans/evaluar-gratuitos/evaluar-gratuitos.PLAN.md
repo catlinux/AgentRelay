@@ -53,13 +53,13 @@ Alcance por tarea en `files`/`doNotModify` del JSON de tarea, como en una delega
 
 Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados **delicado**, el orquestador revisa con especial cuidado el diff y, si el ejecutor falla dos veces, lo hace él. En todas las tareas, `constraints` debe incluir: no cambiar la versión, no escribir secuencias `\u` sueltas y usar la herramienta de edición, no scripts de PowerShell (hay archivos CRLF), no commits. Tras cada paso: `npm test` lo ejecuta el orquestador, commit propio con mensaje descriptivo, marcar el paso aquí como hecho.
 
-### Paso 1 — Estado de cuota autónomo (delicado) — [ ]
+### Paso 1 — Estado de cuota autónomo (delicado) — [x] (hecho junto con el paso 2)
 - Archivos: `src/quota-state.js`, `test/quota-state.test.js`.
 - Hacer: `quota-state.js` guarda y lee `~/.agentrelay/quota.json` (`{ exhausted: {}, quotaLog: [] }`) por sí mismo y exporta, además de lo que ya exporta, `loadQuota(home)`, `isExhausted(quota, id, now)`, `lastQuotaEvent(quota, id)`, `clearExhausted(home, id)`. Mismo comportamiento que hoy (backoff 10/30/60 min, hora del error, `provider:` agregado, `quotaLog` de 30). Sin importar nada de `model-check.js` ni `free-ranking.js`.
 - Terminado: pruebas de quota-state pasan sin esos módulos; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo alto.
 
-### Paso 2 — Consumidores del estado de cuota (delicado) — [ ]
+### Paso 2 — Consumidores del estado de cuota (delicado) — [x]
 - Archivos: `src/executors/codex.js`, `src/cli.js` (solo el bloque de `doctor` que lee `codex:chatgpt`, ~línea 449), `src/orchestrator.js` (quitar `recordReview` y su import; `alternativesHint` sigue de momento), tests afectados (`codex-quota-reset`, `codex-api-fallback`, `executor-errors`, `orchestrator`).
 - Hacer: todo lo que lee o marca cuota usa `src/quota-state.js`. Las revisiones dejan de registrar notas.
 - Terminado: `grep` de `free-ranking`/`model-check` en esos archivos vacío; `npm test` verde.

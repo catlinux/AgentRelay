@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getQuotaState, isAvailable, markQuotaAvailable, markQuotaExhausted } from '../src/quota-state.js';
-import { lastQuotaEvent } from '../src/free-ranking.js';
-import { loadChecks } from '../src/model-check.js';
+import {
+  clearExhausted, getQuotaState, isAvailable, isExhausted, lastQuotaEvent, loadQuota, markQuotaAvailable, markQuotaExhausted,
+} from '../src/quota-state.js';
 
 function makeHome() {
   const root = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-quota-state-'));
@@ -36,7 +36,7 @@ test('guarda el reset indicado por el error con un minuto de margen', () => {
     assert.deepEqual(getQuotaState('vendor/model', { home: context.home, now }), {
       state: 'exhausted', until: new Date(now.getTime() + 180_000), source: 'error',
     });
-    assert.deepEqual(lastQuotaEvent(loadChecks(context.home), 'vendor/model'), {
+    assert.deepEqual(lastQuotaEvent(loadQuota(context.home), 'vendor/model'), {
       at: now.toISOString(), id: 'vendor/model', event: 'agotada', until: record.until,
       resetKnown: true, reason: 'sin cuota',
     });
@@ -68,7 +68,7 @@ test('aplica backoff de 10, 30 y 60 minutos y restablece la racha', () => {
 
     assert.equal(markQuotaAvailable('vendor/model', { home: context.home, now: thirdAt }), true);
     assert.equal(getQuotaState('vendor/model', { home: context.home, now: thirdAt }).state, 'available');
-    assert.equal(lastQuotaEvent(loadChecks(context.home), 'vendor/model').event, 'restablecida');
+    assert.equal(lastQuotaEvent(loadQuota(context.home), 'vendor/model').event, 'restablecida');
     const afterRecovery = markQuotaExhausted('vendor/model', { home: context.home, now: thirdAt });
     assert.equal(afterRecovery.until, new Date(thirdAt.getTime() + 10 * 60_000).toISOString());
     assert.equal(afterRecovery.strikes, 1);
@@ -102,5 +102,19 @@ test('aplica la marca del proveedor al modelo y permite reintentar al vencer', (
     });
     assert.equal(isAvailable('vendor/model', new Date(now.getTime() + 179_999), { home: context.home }), false);
     assert.equal(isAvailable('vendor/model', new Date(provider.until), { home: context.home }), true);
+  } finally { context.cleanup(); }
+});
+
+test('isExhausted y clearExhausted trabajan sobre quota.json y el registro se limita a 30', () => {
+  const context = makeHome();
+  try {
+    const now = new Date('2026-10-09T10:00:00.000Z');
+    markQuotaExhausted('vendor/model', { home: context.home, now });
+    assert.equal(isExhausted(loadQuota(context.home), 'vendor/model', now), true);
+    assert.equal(isExhausted(loadQuota(context.home), 'vendor/model', new Date(now.getTime() + 10 * 60_000)), false);
+    assert.equal(clearExhausted(context.home, 'vendor/model'), true);
+    assert.equal(clearExhausted(context.home, 'vendor/model'), false);
+    for (let i = 0; i < 40; i += 1) markQuotaExhausted(`vendor/m${i}`, { home: context.home, now });
+    assert.equal(loadQuota(context.home).quotaLog.length, 30);
   } finally { context.cleanup(); }
 });

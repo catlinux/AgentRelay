@@ -14,9 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { runInteractive, runProcess } from '../proc.js';
 import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, parseQuotaReset, relativize, tail } from './common.js';
 import { agentrelayHome } from '../config.js';
-import { isExhausted } from '../free-ranking.js';
-import { markQuotaAvailable, markQuotaExhausted } from '../quota-state.js';
-import { loadChecks } from '../model-check.js';
+import { isExhausted, loadQuota, markQuotaAvailable, markQuotaExhausted } from '../quota-state.js';
 
 export const name = 'codex';
 
@@ -254,7 +252,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   let quotaExhausted = false;
   if (apiEnabled) {
     try {
-      quotaExhausted = isExhausted(loadChecks(), 'codex:chatgpt');
+      quotaExhausted = isExhausted(loadQuota(agentrelayHome()), 'codex:chatgpt');
     } catch {
       quotaExhausted = false;
     }
@@ -303,7 +301,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   };
 
   const exhaustedRecord = () => {
-    try { return loadChecks(agentrelayHome()).exhausted?.['codex:chatgpt'] ?? null; } catch { return null; }
+    try { return loadQuota(agentrelayHome()).exhausted['codex:chatgpt'] ?? null; } catch { return null; }
   };
   const quotaResetAt = () => {
     const until = exhaustedRecord()?.until;

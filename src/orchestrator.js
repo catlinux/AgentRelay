@@ -23,11 +23,9 @@ import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
 import { classifyExecutorError, maskSecrets } from './executors/common.js';
 import { isInstalled } from './executors/catalog.js';
-import { loadChecks } from './model-check.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
 import { agentrelayHome } from './config.js';
-import { recordReview } from './free-ranking.js';
 import { isAvailable as quotaAvailable, markQuotaAvailable, markQuotaExhausted } from './quota-state.js';
 import { executorFor, pickEntry, routeEntries } from './router.js';
 import { hasApiProfile } from './executors/codex.js';
@@ -237,7 +235,7 @@ async function continueCycle(ctx, result) {
             const installed = {
               opencode: await isInstalled('opencode'),
             };
-            reason += `\n${alternativesHint({ current: ctx.config.executor, checks: loadChecks(), installed })}`;
+            reason += `\n${alternativesHint({ current: ctx.config.executor, checks: {}, installed })}`;
           } catch {}
         }
         return finalize(ctx, result, check, { status: 'failed', reasons: [reason] });
@@ -487,16 +485,6 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
 
   const ctx = context(root, state, onEvent);
   const review = { at: new Date().toISOString(), decision, feedback: feedback || null };
-  const recordModelReview = () => {
-    if (currentExecutor(state).type !== 'opencode') return;
-    const attemptModel = (Array.isArray(state.attempts) ? [...state.attempts] : []).reverse()
-      .map((attempt) => typeof attempt?.model === 'string' ? attempt.model : attempt?.model?.id)
-      .find((model) => typeof model === 'string' && model);
-    const model = attemptModel ?? state.task?.model ?? currentExecutor(state).model;
-    if (typeof model !== 'string' || !model) return;
-    try { recordReview(model, decision, { home: agentrelayHome() }); } catch {}
-  };
-
   if (decision === 'fix') {
     if (!feedback.trim()) throw new Error('La decisión "fix" necesita --feedback con los problemas a corregir');
     if (state.retriesUsed >= state.policy.maxRetries && !force) {
@@ -511,7 +499,6 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.pid = process.pid;
     state.host = os.hostname();
     saveState(root, state);
-    recordModelReview();
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
     ctx.emit({ type: 'status', runId: state.id, status: 'running', reasons: [] });
     return guard(root, state, async () => {
@@ -532,7 +519,6 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.acceptedBy = 'orchestrator';
     state.statusReasons = [check.passed ? 'aceptada tras validación final' : 'aceptada con --force sin superar la validación final'];
     saveState(root, state);
-    recordModelReview();
     writeReport(root, state, check.patch);
     ctx.emit({ type: 'review', decision, feedback: review.feedback });
     ctx.emit({ type: 'status', runId: state.id, status: 'accepted', reasons: state.statusReasons });
@@ -548,7 +534,6 @@ export async function applyReview({ root, id, decision, feedback = '', force = f
     state.statusReasons = [feedback || 'rechazada por el orquestador; los cambios siguen en el árbol de trabajo'];
   }
   saveState(root, state);
-  recordModelReview();
   ctx.emit({ type: 'review', decision, feedback: review.feedback });
   ctx.emit({ type: 'status', runId: state.id, status: state.status, reasons: state.statusReasons });
   return state;

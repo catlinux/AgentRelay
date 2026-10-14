@@ -4,8 +4,7 @@ import { readEvents } from '../src/events.js';
 import { startRun } from '../src/orchestrator.js';
 import { normalizeTask } from '../src/task.js';
 import { classifyExecutorError } from '../src/executors/common.js';
-import { isExhausted } from '../src/free-ranking.js';
-import { loadChecks } from '../src/model-check.js';
+import { isExhausted, loadQuota } from '../src/quota-state.js';
 import { baseTask, fakePlan, makeRepo, testConfig } from './helpers.js';
 
 test('clasifica errores de credenciales', () => {
@@ -142,7 +141,7 @@ test('marca agotado un modelo de OpenCode cuando la ejecución falla por cuota',
     });
 
     assert.equal(state.status, 'failed');
-    assert.equal(isExhausted(loadChecks(home), model), true);
+    assert.equal(isExhausted(loadQuota(home), model), true);
   } finally {
     if (oldHome === undefined) delete process.env.AGENTRELAY_HOME;
     else process.env.AGENTRELAY_HOME = oldHome;
