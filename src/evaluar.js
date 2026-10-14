@@ -959,3 +959,36 @@ export async function evaluar({ executor, home = agentrelayHome(), modelos, runs
     sinAptos: ordenados.length === 0,
   };
 }
+
+function escribirHistorial(home, runs) {
+  const dir = evaluarDir(home);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, 'history.json'), `${JSON.stringify({ runs }, null, 2)}\n`, 'utf8');
+}
+
+/** Marca la última evaluación guardada como aplicada, con el freeOrder que se escribió. */
+export function marcarUltimoAplicado(home, nuevoFreeOrder) {
+  const { runs } = cargarHistorial(home);
+  if (!runs.length) return false;
+  runs[runs.length - 1] = { ...runs[runs.length - 1], aplicado: true, freeOrderNuevo: nuevoFreeOrder };
+  escribirHistorial(home, runs);
+  return true;
+}
+
+/** Última evaluación aplicada y no revertida, o null. */
+export function ultimoAplicado(home) {
+  const { runs } = cargarHistorial(home);
+  for (let i = runs.length - 1; i >= 0; i -= 1) {
+    if (runs[i]?.aplicado === true && runs[i].revertido !== true) return runs[i];
+  }
+  return null;
+}
+
+export function marcarRevertido(home, at) {
+  const { runs } = cargarHistorial(home);
+  const index = runs.findIndex((run) => run?.at === at);
+  if (index < 0) return false;
+  runs[index] = { ...runs[index], revertido: true };
+  escribirHistorial(home, runs);
+  return true;
+}
