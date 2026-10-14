@@ -21,7 +21,7 @@ import {
 } from './store.js';
 import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
-import { classifyExecutorError, maskSecrets } from './executors/common.js';
+import { classifyExecutorError, isRateLimitError, maskSecrets } from './executors/common.js';
 import { isInstalled } from './executors/catalog.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
@@ -210,7 +210,9 @@ async function continueCycle(ctx, result) {
     if (isBlocked(result)) return finalize(ctx, result, check);
 
     if (!result.ok) {
-      const errorKind = classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`);
+      const errorText = `${result.error ?? ''} ${result.rawError ?? ''}`;
+      // Con routing auto, un límite de velocidad persistente salta al siguiente modelo y deja al actual en espera.
+      const errorKind = classifyExecutorError(errorText) ?? (state.route && isRateLimitError(errorText) ? 'quota' : null);
       if (errorKind && state.route && await switchRoute(ctx, result, errorKind)) {
         result = await attempt(ctx, 'fix', { feedback: SWITCH_FEEDBACK, check });
         continue;
