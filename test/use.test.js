@@ -98,50 +98,34 @@ test('use --list muestra los modelos de Codex con su esfuerzo y marca el que est
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('use --list muestra el ranquing de OpenCode y --all conserva todos los modelos', () => {
+test('use --list --all y routing marcan modelos de OpenCode', () => {
   const dir = temp();
   try {
     const testEnv = installFakeOpenCode(dir);
     mkdirSync(testEnv.AGENTRELAY_HOME, { recursive: true });
-    const checksFile = path.join(dir, 'home', 'model-checks.json');
-    const checks = {
-      lastRun: '2026-10-04',
-      ranking: { at: new Date().toISOString(), entries: [
-        { id: 'opencode/nemotron-3-ultra-free', score: 2, seconds: 8 },
-      ] },
-      models: {
-        'opencode/nemotron-3-ultra-free': { status: 'approved', checkedAt: '2026-10-04T10:00:00.000Z' },
-        'opencode/gpt-oss-120b-free': { status: 'failed', checkedAt: '2026-10-04T10:00:00.000Z' },
-      },
-    };
-    writeFileSync(checksFile, JSON.stringify(checks));
-    const listed = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: testEnv });
-    assert.equal(listed.status, 0, listed.stderr);
-    assert.match(listed.stdout, /opencode\/nemotron-3-ultra-free  #1  ✔✔ 8 s/);
-    assert.doesNotMatch(listed.stdout, /opencode\/gpt-oss-120b-free/);
-    assert.match(listed.stdout, /\(\+1 modelos más de OpenCode sin probar o que no pasaron las pruebas: agentrelay use --list --all\)/);
-    assert.doesNotMatch(listed.stdout, /probado \(2026-10-04\)|no pasó la prueba/);
-
-    const all = spawnSync(process.execPath, [bin, 'use', '--list', '--all'], { cwd: dir, encoding: 'utf8', env: testEnv });
-    assert.equal(all.status, 0, all.stderr);
-    assert.match(all.stdout, /opencode\/nemotron-3-ultra-free.*#1 ✔✔ 8 s/);
-    assert.match(all.stdout, /opencode\/gpt-oss-120b-free  ✘/);
-    assert.doesNotMatch(all.stdout, /modelos más de OpenCode|Agotados hoy|Aún no hay ranquing/);
-
-    writeFileSync(checksFile, JSON.stringify({
-      ...checks,
-      exhausted: { 'opencode/gpt-oss-120b-free': { until: '2099-01-01T00:00:00.000Z' } },
+    writeFileSync(path.join(testEnv.AGENTRELAY_HOME, 'config.json'), JSON.stringify({
+      executor: { type: 'codex', model: 'gpt-6-luna' },
+      routing: { mode: 'off', freeOrder: ['opencode:opencode-go/cat-jam-free'], paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'], maxSwitches: 5 },
     }));
-    const exhausted = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: testEnv });
-    assert.equal(exhausted.status, 0, exhausted.stderr);
-    assert.match(exhausted.stdout, /Agotados hoy \(vuelven mañana\): opencode\/gpt-oss-120b-free/);
-    assert.doesNotMatch(exhausted.stdout, /\(\+\d+ modelos más/);
-
-    writeFileSync(checksFile, JSON.stringify({ lastRun: null, models: {} }));
-    const untested = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: testEnv });
-    assert.equal(untested.status, 0, untested.stderr);
-    assert.match(untested.stdout, /Aún no hay ranquing de modelos gratuitos: agentrelay rank --run/);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+    const listEnv = { ...testEnv, FAKE_OPENCODE_MODELS: 'opencode-go/cat-jam-free,opencode-go/longcat-2.5-preview-free,opencode-go/deepseek-v4.1-flash' };
+    const result = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: listEnv });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /opencode-go\/cat-jam-free {2}gratis/);
+    assert.match(result.stdout, /opencode-go\/deepseek-v4\.1-flash {2}de pago/);
+    assert.doesNotMatch(result.stdout, /longcat-2\.5-preview-free/);
+    const all = spawnSync(process.execPath, [bin, 'use', '--list', '--all'], { cwd: dir, encoding: 'utf8', env: listEnv });
+    assert.match(all.stdout, /longcat-2\.5-preview-free/);
+    assert.doesNotMatch(all.stdout, /free {2}gratis|flash {2}de pago/);
+    const until = new Date(Date.now() + 3_600_000);
+    writeFileSync(path.join(testEnv.AGENTRELAY_HOME, 'quota.json'), JSON.stringify({
+      exhausted: { 'opencode-go/cat-jam-free': { until: until.toISOString(), resetKnown: true, source: 'error' } }, quotaLog: [],
+    }));
+    const exhausted = spawnSync(process.execPath, [bin, 'use', '--list'], { cwd: dir, encoding: 'utf8', env: listEnv });
+    assert.match(exhausted.stdout, /opencode-go\/cat-jam-free {2}agotado hasta \d{2}:\d{2}/);
+  } finally {
+    delete process.env.FAKE_OPENCODE_MODELS;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('use sin argumentos y sin terminal muestra el estado sin cambiar nada', () => {
@@ -164,7 +148,6 @@ test('use interactivo elige ejecutor, modelo y esfuerzo con números', async () 
     { slug: 'gpt-6-luna', visibility: 'list', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }], default_reasoning_level: 'low' },
     { slug: 'gpt-5.5', visibility: 'list', supported_reasoning_levels: [{ effort: 'medium' }, { effort: 'high' }], default_reasoning_level: 'medium' },
   ] }));
-  // Codex (1), segundo modelo (2), esfuerzo «alto» (3: por defecto, medio, alto) y guardar como perfil «bueno».
   const answers = ['1', '2', '3', 'bueno'];
   let output = '';
   process.stdout.write = (chunk) => { output += chunk; return true; };
@@ -176,42 +159,6 @@ test('use interactivo elige ejecutor, modelo y esfuerzo con números', async () 
     assert.equal(config.executor.model, 'gpt-5.5');
     assert.equal(config.executor.thinking, 'high');
     assert.equal(config.profiles.bueno.model, 'gpt-5.5');
-  } finally {
-    process.stdout.write = write;
-    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
-    Object.assign(process.env, saved);
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('use interactivo ofrece los modelos de OpenCode en el orden del ranquing', async () => {
-  const dir = temp();
-  const saved = { ...process.env };
-  const write = process.stdout.write;
-  const testEnv = installFakeOpenCode(dir);
-  Object.assign(process.env, testEnv);
-  mkdirSync(testEnv.AGENTRELAY_HOME, { recursive: true });
-  writeFileSync(path.join(dir, 'home', 'model-checks.json'), JSON.stringify({
-    lastRun: '2026-10-04',
-    ranking: { at: new Date().toISOString(), entries: [
-      { id: 'opencode/nemotron-3-ultra-free', score: 2, seconds: 8 },
-    ] },
-    models: {
-      'opencode/nemotron-3-ultra-free': { status: 'approved', checkedAt: '2026-10-04T10:00:00.000Z' },
-      'opencode/gpt-oss-120b-free': { status: 'failed', checkedAt: '2026-10-04T10:00:00.000Z' },
-    },
-  }));
-  let output = '';
-  process.stdout.write = (chunk) => { output += chunk; return true; };
-  const answers = ['2', '1', '1', ''];
-  try {
-    const code = await main(['use', '--cwd', dir], { ask: async (question) => {
-      output += question;
-      return answers.shift() ?? '';
-    } });
-    assert.equal(code, 0, output);
-    assert.match(output, /opencode\/nemotron-3-ultra-free  ← en uso  #1  ✔✔ 8 s/);
-    assert.doesNotMatch(output, /opencode\/gpt-oss-120b-free/);
   } finally {
     process.stdout.write = write;
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
