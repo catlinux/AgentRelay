@@ -20,6 +20,7 @@ import { CATALOG, executorsDir, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
 import { parseSettingValue } from './settings.js';
 import { getQuotaState } from './quota-state.js';
+import { ejecutorDeAtajo } from './catalogo-ia.js';
 
 export const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
 const effortLabel = (effort) => (effort ? EFFORT_ES[effort] || effort : 'por defecto');
@@ -62,6 +63,9 @@ export function asEffort(text) {
  * (solo las claves indicadas). `profiles` son los perfiles guardados.
  */
 export function parseUseArgs(args, profiles = {}) {
+  // Atajos con nombre claro (deepseek-flash-go, luna-go…): equivalen a "opencode <modelo>" o "codex <modelo>".
+  const atajo = args.length && !Object.hasOwn(profiles, args[0]) ? ejecutorDeAtajo(args[0]) : null;
+  if (atajo) args = [atajo.type, atajo.model, ...args.slice(1)];
   if (args.length === 1 && Object.hasOwn(profiles, args[0]) && !Object.hasOwn(EXECUTOR_DEFAULTS, args[0])) return { profile: args[0] };
   const choice = {};
   for (const arg of args) {
@@ -269,6 +273,8 @@ async function listAll(current, out, values = {}, config = {}) {
     }
   }
   out('Cambia con: agentrelay use <ejecutor> <modelo> [esfuerzo]   (* = esfuerzo por defecto)');
+  out('Atajos: agentrelay use luna-chatgpt | luna-go | deepseek-flash-go | deepseek-pro-go | deepseek-flash-api | deepseek-pro-api');
+  out('Orden del enrutado automático: agentrelay orden');
 }
 
 export async function cmdUse(positionals, values, helpers, runtime = {}) {

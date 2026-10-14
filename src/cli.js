@@ -29,6 +29,7 @@ import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { cmdUse } from './use.js';
 import { cmdEvaluar } from './evaluar-cmd.js';
+import { cmdOrden } from './orden.js';
 import { canOpenBrowser } from './platform.js';
 import { createOutput } from './output.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
@@ -63,6 +64,8 @@ Uso:
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
+  agentrelay orden [gratis <modelos> | pago <nombres> | reset]
+                                    Muestra o cambia el orden del enrutado (Luna, gratuitos de Go, pago)
   agentrelay evaluar [--models a,b] [--runs N] [--no-apply] [--revert]
                                     Prueba los gratuitos de OpenCode Go y propone routing.freeOrder
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
@@ -1568,6 +1571,7 @@ export async function main(argv, runtime = {}) {
       case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
       case 'evaluar': return await cmdEvaluar(rest, values);
+      case 'orden': return cmdOrden(rest, values);
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);

@@ -65,6 +65,8 @@ agentrelay evaluar --revert      # deshace el último cambio aplicado
 
 ## Enrutado automático (opcional)
 
+Ver o cambiar el orden es un solo comando: `agentrelay orden` (muestra cada IA y su estado), `agentrelay orden pago deepseek-pro-go` (cambia la principal de pago), `agentrelay orden gratis cat-jam longcat-2.5-preview` y `agentrelay orden reset`. Nombres de pago: `deepseek-flash-go`, `deepseek-pro-go`, `deepseek-flash-api`, `deepseek-pro-api`, `luna-go`, `luna-api`.
+
 Por defecto AgentRelay usa siempre el ejecutor que tengas configurado. Si activas el enrutado, elige solo y cambia cuando se acaba la cuota:
 
 ```sh

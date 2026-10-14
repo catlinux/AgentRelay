@@ -1,11 +1,9 @@
 // agentrelay evaluar: prueba los modelos gratuitos de OpenCode Go de la cuenta y
 // propone (o aplica) el nuevo routing.freeOrder. Solo se ejecuta cuando se invoca.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
-import { setConfigValue } from './config-file.js';
-import { configTemplate } from './config-template.js';
+import { EXECUTOR_DEFAULTS, agentrelayHome, loadConfig } from './config.js';
+import { archivoUsuario, escribirAjustesUsuario } from './config-usuario.js';
 import { isInstalled } from './executors/catalog.js';
 import { authStatus as opencodeAuthStatus } from './executors/opencode.js';
 import { routeEntries } from './router.js';
@@ -13,24 +11,7 @@ import {
   evaluar as evaluarReal, marcarRevertido, marcarUltimoAplicado, ultimoAplicado,
 } from './evaluar.js';
 
-const userConfigFile = () => path.join(agentrelayHome(), 'config.json');
-
-/** Escribe solo routing.freeOrder en la configuración de usuario y deshace si queda inválida. */
-function writeFreeOrder(freeOrder, { cwd, configPath }) {
-  const file = userConfigFile();
-  const hadFile = existsSync(file);
-  const previous = hadFile ? readFileSync(file, 'utf8') : configTemplate({ scope: 'user' });
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, setConfigValue(previous, 'routing.freeOrder', freeOrder), 'utf8');
-  try {
-    const text = readFileSync(file, 'utf8');
-    parseJsonc(text, file);
-    return loadConfig({ cwd, configPath });
-  } catch (error) {
-    if (hadFile) writeFileSync(file, previous, 'utf8'); else rmSync(file, { force: true });
-    throw error;
-  }
-}
+const writeFreeOrder = (freeOrder, opts) => escribirAjustesUsuario([['routing.freeOrder', freeOrder]], opts);
 
 function describeOrder(loaded, out) {
   out('Orden efectivo del enrutado:');
@@ -41,7 +22,7 @@ function describeOrder(loaded, out) {
 
 function warnProjectOverride(loaded, out) {
   const origin = loaded.origins?.['routing.freeOrder'];
-  if (origin && path.isAbsolute(origin) && path.resolve(origin) !== path.resolve(userConfigFile())) {
+  if (origin && path.isAbsolute(origin) && path.resolve(origin) !== path.resolve(archivoUsuario())) {
     out(`Aviso: ${origin} fija routing.freeOrder y anula este cambio en ese proyecto.`);
   }
 }
