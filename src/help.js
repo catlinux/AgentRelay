@@ -264,6 +264,25 @@ const COMMANDS = {
       ['agentrelay executors add opencode', 'Instala OpenCode como ejecutor opcional.'],
     ],
   },
+  evaluar: {
+    summary: 'Prueba los modelos gratuitos de OpenCode Go y propone el orden de routing.freeOrder.',
+    usage: ['agentrelay evaluar [--models a,b] [--runs N] [--no-apply]', 'agentrelay evaluar --revert'],
+    description: 'Solo se ejecuta cuando lo pides. Descubre los modelos opencode-go/*-free de tu cuenta de OpenCode Go (nunca los de pago), les hace resolver cuatro tareas pequeñas en una carpeta temporal, las corrige con pruebas que el modelo no ve y propone un ranking. Por defecto aplica el resultado reescribiendo solo routing.freeOrder en tu configuración de usuario, y guarda el valor anterior para poder deshacerlo.',
+    options: [
+      ['--models <a,b>', 'Evalúa solo esos modelos; deben ser ids -free que estén en tu cuenta.'],
+      ['--runs <N>', 'Repeticiones por modelo, de 1 a 3 (por defecto 1); con más de una se usa la media.'],
+      ['--no-apply', 'Solo muestra la propuesta, sin cambiar la configuración.'],
+      ['--revert', 'Restaura el routing.freeOrder anterior a la última evaluación aplicada.'],
+      ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
+      ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
+    ],
+    examples: [
+      ['agentrelay evaluar --no-apply', 'Evalúa y muestra la propuesta sin aplicarla.'],
+      ['agentrelay evaluar', 'Evalúa y aplica el nuevo routing.freeOrder.'],
+      ['agentrelay evaluar --runs 2', 'Repite cada tarea dos veces y usa la media.'],
+      ['agentrelay evaluar --revert', 'Deshace el último cambio aplicado.'],
+    ],
+  },
   providers: {
     summary: 'Muestra qué proveedores de modelos están conectados.',
     usage: ['agentrelay providers [--json]'],

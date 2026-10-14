@@ -97,7 +97,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
   - Limpieza en `finally` y en SIGINT: borra el directorio temporal; nunca toca el repo del usuario.
 - Ejecutor: AgentRelay, esfuerzo alto.
 
-### Paso 8 — Comando `evaluar` y aplicación — [ ]
+### Paso 8 — Comando `evaluar` y aplicación — [x]
 - Archivos: `src/cli.js`, `src/help.js`, `assets/claude-commands/ar/evaluar.md` (generado), prueba CLI.
 - Hacer: `agentrelay evaluar [--models a,b (solo ids -free de tu cuenta)] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
 - Ejecutor: AgentRelay, esfuerzo medio.
