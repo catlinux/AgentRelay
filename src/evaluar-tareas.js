@@ -90,12 +90,27 @@ const hiddenContrato = `import test from 'node:test';
 import assert from 'node:assert/strict';
 import { slugify, truncate } from '../src/text.js';
 
-test('hidden contrato', () => {
+test('contrato: sufijo por defecto', () => {
   assert.equal(truncate('abcdef', 4), 'abc…');
+});
+
+test('contrato: sufijo propio', () => {
   assert.equal(truncate('abcdef', 4, '..'), 'ab..');
+});
+
+test('contrato: texto corto sin recortar', () => {
   assert.equal(truncate('ab', 4), 'ab');
+});
+
+test('contrato: n menor que el sufijo', () => {
   assert.equal(truncate('abcdef', 1, '...'), '.');
+});
+
+test('contrato: n cero', () => {
   assert.equal(truncate('abc', 0), '');
+});
+
+test('contrato: slugify intacto', () => {
   assert.equal(slugify('Hola Món!'), 'hola-mon');
 });
 `;
@@ -105,14 +120,25 @@ import assert from 'node:assert/strict';
 import * as stats from '../src/stats.js';
 import { summary } from '../src/report.js';
 
-test('hidden renombrado', () => {
+test('renombrado: average sin redondeo', () => {
   assert.equal(stats.average([1, 2, 2]), 5 / 3);
+});
+
+test('renombrado: average con round', () => {
   assert.equal(stats.average([1, 2, 2], { round: 2 }), 1.67);
-  assert.equal(typeof stats.average, 'function');
+});
+
+test('renombrado: mean ya no se exporta', () => {
   assert.equal(Object.prototype.hasOwnProperty.call(stats, 'mean'), false);
+});
+
+test('renombrado: summary sigue funcionando', () => {
   const r = summary([1, 2, 3]);
   assert.equal(r.count, 3);
   assert.equal(r.mean, 2);
+});
+
+test('renombrado: median no se ha tocado', () => {
   assert.equal(stats.median([3, 1, 2]), 2);
   assert.equal(stats.median([1, 2, 3, 4]), 3);
 });
@@ -123,16 +149,28 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mean, median } from '../src/stats.js';
 
-test('hidden regresion', () => {
+test('regresion: longitud par', () => {
   assert.equal(median([1, 2, 3, 4]), 2.5);
+});
+
+test('regresion: longitud impar', () => {
   assert.equal(median([3, 1, 2]), 2);
-  const content = readFileSync(new URL('../test/stats.test.js', import.meta.url), 'utf8');
-  assert.ok((content.match(/test\\(/g) || []).length > 2, 'visible tests count must grow');
+});
+
+test('regresion: no modifica la entrada', () => {
   const a = [3, 1, 2, 4];
   const copy = [...a];
   median(a);
   assert.deepEqual(a, copy);
+});
+
+test('regresion: mean intacto', () => {
   assert.equal(mean([1, 2, 3]), 2);
+});
+
+test('regresion: hay una prueba visible nueva', () => {
+  const content = readFileSync(new URL('../test/stats.test.js', import.meta.url), 'utf8');
+  assert.ok((content.match(/test\\(/g) || []).length > 2, 'visible tests count must grow');
 });
 `;
 
