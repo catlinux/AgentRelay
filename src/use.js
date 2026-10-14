@@ -13,54 +13,43 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { CONFIG_FILE, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
+import { CONFIG_FILE, DEFAULT_CONFIG, EXECUTOR_DEFAULTS, agentrelayHome, loadConfig, parseJsonc } from './config.js';
 import { setConfigValue, unsetConfigValue } from './config-file.js';
 import { configTemplate } from './config-template.js';
 import { CATALOG, executorsDir, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
-import { loadChecks } from './model-check.js';
-import { isExhausted, rankPosition, rankedFree } from './free-ranking.js';
 import { parseSettingValue } from './settings.js';
+import { getQuotaState } from './quota-state.js';
 
 export const EFFORT_ES = { low: 'bajo', medium: 'medio', high: 'alto', xhigh: 'extremo', max: 'máximo', none: 'ninguno' };
 const effortLabel = (effort) => (effort ? EFFORT_ES[effort] || effort : 'por defecto');
 
-function legacyModelMark(id, checks) {
-  if (!id.endsWith('-free')) return '';
-  const record = checks.models[id];
-  if (record?.status === 'approved') {
-    const date = new Date(record.checkedAt);
-    const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    return `  ✔ probado (${localDate})`;
+/** Marca de cuota en formato HH:MM (hora local). */
+function quotaHour(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function stripPrefix(spec) {
+  return String(spec).replace(/^opencode:/, '');
+}
+
+function routingFreeIds(routing) {
+  return (routing?.freeOrder || []).map(stripPrefix);
+}
+
+function routingPaidOpenCodeIds(routing) {
+  return (routing?.paidOrder || [])
+    .filter((spec) => String(spec).startsWith('opencode:'))
+    .map(stripPrefix);
+}
+
+function freeMark(id, home, now) {
+  const state = getQuotaState(id, { home, now });
+  if (state.state !== 'available') {
+    const until = state.state === 'exhausted' ? state.until : state.nextProbe;
+    return `agotado hasta ${quotaHour(new Date(until))}`;
   }
-  if (record?.status === 'failed') return '  ✘ no pasó la prueba';
-  return '  · sin probar';
-}
-
-function hasRanking(checks) {
-  return Array.isArray(checks?.ranking?.entries) && checks.ranking.entries.length > 0;
-}
-
-function rankedModels(models, checks) {
-  const available = new Map(models.map((model) => [model.id, model]));
-  const ranked = rankedFree(checks);
-  const result = ranked.filter((entry) => available.has(entry.id))
-    .map((entry) => ({ ...available.get(entry.id), ranking: entry }));
-  Object.defineProperty(result, 'stale', { value: ranked.stale });
-  return result;
-}
-
-function rankingMark(id, checks, now = new Date()) {
-  const entry = rankedFree(checks, { now }).find((item) => item.id === id);
-  if (entry) {
-    const position = rankPosition(checks, id);
-    const score = entry.score >= 2 ? '✔✔' : '✔';
-    const seconds = Number.isFinite(entry.seconds) ? entry.seconds : '—';
-    return `#${position} ${score} ${seconds} s`;
-  }
-  if (isExhausted(checks, id, now)) return 'agotado hoy';
-  if (checks.models[id]?.status === 'failed') return '✘';
-  return '';
+  return 'gratis';
 }
 
 /** Devuelve el esfuerzo normalizado si el texto es un esfuerzo (alto, high…), o null. */
@@ -154,7 +143,7 @@ async function pick(ask, title, items, fallback) {
   }
 }
 
-async function interactive(current, ask, helpers) {
+async function interactive(current, ask, helpers, config = {}) {
   const dir = executorsDir();
   const installed = await Promise.all(CATALOG.map((entry) => (entry.bundled ? true : isInstalled(entry.name, { dir }))));
   const currentIndex = CATALOG.findIndex((entry) => entry.name === current.type);
@@ -174,23 +163,36 @@ async function interactive(current, ask, helpers) {
   const choice = { type: entry.name };
   const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
   const { models } = await modelsOf(entry.name, executor);
-  const checks = entry.name === 'opencode' ? loadChecks() : null;
+  const home = agentrelayHome();
+  const now = new Date();
+  const routing = config?.routing || DEFAULT_CONFIG.routing;
+  const freeIds = routingFreeIds(routing);
+  const freeSet = new Set(freeIds);
+  const paidIds = routingPaidOpenCodeIds(routing);
+  const paidSet = new Set(paidIds);
   let model = null;
   if (models.length) {
     let choices = models;
-    if (checks && hasRanking(checks)) {
-      choices = rankedModels(models, checks);
+    if (entry.name === 'opencode') {
+      const ordered = [...models].sort((a, b) => {
+        const ai = freeIds.indexOf(a.id); const bi = freeIds.indexOf(b.id);
+        const ap = paidIds.indexOf(a.id); const bp = paidIds.indexOf(b.id);
+        const rankA = ai >= 0 ? ai : (ap >= 0 ? freeIds.length + ap : freeIds.length + paidIds.length);
+        const rankB = bi >= 0 ? bi : (bp >= 0 ? freeIds.length + bp : freeIds.length + paidIds.length);
+        return rankA - rankB;
+      });
+      choices = ordered;
       if (executor.model && !choices.some((item) => item.id === executor.model)) {
         choices = [{ id: executor.model, currentOnly: true }, ...choices];
       }
     }
     const items = [...choices.map((item) => {
-      const mark = checks && hasRanking(checks)
-        ? rankingMark(item.id, checks)
-        : checks ? legacyModelMark(item.id, checks) : '';
-      const shortMark = item.ranking
-        ? `  #${rankPosition(checks, item.id)}  ${item.ranking.score >= 2 ? '✔✔' : '✔'} ${Number.isFinite(item.ranking.seconds) ? item.ranking.seconds : '—'} s`
-        : mark ? `  ${mark}` : '';
+      let mark = '';
+      if (entry.name === 'opencode') {
+        if (freeSet.has(item.id)) mark = freeMark(item.id, home, now);
+        else if (paidSet.has(item.id)) mark = 'de pago';
+      }
+      const shortMark = mark ? `  ${mark}` : '';
       return `${item.id}${item.id === executor.model ? '  ← en uso' : ''}${shortMark}`;
     }), 'Otro (escribirlo)'];
     const currentIndex = choices.findIndex((item) => item.id === executor.model);
@@ -220,7 +222,7 @@ async function modelsOf(type, executor, timeoutMs = 20_000) {
 }
 
 /** agentrelay use --list: todos los ejecutores y sus modelos en un solo sitio. */
-async function listAll(current, out, values = {}) {
+async function listAll(current, out, values = {}, config = {}) {
   const dir = executorsDir();
   for (const entry of CATALOG) {
     const installed = entry.bundled || await isInstalled(entry.name, { dir });
@@ -228,32 +230,43 @@ async function listAll(current, out, values = {}) {
     if (!installed) { out(`    (instálalo con: ${entry.npmPackage ? `agentrelay executors add ${entry.name}` : entry.connect})`); continue; }
     const executor = entry.name === current.type ? current : { ...current, ...EXECUTOR_DEFAULTS[entry.name], type: entry.name, thinking: null };
     const { models, error } = await modelsOf(entry.name, executor);
-    const checks = entry.name === 'opencode' ? loadChecks() : null;
     if (error) out(`    (no se pudo leer la lista: ${error})`);
     else if (!models.length) out(`    modelo por defecto: ${EXECUTOR_DEFAULTS[entry.name].model || '—'} (este ejecutor no ofrece lista)`);
-    if (entry.name === 'opencode' && !values.all && hasRanking(checks)) {
-      const ranked = rankedModels(models, checks);
-      const rankedIds = new Set(ranked.map((model) => model.id));
-      for (const model of ranked) {
-        const currentMark = entry.name === current.type && model.id === current.model ? '●' : ' ';
-        const position = rankPosition(checks, model.id);
-        const score = model.ranking.score >= 2 ? '✔✔' : '✔';
-        const seconds = Number.isFinite(model.ranking.seconds) ? model.ranking.seconds : '—';
-        out(`  ${currentMark} ${model.id}  #${position}  ${score} ${seconds} s`);
+    if (entry.name === 'opencode') {
+      const home = agentrelayHome();
+      const now = new Date();
+      const routing = config?.routing || DEFAULT_CONFIG.routing;
+      const freeIds = routingFreeIds(routing);
+      const paidIds = routingPaidOpenCodeIds(routing);
+      const freeSet = new Set(freeIds);
+      const paidSet = new Set(paidIds);
+      const modelById = new Map(models.map((model) => [model.id, model]));
+      if (values.all) {
+        for (const model of models) {
+          const efforts = model.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
+          out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}`);
+        }
+      } else {
+        const ordered = [];
+        for (const id of freeIds) {
+          if (!ordered.some((item) => item.id === id)) ordered.push({ id, mark: freeMark(id, home, now) });
+        }
+        for (const id of paidIds) {
+          if (!ordered.some((item) => item.id === id)) ordered.push({ id, mark: 'de pago' });
+        }
+        for (const item of ordered) {
+          const model = modelById.get(item.id);
+          const efforts = model?.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
+          const currentMark = entry.name === current.type && item.id === current.model ? '●' : ' ';
+          out(`  ${currentMark} ${item.id}${efforts}${item.mark ? `  ${item.mark}` : ''}`);
+        }
       }
-      const exhausted = models.map((model) => model.id).filter((id) => isExhausted(checks, id));
-      const additional = models.filter((model) => !rankedIds.has(model.id) && !exhausted.includes(model.id)).length;
-      if (additional > 0) out(`  (+${additional} modelos más de OpenCode sin probar o que no pasaron las pruebas: agentrelay use --list --all)`);
-      if (exhausted.length) out(`  Agotados hoy (vuelven mañana): ${exhausted.join(', ')}`);
-      if (ranked.stale) out('  (ranquing de hace más de 36 h; se actualiza el primer uso de cada día, o a mano con: agentrelay rank --run)');
       continue;
     }
     for (const model of models) {
       const efforts = model.efforts?.length ? `  ${model.efforts.map((effort) => `${effortLabel(effort)}${effort === model.defaultEffort ? '*' : ''}`).join(' ')}` : '';
-      const mark = checks ? (values.all && hasRanking(checks) ? rankingMark(model.id, checks) : legacyModelMark(model.id, checks)) : '';
-      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}${mark ? `  ${mark}` : ''}`);
+      out(`  ${entry.name === current.type && model.id === current.model ? '●' : ' '} ${model.id}${efforts}`);
     }
-    if (entry.name === 'opencode' && !values.all && !hasRanking(checks)) out('  Aún no hay ranquing de modelos gratuitos: agentrelay rank --run');
   }
   out('Cambia con: agentrelay use <ejecutor> <modelo> [esfuerzo]   (* = esfuerzo por defecto)');
 }
@@ -268,7 +281,7 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
   const profiles = loaded.config.profiles || {};
   const out = (text) => process.stdout.write(`${text}\n`);
 
-  if (values.list) { await listAll(current, out, values); return 0; }
+  if (values.list) { await listAll(current, out, values, loaded.config); return 0; }
 
   // Guardar el ajuste actual como perfil.
   if (values.save !== undefined) {
@@ -302,7 +315,7 @@ export async function cmdUse(positionals, values, helpers, runtime = {}) {
     const question = ask || ((text) => { rl ||= readline.createInterface({ input: process.stdin, output: process.stdout }); return rl.question(text); });
     try {
       out(`En uso: ${describe(current)}\n`);
-      choice = await interactive(current, question, helpers);
+      choice = await interactive(current, question, helpers, loaded.config);
       if (!choice) return 0;
       const interactiveEdits = choiceEdits(choice, current);
       const saved = writeChanges(file, scope, interactiveEdits, { cwd: root, configPath: values.config });

@@ -65,7 +65,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Terminado: `grep` de `free-ranking`/`model-check` en esos archivos vacío; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo alto.
 
-### Paso 3 — `use` y `alternatives` sin ranquing — [ ]
+### Paso 3 — `use` y `alternatives` sin ranquing — [x]
 - Archivos: `src/use.js`, `src/alternatives.js`, `test/use.test.js`, `test/alternatives.test.js`.
 - Hacer: `use --list` y el modo interactivo de OpenCode muestran primero los modelos de `routing.freeOrder` (marcados «gratis» y «agotado hasta HH:MM» si `quota-state` lo dice), después los `opencode:` de `routing.paidOrder` («de pago»); `--all` lista todo lo de `opencode models`. `alternativesHint` sugiere las entradas de `freeOrder` no agotadas (`agentrelay use opencode <id>`), Codex si no es el actual, y `opencode-go/deepseek-v4.1-flash` como pago en lugar de `deepseek/deepseek-flash`. Recibe la config en lugar de `checks`.
 - Terminado: sin imports de `free-ranking`/`model-check`; `npm test` verde.

@@ -235,7 +235,7 @@ async function continueCycle(ctx, result) {
             const installed = {
               opencode: await isInstalled('opencode'),
             };
-            reason += `\n${alternativesHint({ current: ctx.config.executor, checks: {}, installed })}`;
+            reason += `\n${alternativesHint({ current: ctx.config.executor, config: ctx.config, installed })}`;
           } catch {}
         }
         return finalize(ctx, result, check, { status: 'failed', reasons: [reason] });
