@@ -127,6 +127,12 @@ export async function cmdEvaluar(positionals, values, runtime = {}) {
     return 0;
   }
   const nuevo = result.seleccion.map((id) => `opencode:${id}`);
+  // Un modelo que no se pudo evaluar (cuota, red, sesión) no está suspendido: se conserva al final.
+  const conservados = (result.freeOrderPrevio ?? []).filter((spec) => (
+    result.puntuaciones?.[String(spec).replace(/^opencode:/, '')]?.estado === 'no-evaluado' && !nuevo.includes(spec)
+  ));
+  nuevo.push(...conservados);
+  if (conservados.length) out(`Se conservan al final por no haberse podido evaluar: ${conservados.join(', ')}`);
   if (values['no-apply']) {
     out(`Propuesta sin aplicar: routing.freeOrder = ${nuevo.join(', ')}`);
     out('Para aplicarla, vuelve a ejecutar agentrelay evaluar sin --no-apply.');

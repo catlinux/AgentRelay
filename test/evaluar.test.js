@@ -278,6 +278,7 @@ test('ejecutarTarea sin cambios suspende con fallo modelo', async () => {
     const res = await ejecutarTarea({ executor: { command: ['node'] }, modelo: 'opencode-go/x-free', tarea, startRun, tmpBase });
     assert.equal(res.aprobada, false);
     assert.equal(res.fallo.tipo, 'modelo');
+    assert.match(res.fallo.mensaje, /las pruebas ocultas no pasan \(fallan: .*contrato: sufijo propio/);
     assert.deepEqual(readdirSync(tmpBase), []);
   } finally {
     rmSync(tmpBase, { recursive: true, force: true });

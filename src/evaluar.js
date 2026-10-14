@@ -301,6 +301,24 @@ function minimalEnv() {
   };
 }
 
+/** Nombres de las pruebas ocultas que fallan y la primera diferencia, para que el informe diga qué comprobación no se cumplió. */
+function resumirFalloOcultas(stdout) {
+  const text = asText(stdout);
+  const marca = text.indexOf('failing tests:');
+  const lines = (marca >= 0 ? text.slice(marca) : text).split(/\r?\n/).map((l) => l.trim());
+  const nombres = [];
+  let detalle = '';
+  for (const line of lines) {
+    const m = /^✖ (.+?) \(\d[\d.]*ms\)$/.exec(line);
+    if (m && !nombres.includes(m[1])) nombres.push(m[1]);
+    else if (!detalle && /^(?:\w*Error\b|actual:|expected:)/.test(line)) detalle = line;
+  }
+  const partes = [];
+  if (nombres.length) partes.push(`fallan: ${nombres.join('; ')}`);
+  if (detalle) partes.push(detalle.replace(/,$/, ''));
+  return partes.join(' · ').slice(0, 400);
+}
+
 function evaluateReportCheck(report, rc) {
   if (!rc) return true;
   const fields = Array.isArray(rc.fields) ? rc.fields : (rc.fields ? [rc.fields] : []);
@@ -379,6 +397,7 @@ export async function ejecutarTarea({ executor, modelo, tarea, startRun = startR
 
     const testRes = await runProcess(NODE, ['--test'], { cwd: dir, env: minimalEnv(), timeoutMs: 120000, windowsShell: false });
     const ocultasPasan = testRes.code === 0 && !testRes.timedOut && !testRes.error;
+    const resumenOcultas = ocultasPasan ? '' : resumirFalloOcultas(testRes.stdout);
 
     const doNotModify = Array.isArray(task.doNotModify) ? task.doNotModify : [];
     const scope = scopeViolations(changed.map((p) => ({ path: p })), doNotModify);
@@ -421,7 +440,7 @@ export async function ejecutarTarea({ executor, modelo, tarea, startRun = startR
       fallo = infra;
     } else if (!aprobada) {
       const reasons = [];
-      if (!ocultasPasan) reasons.push('las pruebas ocultas no pasan');
+      if (!ocultasPasan) reasons.push(resumenOcultas ? `las pruebas ocultas no pasan (${resumenOcultas})` : 'las pruebas ocultas no pasan');
       if (changedOutside.length) reasons.push('archivos fuera de los permitidos');
       if (scope.length) reasons.push('violación de alcance');
       if (!report) reasons.push('falta el informe');

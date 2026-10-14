@@ -33,13 +33,13 @@ function entorno() {
   };
 }
 
-function resultado(env, seleccion) {
+function resultado(env, seleccion, extra = {}) {
   const entrada = { at: '2026-10-14T10:00:00.000Z', freeOrderPrevio: PREVIO, modelos: {}, seleccion };
   mkdirSync(evaluarDir(env.home), { recursive: true });
   writeFileSync(path.join(evaluarDir(env.home), 'history.json'), JSON.stringify({ runs: [entrada] }));
   return async () => ({
     informe: '# Informe', rutaInforme: path.join(evaluarDir(env.home), 'x.md'),
-    seleccion, ordenados: seleccion.map((id) => ({ id })), puntuaciones: {}, freeOrderPrevio: PREVIO, sinAptos: seleccion.length === 0,
+    seleccion, ordenados: seleccion.map((id) => ({ id })), puntuaciones: {}, freeOrderPrevio: PREVIO, sinAptos: seleccion.length === 0, ...extra,
   });
 }
 
@@ -136,5 +136,19 @@ test('avisa cuando el config del proyecto fija routing.freeOrder', async () => {
     const code = await cmdEvaluar([], { cwd: env.cwd }, env.runtime({ evaluar: resultado(env, ['opencode-go/a-free']) }));
     assert.equal(code, 0, env.errores.join('\n'));
     assert.match(env.salida.join('\n'), /fija routing\.freeOrder y anula este cambio/);
+  } finally { env.limpiar(); }
+});
+
+test('conserva al final los modelos no evaluados que ya estaban en freeOrder', async () => {
+  const env = entorno();
+  try {
+    const puntuaciones = {
+      'opencode-go/cat-jam-free': { estado: 'no-evaluado' },
+      'opencode-go/longcat-2.5-preview-free': { estado: 'suspendido' },
+    };
+    const code = await cmdEvaluar([], { cwd: env.cwd }, env.runtime({ evaluar: resultado(env, ['opencode-go/a-free'], { puntuaciones }) }));
+    assert.equal(code, 0, env.errores.join('\n'));
+    assert.deepEqual(env.config().routing.freeOrder, ['opencode:opencode-go/a-free', 'opencode:opencode-go/cat-jam-free']);
+    assert.match(env.salida.join('\n'), /Se conservan al final/);
   } finally { env.limpiar(); }
 });
