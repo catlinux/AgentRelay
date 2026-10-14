@@ -46,7 +46,16 @@ function routeSection(route, attempts) {
     .map((entry) => `- ${entry.key}: ${entry.reason}`);
   const paid = attempts.some((attempt) => attempt.paid === true)
     ? '\n\n**Se ha usado un ejecutor de pago en esta ejecución.**' : '';
-  return `## Enrutado\n\n${switches}\n\nEntradas descartadas al elegir:\n${skipped.length ? skipped.join('\n') : '_(ninguna)_'}${paid}`;
+  const causas = { quota: 'cuota o límite', transient: 'fallo de conexión o saturación' };
+  const retries = route.retries?.length
+    ? `\n\nReintentos con pausa:\n${route.retries.map((retry) => {
+      const at = new Date(retry.at);
+      const time = Number.isFinite(at.getTime())
+        ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+        : '--:--';
+      return `- ${time} ${retry.entry}: fallo ${retry.failures}/${retry.of} (${causas[retry.reason] ?? retry.reason}), se reintentó tras ${retry.pauseSeconds} s`;
+    }).join('\n')}` : '';
+  return `## Enrutado\n\n${switches}${retries}\n\nEntradas descartadas al elegir:\n${skipped.length ? skipped.join('\n') : '_(ninguna)_'}${paid}`;
 }
 
 function validationsSection(check) {

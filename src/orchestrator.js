@@ -220,6 +220,10 @@ async function continueCycle(ctx, result) {
       const retry = state.route && errorKind ? retryPlan(state.route, errorKind, errorText) : null;
       if (retry) {
         state.route.strikes = retry.failures;
+        (state.route.retries ??= []).push({
+          at: new Date().toISOString(), entry: state.route.current.key, failures: retry.failures, of: retry.allowed,
+          pauseSeconds: retry.pauseMs / 1000, reason: errorKind,
+        });
         saveState(ctx.root, state);
         ctx.emit({
           type: 'route_retry', entry: state.route.current.key, failures: retry.failures, of: retry.allowed, pauseSeconds: retry.pauseMs / 1000,
