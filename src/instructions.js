@@ -40,6 +40,8 @@ export const PROJECT_BLOCK = [
   '',
   '**Regla principal: delega por defecto.** Toda implementación que no sea trivial (crear o modificar código, tests, configuración o documentación de más de unas pocas líneas) se delega con `agentrelay run`. Escribirla tú gasta tu consumo, que es justo lo que AgentRelay quiere ahorrar. Hazla tú solo si es trivial (1-3 líneas), una decisión de diseño, algo sensible o una tarea ya escalada; y en ese caso di en una línea por qué no delegas.',
   '',
+  '**Antes de delegar, ¿lo resuelve un script?** Si la tarea es repetitiva, masiva o mecánica (renombrados, conversiones, migraciones, recuentos, extracción de datos, informes) y un script la hace de forma fiable y más barata que procesarla con tokens, escribe el script y ejecútalo, sin delegarla a un ejecutor ni hacerla a mano. No lo montes para algo de pocas líneas ni de un solo uso donde escribirlo cueste más que hacerlo.',
+  '',
   '**Al empezar cualquier sesión, ponte al día:** lee `.agentrelay/ESTADO.md` (o ejecuta `agentrelay status`, que lo muestra y `agentrelay status --write` lo actualiza). Resume dónde está el proyecto, qué ejecuciones hay y qué hacer ahora. Si el usuario te pide continuar, parte de ahí en lugar de preguntarle.',
   '',
   '### Cómo delegar',

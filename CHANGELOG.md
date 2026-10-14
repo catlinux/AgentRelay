@@ -8,6 +8,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Añadido
 
+- **El bloque de `agentrelay init` pide valorar un script antes de delegar.** Si la tarea es repetitiva, masiva o mecánica y un script la resuelve de forma fiable y más barata, el orquestador lo escribe y lo ejecuta en lugar de gastar tokens.
 - **Instalador de Windows en GitHub.** El flujo `.github/workflows/release-windows.yml` compila `AgentRelay-Setup.exe` con Inno Setup al subir una etiqueta `v*` y lo adjunta a la release (enlace fijo a la última: `releases/latest/download/AgentRelay-Setup.exe`); a mano (Actions → «Instalador de Windows») lo deja como artefacto sin crear release. El `.exe` no está firmado.
 - **`docs/GUIA.md`**: guía corta de qué hace AgentRelay y cómo se usa (ejecutores, uso diario, proveedores y ranquing, enrutado automático, mantenimiento y problemas habituales).
 - **Cline retirado.** DeepSeek rinde igual por OpenCode (`deepseek/deepseek-flash` y `deepseek/deepseek-v4-pro`, comprobado con las mismas tareas en las cuatro combinaciones), así que AgentRelay ya no incluye el ejecutor Cline. Una configuración o un perfil con `executor.type: "cline"` se lee como OpenCode con DeepSeek y avisa para que cambies el archivo; `agentrelay use cline` explica cómo pasar a OpenCode. Los instaladores de Windows y Debian ya no ofrecen Cline.
