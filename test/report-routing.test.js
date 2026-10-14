@@ -39,3 +39,11 @@ test('renderReport incluye cambios, entradas descartadas y uso de pago al enruta
   assert.match(report, /\*\*Se ha usado un ejecutor de pago en esta ejecución\.\*\*/);
   assert.ok(report.includes('| 1 | implement · codex:gpt-6-luna |'));
 });
+
+test('el informe lista los reintentos con pausa de una entrada del enrutado', () => {
+  const route = {
+    first: 'opencode:fake/free-a', current: { key: 'opencode:fake/free-b' }, switches: [], skipped: [],
+    retries: [{ at: '2026-10-15T10:00:00.000Z', entry: 'opencode:fake/free-a', failures: 1, of: 2, pauseSeconds: 5, reason: 'quota' }],
+  };
+  assert.match(renderReport(state(route)), /Reintentos con pausa:\n- \d{2}:\d{2} opencode:fake\/free-a: fallo 1\/2 \(cuota o límite\), se reintentó tras 5 s/);
+});
