@@ -13,9 +13,8 @@ Necesitan al usuario en casa o una clave:
 - [ ] Comprobar en Linux (Debian y VPS) que `executor.network` abre la red del sandbox de Codex; en Windows ya está probado.
 - [ ] Activar y probar el enrutado con `routing.mode: "auto"` y OpenCode Go: Luna gratis → Cat Jam → LongCat → DeepSeek V4.1 Flash. Comprobar que el cambio por cuota funciona con el error real de Go (hoy se detecta con patrones genéricos) y si el cupo de Go es global o por modelo (las barras de la consola son globales; la documentación dice por modelo).
 - [ ] Ronda de pruebas más dura de los ejecutores gratuitos y de Go (cambios en 3-4 archivos, instrucciones ambiguas, casos de «no puedo»): la primera ronda la pasaron los 8 modelos y no separa la calidad.
-- [ ] Revisar a mano los modelos gratuitos nuevos que salgan y, si valen, añadirlos a `routing.freeOrder` (no hay revisión automática).
+- [ ] **`agentrelay bench` bajo demanda y retirada sin rastro del ranquing antiguo** (`rank`, `executors check`, informe diario, notas por revisiones): descubre los gratuitos de OpenCode Go, los prueba con 4 tareas cortas y exigentes y aplica los dos mejores a `routing.freeOrder` sin tocar Luna ni `paidOrder`. Plan: [.agents/plans/benchmark-go/benchmark-go.PLAN.md](.agents/plans/benchmark-go/benchmark-go.PLAN.md).
 - [ ] Añadir OpenCode Go a `src/free-providers.js` (hoy sale sin dato de privacidad) y corregir el nombre antiguo `deepseek-v4-flash` en el catálogo y en `src/alternatives.js` (ahora `deepseek-flash` o `opencode-go/deepseek-v4.1-flash`).
-- [ ] Decidir si se retira por completo el código del ranquing (`src/model-rank.js`, `src/free-ranking.js`, `src/free-models.js`, `rank`); hoy queda solo para uso manual y para el estado de cuota.
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe).
 
 Mejoras acordadas:
