@@ -1,5 +1,5 @@
 ---
-description: Instala ejecutores y revisa modelos gratuitos
+description: Instala ejecutores opcionales
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku

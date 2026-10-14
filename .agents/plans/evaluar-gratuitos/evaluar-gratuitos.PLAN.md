@@ -71,7 +71,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Terminado: sin imports de `free-ranking`/`model-check`; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo medio.
 
-### Paso 4 — Retirar comandos y módulos del ranquing — [ ]
+### Paso 4 — Retirar comandos y módulos del ranquing — [x]
 - Archivos: `src/cli.js` (`cmdRank`, `discoverRankCandidates`, `freeProvidersConnected`, `freeTierProviderIds`, rama `check` de `cmdExecutors`, imports), `src/help.js` (entradas `rank` y `executors check`), `src/claude-commands.js` (añadir `rank.md` a `RETIRED_COMMANDS` para que `setup` borre el `/ar:rank` instalado), `assets/claude-commands/ar/rank.md` y `executors.md` (regenerar con el mecanismo del repo), y borrar `src/model-rank.js`, `src/free-ranking.js`, `src/model-check.js`, `src/free-models.js`, `src/executors-report.js` con sus pruebas (`model-rank*.test.js`, `free-ranking.test.js`, `model-check.test.js`, `free-models.test.js`, `executors-report.test.js`).
 - Terminado: `grep -ri "rank\|ranquing\|model-checks\|executors check\|informe diario"` en `src/`, `test/`, `assets/` solo devuelve lo que pertenece a `evaluar` (aún inexistente) o nada; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo medio. Si agota el tiempo, dividir en 4a (cli/help/assets) y 4b (borrados y pruebas).

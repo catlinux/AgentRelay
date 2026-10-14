@@ -37,12 +37,8 @@ import { pendingChanges } from './git.js';
 import { collectProjectState, refreshProjectState, renderProjectState, writeProjectState } from './project-state.js';
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
-import { loadChecks, markDay, saveChecks } from './model-check.js';
-import { loadFreeMetadata, discoverFreeModels, discoverProviderModels } from './free-models.js';
-import { mergeRankEntries, rankModels, renderRanking } from './model-rank.js';
 import { isExhausted as quotaIsExhausted, lastQuotaEvent, loadQuota } from './quota-state.js';
 import { connectedProviders, PROVIDERS } from './free-providers.js';
-import { writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
 import { commandParts as opencodeCommandParts, connectedProviderIds } from './executors/opencode.js';
 import { apiProfileDir, commandParts as codexCommandParts, hasApiProfile } from './executors/codex.js';
@@ -65,7 +61,6 @@ Uso:
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
-  agentrelay rank [--run] [--detach] [--provider <id[,id]>] [--max <N>] [--force] [--json]  Muestra o calcula el ranquing de modelos gratuitos
   agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
@@ -75,8 +70,8 @@ Uso:
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
 
-  agentrelay executors [add <nombre> | check [--force]]
-                                    Instala ejecutores y revisa modelos gratuitos
+  agentrelay executors [add <nombre>]
+                                    Instala ejecutores opcionales
 
 Avanzado:
   agentrelay set <clave> <valor> [--local] Cambia un ajuste suelto (ejemplo: set timeout 1800)
@@ -143,11 +138,6 @@ const OPTIONS = {
   'feedback-file': { type: 'string' },
   force: { type: 'boolean' },
   all: { type: 'boolean' },
-  background: { type: 'boolean' },
-  max: { type: 'string' },
-  provider: { type: 'string' },
-  detach: { type: 'boolean' },
-  run: { type: 'boolean' },
   'dry-run': { type: 'boolean' },
   fix: { type: 'boolean' },
   yes: { type: 'boolean' },
@@ -718,176 +708,6 @@ async function cmdUnset(positionals, values) {
   return applySetting(key, { unset: true }, values);
 }
 
-function freeTierProviderIds() {
-  return PROVIDERS.filter(({ freeTier }) => freeTier).map(({ id }) => id);
-}
-
-export function discoverRankCandidates({ listed = [], metadata = {}, source = 'sufijo', connected = [], includeUnlisted = true, freeTierProviders = freeTierProviderIds() } = {}) {
-  const zenCandidates = discoverFreeModels({ listed, metadata: metadata.models, source, includeUnlisted });
-  const live = Object.fromEntries(connected.map((provider) => [provider, []]));
-  for (const model of listed) {
-    const id = typeof model === 'string' ? model : model?.id;
-    const slash = typeof id === 'string' ? id.indexOf('/') : -1;
-    if (slash < 1) continue;
-    const provider = id.slice(0, slash);
-    (live[provider] ??= []).push(id.slice(slash + 1));
-  }
-  const providerCandidates = discoverProviderModels({ providers: metadata.providers, connected, live, freeTierProviders })
-    .map(({ id, name, context, reasoning, releaseDate, freeTier, cost }) => ({
-      id,
-      free: true,
-      listed: true,
-      reason: cost?.input === 0 && cost?.output === 0 ? 'metadatos' : 'nivel gratuito con límites',
-      name,
-      context,
-      reasoning,
-      toolCall: true,
-      releaseDate,
-      freeTier,
-      ...(cost ? { cost } : {}),
-    }));
-  return [...zenCandidates, ...providerCandidates];
-}
-
-export function filterRankCandidates(candidates, providers) {
-  const selected = new Set(providers);
-  return candidates.filter(({ id }) => {
-    const slash = id.indexOf('/');
-    return selected.has(slash === -1 ? 'opencode' : id.slice(0, slash));
-  });
-}
-
-/** Proveedores gratuitos conectados además de OpenCode Zen (que se descubre aparte). */
-async function freeProvidersConnected(executor) {
-  const opencodeAuth = await connectedProviderIds(executor);
-  return connectedProviders({ env: process.env, opencodeAuth })
-    .filter(({ id, tier }) => id !== 'opencode' && tier === 'free')
-    .map(({ id }) => id);
-}
-
-async function cmdRank(positionals, values) {
-  if (positionals.length) {
-    process.stderr.write('Uso: agentrelay rank [--run] [--detach] [--provider <id[,id]>] [--max <N>] [--force] [--json]\n');
-    return 1;
-  }
-  const selectedProviders = values.provider === undefined ? null : [...new Set(values.provider.split(/[,\s]+/).map((id) => id.trim()).filter(Boolean))];
-  if (values.provider !== undefined && selectedProviders.length === 0) {
-    process.stderr.write(`Indica al menos un proveedor con --provider. Disponibles: ${PROVIDERS.map(({ id }) => id).join(', ')}.\n`);
-    return 1;
-  }
-  const unknownProvider = selectedProviders?.find((id) => !PROVIDERS.some((provider) => provider.id === id));
-  if (unknownProvider) {
-    process.stderr.write(`Proveedor desconocido: ${unknownProvider}. Disponibles: ${PROVIDERS.map(({ id }) => id).join(', ')}.\n`);
-    return 1;
-  }
-  const max = values.max === undefined ? Infinity : Number(values.max);
-  if (values.max !== undefined && (!/^\d+$/.test(values.max) || max < 1 || !Number.isSafeInteger(max))) {
-    process.stderr.write('La opción --max debe ser un entero mayor o igual que 1.\n');
-    return 1;
-  }
-  const home = agentrelayHome();
-  if (!values.run && !values.detach) {
-    const ranking = loadChecks(home).ranking;
-    if (!ranking) {
-      process.stdout.write('Aún no hay ranquing. Calcúlalo con: agentrelay rank --run\n');
-      return 0;
-    }
-    if (values.json) {
-      process.stdout.write(`${JSON.stringify(ranking, null, 2)}\n`);
-      return 0;
-    }
-    const date = new Date(ranking.at);
-    const localDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(date);
-    process.stdout.write(`Último ranquing guardado (${localDate})\n`);
-    process.stdout.write(`${renderRanking({ entries: ranking.entries, skipped: [], stoppedBy: ranking.stoppedBy, tested: ranking.entries.length }, { date, total: ranking.entries.length })}\n`);
-    if (Date.now() - date.getTime() > 24 * 60 * 60 * 1000) {
-      process.stdout.write('Tiene más de 24 horas; para recalcularlo: agentrelay rank --run\n');
-    }
-    return 0;
-  }
-  const dir = executorsDir();
-  const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
-  const executor = config.executor.type === 'opencode'
-    ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-  const adapter = getExecutor('opencode');
-  if (!await isInstalled('opencode', { dir })) {
-    if (!values.background) process.stderr.write('OpenCode no está instalado. Instálalo con: agentrelay executors add opencode\n');
-    return values.background ? 0 : 1;
-  }
-  const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
-  if (!auth.ok) {
-    if (!values.background) process.stderr.write(`OpenCode no tiene sesión. Conéctala con: agentrelay login opencode${auth.message ? ` (${auth.message})` : ''}\n`);
-    return values.background ? 0 : 1;
-  }
-  if (values.detach) {
-    const entry = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'agentrelay.js');
-    const args = [entry, 'rank', '--run', '--background'];
-    if (values.max !== undefined) args.push('--max', String(max));
-    if (selectedProviders) args.push('--provider', selectedProviders.join(','));
-    if (values.force) args.push('--force');
-    const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true });
-    child.unref();
-    process.stdout.write('Ranquing en marcha en segundo plano (puede tardar varios minutos y usa la cuota gratuita de los modelos). Mira el resultado con: agentrelay rank\n');
-    return 0;
-  }
-  const listed = await adapter.listModels(executor);
-  const metadata = await loadFreeMetadata({ home });
-  const connected = await freeProvidersConnected(executor);
-  let candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, freeTierProviders: freeTierProviderIds() });
-  if (selectedProviders) candidates = filterRankCandidates(candidates, selectedProviders);
-  if (!candidates.length && !selectedProviders) {
-    if (!values.background) {
-      const message = 'No hay modelos gratuitos disponibles en tu cuenta de OpenCode.';
-      if (values.json) {
-        process.stderr.write(`${message}\n`);
-        process.stdout.write(`${JSON.stringify({ entries: [], skipped: [], stoppedBy: null, tested: 0 }, null, 2)}\n`);
-      } else process.stdout.write(`${message}\n`);
-    }
-    return 0;
-  }
-  const selected = candidates.reduce((counts, candidate) => {
-    const slash = candidate.id.indexOf('/');
-    const provider = slash === -1 ? 'opencode' : candidate.id.slice(0, slash);
-    counts.set(provider, Math.min(max, (counts.get(provider) ?? 0) + 1));
-    return counts;
-  }, new Map());
-  const selectedCount = [...selected.values()].reduce((total, count) => total + count, 0);
-  const unlistedCount = candidates.filter((candidate) => candidate.listed === false).length;
-  if (!values.background && !values.json) {
-    process.stdout.write(`Rastreando ${selectedCount} modelos que se sospecha que son gratuitos (${candidates.length - unlistedCount} de tu cuenta y ${unlistedCount} que solo constan como gratuitos en models.dev: si no existen en tu cuenta se descartan al momento). Puede tardar bastante: cada prueba consume cuota gratuita. Usa --max N para limitarlo por proveedor.\n`);
-    process.stdout.write(`Metadatos: ${metadata.source}\n`);
-  }
-  const now = new Date();
-  const previousRanking = selectedProviders ? loadChecks(home).ranking : null;
-  const previousEntries = Array.isArray(previousRanking?.entries) ? previousRanking.entries : [];
-  let result;
-  try {
-    result = await rankModels({
-      candidates, executor, adapter, max: Infinity, maxPerProvider: max, force: values.force, home, now,
-      log: values.background || values.json ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
-    });
-  } catch (error) {
-    if (values.background) return 0;
-    throw error;
-  }
-  if (selectedProviders) {
-    result.entries = mergeRankEntries(previousEntries, result.entries, selectedProviders);
-    result.tested = result.entries.length;
-    const checks = loadChecks(home);
-    checks.ranking = {
-      at: now.toISOString(),
-      stoppedBy: result.stoppedBy,
-      entries: result.entries.map((item) => ({ ...item })),
-    };
-    saveChecks(checks, home);
-  }
-  if (!values.background) {
-    if (values.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    else process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: result.entries.length + result.skipped.length })}\n`);
-  }
-  return 0;
-}
-
 async function cmdProviders(positionals, values) {
   if (positionals.length) {
     process.stderr.write('Uso: agentrelay providers [--json]\n');
@@ -941,43 +761,8 @@ async function cmdExecutors(positionals, values) {
     process.stdout.write('Para ver y cambiar de ejecutor usa: agentrelay use (o agentrelay use --list). Para instalar uno: agentrelay executors add <nombre>\n');
     return 0;
   }
-  if (action === 'check' && positionals.length === 1) {
-    const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
-    const executor = config.executor.type === 'opencode'
-      ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-    const adapter = getExecutor('opencode');
-    const home = agentrelayHome();
-    markDay(home);
-    if (await isInstalled('opencode', { dir })) {
-      const auth = adapter.authStatus ? await adapter.authStatus(executor) : { ok: false };
-      if (auth.ok) {
-        const listed = await adapter.listModels(executor);
-        const metadata = await loadFreeMetadata({ home });
-        const connected = await freeProvidersConnected(executor);
-        const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, includeUnlisted: false, freeTierProviders: freeTierProviderIds() });
-        const quota = loadQuota(home);
-        const available = candidates.filter(({ id }) => !quotaIsExhausted(quota, id));
-        const now = new Date();
-        const result = await rankModels({
-          candidates: available, executor, adapter, home, now, force: values.force,
-          log: values.background ? () => {} : (item) => process.stdout.write(`${item.score > 0 ? '✔' : '✘'} ${item.id} ${item.score}/3 (${item.seconds} s)\n`),
-        });
-        if (!values.background) process.stdout.write(`${renderRanking(result, { date: now, unlisted: [], total: available.length })}\n`);
-      } else if (!values.background) process.stdout.write('OpenCode no tiene sesión (agentrelay login opencode); se omite la prueba de modelos.\n');
-    } else if (!values.background) process.stdout.write('OpenCode no está instalado (agentrelay executors add opencode); se omite la prueba de modelos.\n');
-    let written;
-    try { written = await writeReport({ current: config.executor, home, root: process.env.AGENTRELAY_REPORT_ROOT || undefined }); }
-    catch (error) {
-      if (!values.background) process.stderr.write(`No se pudo escribir el informe diario: ${error.message}\n`);
-      return values.background ? 0 : 1;
-    }
-    if (!values.background) {
-      process.stdout.write(`Informe: ${written.path}\n`);
-    }
-    return 0;
-  }
   if (action !== 'add' || positionals.length !== 2) {
-    process.stderr.write('Uso: agentrelay executors [add <nombre> | check [--force]]\n');
+    process.stderr.write('Uso: agentrelay executors [add <nombre>]\n');
     return 1;
   }
   const name = positionals[1];
@@ -1773,7 +1558,6 @@ export async function main(argv, runtime = {}) {
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
-      case 'rank': return await cmdRank(rest, values);
       case 'providers': return await cmdProviders(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(rest, values);
