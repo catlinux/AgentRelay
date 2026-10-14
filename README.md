@@ -44,7 +44,7 @@ AgentRelay nunca hace commits ni push: los cambios quedan en tu carpeta para que
 | **Codex** (por defecto, incluido) | Tu cuenta de ChatGPT, modelo GPT-6 Luna | Incluido en el plan gratuito |
 | **OpenCode** (opcional) | Modelos gratuitos de varios proveedores (OpenCode Zen, Mistral, OpenRouter, Z.AI) y DeepSeek de pago | Gratis o lo que cobre el proveedor |
 
-Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. `agentrelay providers` muestra los proveedores conectados, sus límites y un aviso de privacidad; la revisión diaria evalúa con tres pruebas los modelos gratuitos de todos los proveedores conectados y `agentrelay rank` muestra el ranquing. Con `agentrelay set routing auto`, AgentRelay pasa automáticamente de los gratuitos a los de pago cuando se agota la cuota; consulta [el manual](docs/MANUAL.md) para más detalles.
+Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. `agentrelay providers` muestra los proveedores conectados, sus límites y un aviso de privacidad; `agentrelay rank --run` evalúa a mano con tres pruebas los modelos gratuitos de los proveedores conectados (no hay revisión automática) y `agentrelay rank` muestra el ranquing. Con `agentrelay set routing auto`, AgentRelay pasa automáticamente de los gratuitos a los de pago cuando se agota la cuota; consulta [el manual](docs/MANUAL.md) para más detalles.
 
 ## Requisitos
 
