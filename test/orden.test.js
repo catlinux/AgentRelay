@@ -40,7 +40,7 @@ test('sin argumentos muestra el orden efectivo: Luna gratis, gratuitos de Go y p
     assert.match(texto, /1\. Luna · cuenta de ChatGPT \(Codex\) · gratis/);
     assert.match(texto, /2\. opencode-go\/cat-jam-free · gratis/);
     assert.match(texto, /4\. DeepSeek Flash · suscripción de OpenCode Go · de pago/);
-    assert.match(texto, /Luna · API de OpenAI \(Codex\) · de pago · sin configurar/);
+    assert.doesNotMatch(texto, /5\. /);
   } finally { env.limpiar(); }
 });
 
@@ -52,13 +52,11 @@ test('con el enrutado apagado lo dice y explica cómo activarlo', () => {
   } finally { env.limpiar(); }
 });
 
-test('pago con un solo nombre lo pone el primero y conserva las demás detrás', () => {
+test('pago con un solo nombre cambia la IA de pago y no deja otras detrás', () => {
   const env = entorno();
   try {
     assert.equal(env.ejecutar('pago', 'deepseek-pro-go'), 0, env.errores.join('\n'));
-    assert.deepEqual(env.config().routing.paidOrder, [
-      'opencode:opencode-go/deepseek-v4-pro', 'opencode:opencode-go/deepseek-v4.1-flash', 'codex-api:gpt-6-luna',
-    ]);
+    assert.deepEqual(env.config().routing.paidOrder, ['opencode:opencode-go/deepseek-v4-pro']);
     assert.deepEqual(env.config().routing.freeOrder, ['opencode:opencode-go/cat-jam-free', 'opencode:opencode-go/longcat-2.5-preview-free']);
   } finally { env.limpiar(); }
 });

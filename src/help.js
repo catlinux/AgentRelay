@@ -268,18 +268,18 @@ const COMMANDS = {
   orden: {
     summary: 'Muestra o cambia el orden en que el enrutado automático prueba las IA.',
     usage: ['agentrelay orden', 'agentrelay orden gratis <modelo> [<modelo> …]', 'agentrelay orden pago <nombre> [<nombre> …]', 'agentrelay orden reset'],
-    description: 'Con el enrutado automático cada tarea prueba primero Luna con la cuenta de ChatGPT (si hay cuota), después los gratuitos de OpenCode Go y por último las IA de pago. Sin argumentos muestra ese orden con el estado de cada una. gratis fija los gratuitos de OpenCode Go (nombres como cat-jam o longcat-2.5-preview). pago acepta nombres claros: luna-go, luna-api, deepseek-flash-go, deepseek-pro-go, deepseek-flash-api y deepseek-pro-api; con un solo nombre esa IA pasa a ser la principal de pago y las demás siguen detrás, y con varios la lista queda exactamente en ese orden. Solo cambia tu configuración de usuario.',
+    description: 'Con el enrutado automático cada tarea prueba primero Luna con la cuenta de ChatGPT (si hay cuota), después los gratuitos de OpenCode Go y por último las IA de pago. Sin argumentos muestra ese orden con el estado de cada una. gratis fija los gratuitos de OpenCode Go (nombres como cat-jam o longcat-2.5-preview). pago acepta nombres claros: luna-go, luna-api, deepseek-flash-go, deepseek-pro-go, deepseek-flash-api y deepseek-pro-api; la lista de pago queda exactamente con los nombres indicados, en ese orden (por defecto solo DeepSeek Flash de Go). Cada gratuita se prueba dos veces seguidas antes de saltar; si falla la IA de pago, la tarea se detiene y se pregunta qué IA usar. Solo cambia tu configuración de usuario.',
     options: [
       ['gratis <modelo> …', 'Gratuitos de OpenCode Go, en ese orden (deben terminar en -free).'],
-      ['pago <nombre> …', 'IA de pago. Un nombre = la principal; varios = lista exacta.'],
+      ['pago <nombre> …', 'IA de pago (por defecto DeepSeek Flash de Go). Varios nombres = lista exacta; si falla la última, se detiene y se pregunta.'],
       ['reset', 'Vuelve al orden por defecto (gratuitos y pago).'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],
     examples: [
       ['agentrelay orden', 'Muestra el orden actual y el estado de cada IA.'],
-      ['agentrelay orden pago deepseek-pro-go', 'DeepSeek Pro por tu suscripción de Go pasa a ser la principal de pago.'],
-      ['agentrelay orden pago deepseek-flash-go luna-go', 'Primero DeepSeek Flash y después Luna, ambas por OpenCode Go.'],
+      ['agentrelay orden pago deepseek-pro-go', 'La IA de pago pasa a ser DeepSeek Pro por tu suscripción de Go.'],
+      ['agentrelay orden pago deepseek-flash-go luna-go', 'DeepSeek Flash y, solo si falla, Luna, ambas por OpenCode Go.'],
       ['agentrelay orden gratis cat-jam longcat-2.5-preview', 'Solo esos dos gratuitos de Go, en ese orden.'],
     ],
   },

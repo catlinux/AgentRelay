@@ -94,15 +94,16 @@ test('si se agota una cuota durante la tarea, cambia a fix con el nuevo modelo s
     entries: [first, second],
     plan: {
       byModel: {
-        'fake/free-a': { implement: { ...quotaFailure, write: { 'partial.txt': 'partial\n' } } },
+        'fake/free-a': { implement: { ...quotaFailure, write: { 'partial.txt': 'partial\n' } }, fix: quotaFailure },
         'fake/free-b': { fix: GOOD },
       },
     },
   }, ({ state, repo, home, events }) => {
     assert.equal(state.status, 'awaiting_review');
-    assert.deepEqual(state.attempts.map((attempt) => attempt.kind), ['implement', 'fix']);
-    assert.equal(state.attempts[1].model.id, 'fake/free-b');
-    assert.equal(repo.calls()[1].model, 'fake/free-b');
+    assert.deepEqual(state.attempts.map((attempt) => attempt.kind), ['implement', 'fix', 'fix']);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a', 'fake/free-b']);
+    assert.equal(repo.calls()[2].model, 'fake/free-b');
+    assert.equal(events.filter((event) => event.type === 'route_retry').length, 1);
     assert.equal(state.retriesUsed, 0);
     assert.equal(isAvailable(first.quotaId, new Date(), { home }), false);
     const [change] = events.filter((event) => event.type === 'route_switch');
@@ -120,13 +121,16 @@ test('con routing, un límite de velocidad salta al siguiente modelo y deja el a
     entries: [first, second],
     plan: {
       byModel: {
-        'fake/free-a': { implement: { error: 'Upstream request failed: Rate limit exceeded. Please try again later.', exitCode: 1, report: null } },
+        'fake/free-a': {
+          implement: { error: 'Upstream request failed: Rate limit exceeded. Please try again later.', exitCode: 1, report: null },
+          fix: { error: 'Upstream request failed: Rate limit exceeded. Please try again later.', exitCode: 1, report: null },
+        },
         'fake/free-b': { fix: GOOD },
       },
     },
   }, ({ state, home }) => {
     assert.equal(state.status, 'awaiting_review');
-    assert.equal(state.attempts[1].model.id, 'fake/free-b');
+    assert.equal(state.attempts[2].model.id, 'fake/free-b');
     assert.equal(state.retriesUsed, 0);
     assert.equal(isAvailable(first.quotaId, new Date(), { home }), false);
   });
@@ -155,10 +159,10 @@ test('si se agotan todas las entradas, el estado falla e indica que routing no t
   const byModel = Object.fromEntries(entries.map(({ model }) => [model, { implement: quotaFailure, fix: quotaFailure }]));
   await withRun({ entries, plan: { byModel } }, ({ state, repo, home }) => {
     assert.equal(state.status, 'failed');
-    assert.match(state.statusReasons.join(' '), /No queda ninguna entrada de routing disponible/);
-    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-b', 'fake/paid-a']);
+    assert.match(state.statusReasons.join(' '), /Se detiene el enrutado[\s\S]*PREGUNTA al usuario[\s\S]*agentrelay orden pago/);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a', 'fake/free-b', 'fake/free-b', 'fake/paid-a']);
     assert.equal(state.route.switches.at(-1).paid, true);
-    assert.equal(repo.calls().length, entries.length);
+    assert.equal(repo.calls().length, 5);
     for (const entry of entries) assert.equal(isAvailable(entry.quotaId, new Date(), { home }), false);
   });
 });
@@ -167,13 +171,58 @@ test('routing.maxSwitches 0 impide el cambio de ejecutor', async () => {
   const first = routeEntry('fake/free-a');
   await withRun({
     entries: [first, routeEntry('fake/free-b')],
-    plan: { byModel: { 'fake/free-a': { implement: quotaFailure } } },
+    plan: { byModel: { 'fake/free-a': { implement: quotaFailure, fix: quotaFailure } } },
     routing: { maxSwitches: 0 },
   }, ({ state, repo, events }) => {
     assert.equal(state.status, 'failed');
     assert.match(state.statusReasons.join(' '), /routing\.maxSwitches/);
+    assert.equal(state.attempts.length, 2);
+    assert.equal(repo.calls().length, 2);
+    assert.deepEqual(events.filter((event) => event.type === 'route_switch'), []);
+  });
+});
+
+test('la IA de pago no se reintenta: si falla, la tarea se detiene y pregunta', async () => {
+  const paid = routeEntry('fake/paid-a', true);
+  await withRun({
+    entries: [paid],
+    plan: { byModel: { 'fake/paid-a': { implement: quotaFailure } } },
+  }, ({ state, repo, events }) => {
+    assert.equal(state.status, 'failed');
     assert.equal(state.attempts.length, 1);
     assert.equal(repo.calls().length, 1);
+    assert.match(state.statusReasons.join(' '), /PREGUNTA al usuario qué IA usar/);
+    assert.deepEqual(events.filter((event) => event.type === 'route_retry'), []);
+  });
+});
+
+test('si el error indica cuándo se restablece la cuota, la gratuita no se reintenta: salta enseguida', async () => {
+  const first = routeEntry('fake/free-a');
+  const second = routeEntry('fake/free-b');
+  await withRun({
+    entries: [first, second],
+    plan: {
+      byModel: {
+        'fake/free-a': { implement: { error: 'Usage limit reached; {"resets_in_seconds": 3600}', exitCode: 1, report: null } },
+        'fake/free-b': { fix: GOOD },
+      },
+    },
+  }, ({ state, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-b']);
+    assert.deepEqual(events.filter((event) => event.type === 'route_retry'), []);
+  });
+});
+
+test('un éxito reinicia la cuenta de fallos de la entrada', async () => {
+  const first = routeEntry('fake/free-a');
+  await withRun({
+    entries: [first, routeEntry('fake/free-b')],
+    plan: { byModel: { 'fake/free-a': { implement: quotaFailure, fix: GOOD } } },
+  }, ({ state, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a']);
+    assert.equal(state.route.strikes, 0);
     assert.deepEqual(events.filter((event) => event.type === 'route_switch'), []);
   });
 });

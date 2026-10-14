@@ -21,7 +21,8 @@ import {
 } from './store.js';
 import { runValidations, scopeViolations } from './validate.js';
 import { VERSION } from './version.js';
-import { classifyExecutorError, isRateLimitError, maskSecrets } from './executors/common.js';
+import { classifyExecutorError, isRateLimitError, maskSecrets, parseQuotaReset } from './executors/common.js';
+import { CATALOGO } from './catalogo-ia.js';
 import { isInstalled } from './executors/catalog.js';
 import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
@@ -133,6 +134,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
   addUsage(state, result.usage);
   saveState(root, state);
   if (result.ok && state.route) {
+    state.route.strikes = 0;
     try { markQuotaAvailable(state.route.current.quotaId, { home: agentrelayHome() }); } catch {}
   }
 
@@ -213,6 +215,13 @@ async function continueCycle(ctx, result) {
       const errorText = `${result.error ?? ''} ${result.rawError ?? ''}`;
       // Con routing auto, un límite de velocidad persistente salta al siguiente modelo y deja al actual en espera.
       const errorKind = classifyExecutorError(errorText) ?? (state.route && isRateLimitError(errorText) ? 'quota' : null);
+      if (errorKind === 'quota' && state.route && shouldRetrySameEntry(state.route, errorText)) {
+        state.route.strikes = (state.route.strikes ?? 0) + 1;
+        saveState(ctx.root, state);
+        ctx.emit({ type: 'route_retry', entry: state.route.current.key, strike: state.route.strikes, of: FREE_ATTEMPTS });
+        result = await attempt(ctx, 'fix', { feedback: RETRY_FEEDBACK, check });
+        continue;
+      }
       if (errorKind && state.route && await switchRoute(ctx, result, errorKind)) {
         result = await attempt(ctx, 'fix', { feedback: SWITCH_FEEDBACK, check });
         continue;
@@ -223,7 +232,7 @@ async function continueCycle(ctx, result) {
           : errorKind === 'unavailable'
             ? 'el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use'
             : 'problema de cuota o saldo del ejecutor: revisa el saldo o plan del proveedor o elige otro ejecutor.';
-        if (state.route) reason += '\nNo queda ninguna entrada de routing disponible (o se alcanzó routing.maxSwitches): mira la sección Enrutado del informe.';
+        if (state.route) reason += `\n${routeStoppedMessage(state.route)}`;
         if (errorKind === 'quota' && !state.route) {
           if (ctx.config.executor.type === 'opencode' && ctx.config.executor.model) {
             try {
@@ -273,6 +282,25 @@ async function continueCycle(ctx, result) {
 const SWITCH_FEEDBACK = 'The previous executor stopped before finishing (quota, credentials or model not available). '
   + 'The working tree keeps its partial changes: review them and continue the task from there until it is complete.';
 
+// Una entrada gratuita se prueba FREE_ATTEMPTS veces seguidas antes de saltar a la siguiente; la de pago no se reintenta.
+const FREE_ATTEMPTS = 2;
+const RETRY_FEEDBACK = 'The previous attempt stopped before finishing because of a provider quota or rate-limit error. '
+  + 'The working tree keeps its partial changes: review them and continue the task from there until it is complete.';
+
+/** Reintenta la misma entrada solo si es gratuita, aún no ha agotado sus intentos y el error no da una hora de reinicio (esperar no sirve). */
+function shouldRetrySameEntry(route, errorText) {
+  if (route.current.paid) return false;
+  if ((route.strikes ?? 0) + 1 >= FREE_ATTEMPTS) return false;
+  return !parseQuotaReset(errorText);
+}
+
+/** Mensaje cuando el enrutado se detiene: nunca se sigue con otra IA sin que el usuario la elija. */
+function routeStoppedMessage(route) {
+  const names = CATALOGO.filter((item) => item.ruta).map((item) => item.id).join(', ');
+  return `Se detiene el enrutado: ha fallado ${route.current.label} y no queda ninguna otra IA en el orden (o se alcanzó routing.maxSwitches). `
+    + `No se continúa con otra sin tu decisión: PREGUNTA al usuario qué IA usar. Opciones: agentrelay orden pago <${names}> y volver a lanzar la tarea (agentrelay orden muestra el orden actual). Mira la sección Enrutado del informe.`;
+}
+
 const SWITCH_REASONS = { quota: 'cuota agotada', credentials: 'sin credenciales', unavailable: 'modelo no disponible' };
 
 const routeQuotaAvailable = (quotaId) => quotaAvailable(quotaId, new Date(), { home: agentrelayHome() });
@@ -311,6 +339,7 @@ async function switchRoute(ctx, result, errorKind) {
   };
   route.switches.push(change);
   route.current = entry;
+  route.strikes = 0;
   saveState(root, state);
   ctx.emit({ type: 'route_switch', ...change });
   return entry;
