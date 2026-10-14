@@ -27,9 +27,11 @@ const routeEntry = (model, paid = false) => ({
 afterEach(() => {
   routerHooks.entries = null;
   routerHooks.usable = null;
+  routerHooks.sleep = null;
 });
 
 async function withRun({ entries, plan, routing = {}, task = {}, beforeStart, mode = 'auto', onEntries } = {}, check) {
+  const pauses = [];
   const repo = makeRepo();
   const home = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-routing-home-'));
   const envNames = ['AGENTRELAY_HOME', 'FAKE_OPENCODE_PLAN', 'FAKE_OPENCODE_LOG', 'FAKE_OPENCODE_MODELS', 'FAKE_OPENCODE_STORED'];
@@ -41,6 +43,7 @@ async function withRun({ entries, plan, routing = {}, task = {}, beforeStart, mo
     return entries ?? [];
   };
   routerHooks.usable = async () => ({ ok: true });
+  routerHooks.sleep = async (ms) => { pauses.push(ms); };
 
   try {
     await beforeStart?.({ repo, home });
@@ -51,10 +54,11 @@ async function withRun({ entries, plan, routing = {}, task = {}, beforeStart, mo
         routing: { mode, paidOrder: [], maxSwitches: 5, ...routing },
       }),
     });
-    await check({ state, repo, home, events: readEvents(repo.dir, state.id) });
+    await check({ state, repo, home, events: readEvents(repo.dir, state.id), pauses });
   } finally {
     routerHooks.entries = null;
     routerHooks.usable = null;
+    routerHooks.sleep = null;
     for (const name of envNames) {
       if (previousEnv[name] === undefined) delete process.env[name];
       else process.env[name] = previousEnv[name];
@@ -182,7 +186,7 @@ test('routing.maxSwitches 0 impide el cambio de ejecutor', async () => {
   });
 });
 
-test('la IA de pago no se reintenta: si falla, la tarea se detiene y pregunta', async () => {
+test('un error definitivo de la IA de pago (cuota) la detiene sin reintentos y pregunta', async () => {
   const paid = routeEntry('fake/paid-a', true);
   await withRun({
     entries: [paid],
@@ -224,6 +228,57 @@ test('un éxito reinicia la cuenta de fallos de la entrada', async () => {
     assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a']);
     assert.equal(state.route.strikes, 0);
     assert.deepEqual(events.filter((event) => event.type === 'route_switch'), []);
+  });
+});
+
+const rateLimit = { error: 'Upstream request failed: Rate limit exceeded. Please try again later.', exitCode: 1, report: null };
+const netError = { error: 'request failed: ECONNRESET socket hang up', exitCode: 1, report: null };
+
+test('la IA de pago reintenta un fallo pasajero con pausas de 5 y 15 s y se completa', async () => {
+  await withRun({
+    entries: [routeEntry('fake/paid-a', true)],
+    plan: { byModel: { 'fake/paid-a': { implement: rateLimit, fix: [rateLimit, GOOD] } } },
+  }, ({ state, pauses, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(state.attempts.length, 3);
+    assert.deepEqual(pauses, [5000, 15000]);
+    assert.equal(events.filter((event) => event.type === 'route_retry').length, 2);
+  });
+});
+
+test('si la IA de pago sigue fallando tras tres intentos, se detiene y pregunta', async () => {
+  await withRun({
+    entries: [routeEntry('fake/paid-a', true)],
+    plan: { byModel: { 'fake/paid-a': { implement: netError, fix: netError } } },
+  }, ({ state, pauses }) => {
+    assert.equal(state.status, 'failed');
+    assert.equal(state.attempts.length, 3);
+    assert.deepEqual(pauses, [5000, 15000]);
+    assert.match(state.statusReasons.join(' '), /varias veces seguidas[\s\S]*PREGUNTA al usuario/);
+  });
+});
+
+test('la IA de pago no reintenta un saldo insuficiente: se detiene a la primera', async () => {
+  await withRun({
+    entries: [routeEntry('fake/paid-a', true)],
+    plan: { byModel: { 'fake/paid-a': { implement: { error: 'Insufficient Balance (request_id: x)', exitCode: 1, report: null } } } },
+  }, ({ state, pauses }) => {
+    assert.equal(state.status, 'failed');
+    assert.equal(state.attempts.length, 1);
+    assert.deepEqual(pauses, []);
+    assert.match(state.statusReasons.join(' '), /PREGUNTA al usuario/);
+  });
+});
+
+test('una gratuita con fallos de red espera 5 s, reintenta una vez y salta a la siguiente', async () => {
+  await withRun({
+    entries: [routeEntry('fake/free-a'), routeEntry('fake/free-b')],
+    plan: { byModel: { 'fake/free-a': { implement: netError, fix: netError }, 'fake/free-b': { fix: GOOD } } },
+  }, ({ state, pauses, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a', 'fake/free-b']);
+    assert.deepEqual(pauses, [5000]);
+    assert.equal(events.find((event) => event.type === 'route_switch').reason, 'fallos repetidos del proveedor');
   });
 });
 

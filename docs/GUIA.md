@@ -80,7 +80,7 @@ Cada tarea empieza por el primero disponible de esta lista:
 2. Los modelos gratuitos de `routing.freeOrder`, en el orden que tú fijes (por defecto Cat Jam y LongCat de OpenCode Go; no dependen del esfuerzo de la tarea).
 3. La de pago de `routing.paidOrder`: por defecto solo DeepSeek V4.1 Flash de OpenCode Go (limitada por tu suscripción). Se cambia con `agentrelay orden pago <nombre>`.
 
-Una gratuita se prueba **dos veces seguidas**: si las dos fallan por cuota, saldo o límite de velocidad, salta a la siguiente (si el error ya dice cuándo se restablece, salta a la primera). Si falta la sesión o el modelo ya no existe, salta enseguida. Si la IA de pago falla, la tarea **se detiene y se te pregunta qué IA usar**: nunca continúa sola con otra. La siguiente tarea vuelve a empezar por los gratuitos.
+Cada **gratuita** se prueba dos veces seguidas (con 5 s de pausa) si falla por cuota, saldo, límite de velocidad o un fallo pasajero de conexión, y a la segunda salta a la siguiente; si el error ya dice cuándo se restablece la cuota, salta sin reintentar. La **IA de pago** se prueba hasta tres veces (pausas de 5 y 15 s) solo ante un fallo pasajero (límite de velocidad, red, 502/503/504, saturación); un error definitivo (saldo insuficiente, credenciales, modelo inexistente) la detiene a la primera. Si la IA de pago sigue fallando, la tarea **se detiene y se te pregunta qué IA usar**: nunca continúa sola con otra. La siguiente tarea vuelve a empezar por los gratuitos.
 
 En el informe, la sección **Enrutado** dice con qué empezó, los cambios, los modelos saltados y, en negrita, si se ha usado alguno de pago.
 
