@@ -73,7 +73,7 @@ agentrelay set routing off --local    # para desactivarlo
 Cada tarea empieza por el primero disponible de esta lista:
 
 1. Luna con la cuota gratuita de ChatGPT (solo si Codex está conectado con tu cuenta; con clave de API se salta, porque se factura).
-2. Los modelos gratuitos de `routing.freeOrder`, en el orden que tú fijes (por defecto Cat Jam y LongCat de OpenCode Go; con esfuerzo alto se omiten).
+2. Los modelos gratuitos de `routing.freeOrder`, en el orden que tú fijes (por defecto Cat Jam y LongCat de OpenCode Go; no dependen del esfuerzo de la tarea).
 3. Los de pago de `routing.paidOrder`: DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go (limitados por tu suscripción) y, al final, Luna por API (`agentrelay login --api`), **sin tope de gasto**.
 
 Si a media tarea se agota la cuota (o falta la sesión, o el modelo ya no existe), sigue con el siguiente sin gastar reintentos, hasta 5 cambios (`routing.maxSwitches`). La siguiente tarea vuelve a empezar por los gratuitos.

@@ -9,7 +9,6 @@ import { EXECUTOR_DEFAULTS } from './config.js';
 import { getProvider } from './free-providers.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
-const HIGH_EFFORTS = new Set(['high', 'xhigh', 'max']);
 
 function providerOf(model) {
   const slash = typeof model === 'string' ? model.indexOf('/') : -1;
@@ -37,9 +36,9 @@ export function parsePaidEntry(spec) {
 /**
  * Entradas en orden de preferencia, sin filtrar por cuota:
  * Luna con la cuota gratuita de ChatGPT, los gratuitos de freeOrder y los de pago.
- * Con esfuerzo alto solo entran Luna y las entradas de pago.
+ * El esfuerzo no filtra: el orden de freeOrder lo decide el usuario.
  */
-export function routeEntries({ config, effort = null } = {}) {
+export function routeEntries({ config } = {}) {
   const entries = [];
   const keys = new Set();
   const codexModel = config.executor.type === 'codex' && config.executor.model
@@ -50,20 +49,17 @@ export function routeEntries({ config, effort = null } = {}) {
   };
   entries.push(luna);
   keys.add(luna.key);
-  const highEffort = HIGH_EFFORTS.has(effort);
-  if (!highEffort) {
-    for (const spec of config.routing?.freeOrder ?? []) {
-      const match = /^opencode:(\S+)$/.exec(String(spec));
-      if (!match) continue;
-      const [, model] = match;
-      const key = `opencode:${model}`;
-      if (keys.has(key)) continue;
-      entries.push({
-        key, type: 'opencode', model, api: false, paid: false,
-        quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,
-      });
-      keys.add(key);
-    }
+  for (const spec of config.routing?.freeOrder ?? []) {
+    const match = /^opencode:(\S+)$/.exec(String(spec));
+    if (!match) continue;
+    const [, model] = match;
+    const key = `opencode:${model}`;
+    if (keys.has(key)) continue;
+    entries.push({
+      key, type: 'opencode', model, api: false, paid: false,
+      quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,
+    });
+    keys.add(key);
   }
   for (const spec of config.routing?.paidOrder ?? []) {
     const entry = parsePaidEntry(spec);
