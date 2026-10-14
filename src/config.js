@@ -38,7 +38,8 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
   routing: {
     mode: 'off',
-    paidOrder: ['opencode:deepseek/deepseek-flash', 'codex-api:gpt-6-luna', 'opencode:deepseek/deepseek-v4-pro'],
+    freeOrder: ['opencode:opencode-go/cat-jam-free', 'opencode:opencode-go/longcat-2.5-preview-free'],
+    paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash', 'opencode:opencode-go/deepseek-v4-pro', 'codex-api:gpt-6-luna'],
     maxSwitches: 5,
   },
   // Ajustes que sustituyen a la política por defecto (ver src/policy.js).
@@ -181,7 +182,7 @@ const KNOWN = {
   '': ['executor', 'validation', 'routing', 'policy', 'report', 'profiles'],
   executor: ['type', 'command', 'provider', 'model', 'thinking', 'timeoutSeconds', 'extraArgs', 'network', 'apiFallback'],
   validation: ['commands', 'timeoutSeconds'],
-  routing: ['mode', 'paidOrder', 'maxSwitches'],
+  routing: ['mode', 'freeOrder', 'paidOrder', 'maxSwitches'],
   policy: ['review', 'maxRetries', 'autoFix', 'requireValidation', 'selfReview', 'skipPassMaxFiles'],
   'policy.selfReview': COMPLEXITIES,
   report: ['maxDiffChars', 'maxOutputChars'],
@@ -264,6 +265,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
   if (!['off', 'auto'].includes(config.routing.mode)) invalid('routing.mode', 'debe ser off o auto');
+  if (!Array.isArray(config.routing.freeOrder) || !config.routing.freeOrder.every((v) => typeof v === 'string' && /^opencode:\S+$/.test(v))) invalid('routing.freeOrder', 'debe ser una lista de entradas opencode:modelo válidas');
   if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
   if (!Number.isInteger(config.routing.maxSwitches) || config.routing.maxSwitches < 0 || config.routing.maxSwitches > 20) invalid('routing.maxSwitches', 'debe ser un entero entre 0 y 20');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }

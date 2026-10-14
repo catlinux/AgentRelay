@@ -341,7 +341,7 @@ async function entryUsable(entry, base) {
 /** Elige la primera entrada utilizable de una ejecución nueva con routing.mode = "auto". */
 async function startRoute(config, task) {
   const effort = task.effort ?? config.executor.thinking;
-  const entries = routerHooks.entries?.({ config, effort }) ?? routeEntries({ config, checks: loadChecks(), effort });
+  const entries = routerHooks.entries?.({ config, effort }) ?? routeEntries({ config, effort });
   const { entry, skipped } = await pickEntry(entries, {
     isAvailable: routeQuotaAvailable,
     isUsable: (candidate) => usableEntry(candidate, config.executor),
