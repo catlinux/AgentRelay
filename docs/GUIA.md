@@ -47,18 +47,20 @@ En Windows, si usas PowerShell: `agentrelay` funciona; el orquestador usa `agent
 
 ## Modelos gratuitos y proveedores
 
-Los proveedores gratuitos cambian de modelos a menudo, así que AgentRelay los vigila:
+Los proveedores gratuitos cambian de modelos a menudo. Puedes ver qué tienes conectado y, cuando quieras, medir los gratuitos de tu cuenta de OpenCode Go:
 
 ```sh
-agentrelay providers          # qué proveedores tienes conectados, sus límites y avisos de privacidad
-agentrelay rank               # el último ranquing de modelos
-agentrelay rank --run --max 3 # recalcula (prueba hasta 3 modelos por proveedor; gasta algo de cuota)
+agentrelay providers             # qué proveedores tienes conectados, sus límites y avisos de privacidad
+agentrelay evaluar --no-apply    # prueba los gratuitos y muestra la propuesta sin cambiar nada
+agentrelay evaluar               # lo mismo, y aplica el resultado a routing.freeOrder
+agentrelay evaluar --revert      # deshace el último cambio aplicado
 ```
 
 - Se conectan con `agentrelay login opencode` (eliges el proveedor y pegas la clave). AgentRelay no guarda esas claves.
-- **Cada modelo pasa tres pruebas** (fácil, media y difícil, con varios archivos). Es **apto** si supera la media y la difícil. Nivel **A** si además es rápido; nivel **B** si es más lento.
-- La evaluación solo se hace cuando la pides (`agentrelay rank --run`); no hay revisión automática en segundo plano. Un modelo ya probado no se repite hasta pasados 7 días.
-- Tus revisiones afectan a la nota: `accept` suma, `fix`, `reject` y `escalate` restan, y eso desempata entre modelos parecidos.
+- **`evaluar` solo prueba los modelos `opencode-go/*-free` de tu cuenta de OpenCode Go** (nunca los de pago) y solo cuando tú lo pides: no hay evaluación automática ni en segundo plano.
+- **Cada modelo resuelve cuatro tareas cortas** en una carpeta temporal, que se corrigen con pruebas que el modelo no ve. Es **apto** con 3 de 4 aprobadas y sin tocar archivos prohibidos. Si falla por cuota, red o sesión queda «no evaluado», no «suspendido».
+- El resultado solo reescribe `routing.freeOrder` (los dos mejores, o tres si el tercero es claramente bueno), guarda el valor anterior para `--revert` y nunca toca `routing.paidOrder`. El informe queda en `~/.agentrelay/evaluar/`.
+- `--models a,b` limita la evaluación a esos modelos `-free`; `--runs N` (1 a 3) repite cada tarea y usa la media.
 - Descartados tras probarlos: Groq, NVIDIA y Google (ningún modelo apto), y Cline (OpenCode con DeepSeek rinde igual).
 
 ## Enrutado automático (opcional)
@@ -95,7 +97,7 @@ El gasto de cada ejecución (tokens y coste estimado) está en su informe, en la
 | Síntoma | Qué mirar |
 |---|---|
 | «El modelo … no está disponible para el ejecutor» | `agentrelay use opencode <modelo>`; `agentrelay providers` para ver qué está conectado |
-| Todo suspende la prueba fácil en `rank` | Que OpenCode no tenga procesos colgados (`opencode` en el administrador de tareas) y `agentrelay update --yes` |
+| Todos los modelos salen «no evaluados» en `evaluar` | Que OpenCode no tenga procesos colgados (`opencode` en el administrador de tareas) y `agentrelay update --yes` |
 | «El repositorio tiene cambios sin confirmar» | Confirma o guarda los cambios antes de delegar, o usa `--allow-dirty` |
 | Una cuota gratuita se ha agotado | Se repone sola (la hora sale en `agentrelay doctor` para Luna); con el enrutado activo se pasa al siguiente |
 | El enrutado se salta Luna gratis | Codex tiene sesión con clave de API: `agentrelay login` con tu cuenta de ChatGPT |

@@ -44,7 +44,7 @@ AgentRelay never commits or pushes: changes stay in your folder for you to revie
 | **Codex** (default, bundled) | Your ChatGPT account, GPT-6 Luna model | Included in the free plan |
 | **OpenCode** (optional) | Free models from several providers (OpenCode Zen, Mistral, OpenRouter, Z.AI) and paid DeepSeek | Free or whatever the provider charges |
 
-Switch between them with a single command: `agentrelay use` (interactive) or `agentrelay use opencode`. `agentrelay providers` shows the connected providers, their limits, and a privacy notice; the daily check evaluates free models from every connected provider with three tests, and `agentrelay rank` shows the ranking. With `agentrelay set routing auto`, AgentRelay automatically moves from free models to paid ones when the quota runs out; see [the manual](docs/MANUAL.md) for details.
+Switch between them with a single command: `agentrelay use` (interactive) or `agentrelay use opencode`. `agentrelay providers` shows the connected providers, their limits, and a privacy notice; `agentrelay evaluar` runs, on demand only, four short tasks against the free models of your OpenCode Go account and proposes the order of `routing.freeOrder`. With `agentrelay set routing auto`, AgentRelay automatically moves from free models to paid ones when the quota runs out; see [the manual](docs/MANUAL.md) for details.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ agentrelay watch    # 2. (in another terminal) watch the executor work
 
 To switch AI: `agentrelay use`. To see where you are: `agentrelay status`. If something fails: `agentrelay doctor`.
 
-**The same commands in the terminal and in the Claude Code chat:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay rank` ↔ `/ar:rank`... (all except `watch`). `agentrelay help` lists them.
+**The same commands in the terminal and in the Claude Code chat:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay evaluar` ↔ `/ar:evaluar`... (all except `watch`). `agentrelay help` lists them.
 
 **Everything else, with examples: [User manual](docs/MANUAL.md)** (in Spanish; the commands and examples are the same).
 
