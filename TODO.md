@@ -11,8 +11,12 @@ Necesitan al usuario en casa o una clave:
 - [ ] Probar los instaladores en equipos reales: compilar el `.exe` de Windows con Inno Setup y probarlo; probar `install-gui.sh` y el `.deb` en Debian/Ubuntu con pantalla. Después, decidir si se publican en una release de GitHub.
 - [ ] Probar el flujo de un usuario nuevo (clon limpio, sin configuración previa) y dejarlo documentado. Windows y Linux (Debian) probados en la 0.0.2; falta rehacerlo con la 0.2.
 - [ ] Comprobar en Linux (Debian y VPS) que `executor.network` abre la red del sandbox de Codex; en Windows ya está probado.
-- [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe diario).
-- [ ] Probar el informe diario y el ranquing automático en un uso real de varios días; ajustar lo que moleste.
+- [ ] Activar y probar el enrutado con `routing.mode: "auto"` y OpenCode Go: Luna gratis → Cat Jam → LongCat → DeepSeek V4.1 Flash. Comprobar que el cambio por cuota funciona con el error real de Go (hoy se detecta con patrones genéricos) y si el cupo de Go es global o por modelo (las barras de la consola son globales; la documentación dice por modelo).
+- [ ] Ronda de pruebas más dura de los ejecutores gratuitos y de Go (cambios en 3-4 archivos, instrucciones ambiguas, casos de «no puedo»): la primera ronda la pasaron los 8 modelos y no separa la calidad.
+- [ ] Revisar a mano los modelos gratuitos nuevos que salgan y, si valen, añadirlos a `routing.freeOrder` (no hay revisión automática).
+- [ ] Añadir OpenCode Go a `src/free-providers.js` (hoy sale sin dato de privacidad) y corregir el nombre antiguo `deepseek-v4-flash` en el catálogo y en `src/alternatives.js` (ahora `deepseek-flash` o `opencode-go/deepseek-v4.1-flash`).
+- [ ] Decidir si se retira por completo el código del ranquing (`src/model-rank.js`, `src/free-ranking.js`, `src/free-models.js`, `rank`); hoy queda solo para uso manual y para el estado de cuota.
+- [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe).
 
 Mejoras acordadas:
 

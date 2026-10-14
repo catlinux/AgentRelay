@@ -103,8 +103,8 @@ Conecta un proveedor con `agentrelay login opencode` y elige uno en el asistente
 La lista se mantiene al día así:
 
 - Metadatos de [models.dev](https://models.dev) (precio, herramientas y contexto) en caché durante 24 horas. En cada evaluación se lee la lista real de tu cuenta (`opencode models`), así los modelos retirados salen del ranquing.
-- Una vez al día, en segundo plano al primer `run` o `start`, se evalúan todos los proveedores conectados. `agentrelay rank --run` inicia la evaluación manualmente. Cada modelo se vuelve a evaluar tras 7 días; `--force` lo repite antes. Los errores 410/404 indican que el modelo ya no está disponible.
-- Solo se envían tareas de ejemplo, nunca tu código. Desactiva la evaluación con `AGENTRELAY_NO_MODEL_CHECK=1`.
+- No hay evaluación automática ni en segundo plano: `agentrelay rank --run` (o `agentrelay executors check`) evalúa los proveedores conectados cuando tú lo pides. Cada modelo se vuelve a evaluar tras 7 días; `--force` lo repite antes. Los errores 410/404 indican que el modelo ya no está disponible.
+- Solo se envían tareas de ejemplo, nunca tu código.
 
 Se prueban solo modelos gratuitos que admiten herramientas y tienen al menos 64k de contexto: tres tareas (fácil, media y difícil; esta última usa varios archivos y un test que arreglar). Apto significa superar las pruebas media y difícil. Nivel A: apto y cada prueba dura 150 s o menos; nivel B: apto y más lento. `--max N` limita cuántos se prueban por proveedor y las pruebas se intercalan entre proveedores. Las revisiones desempatan la nota: `agentrelay review` suma con `accept` y resta con `fix`, `reject` o `escalate`. `agentrelay rank` muestra las columnas Prueba 1-3 y Nivel.
 
@@ -114,8 +114,8 @@ La cuota no se puede consultar. Cuando un modelo indica que se agotó, queda mar
 Está desactivado por defecto (`routing.mode: "off"`): se usa siempre el ejecutor configurado. Actívalo con `agentrelay set routing auto` (o `--local` para un proyecto). Cada tarea empieza por el primer candidato disponible, en este orden:
 
 1. Luna con la cuota gratuita de ChatGPT. Si Codex usa una clave de API en vez de la cuenta de ChatGPT, se omite porque es de pago.
-2. Modelos gratuitos aptos del ranquing. Con esfuerzo alto o extremo, solo se consideran los de nivel A.
-3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek Flash → Luna por API (`agentrelay login --api`) → DeepSeek Pro. No hay tope de gasto.
+2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del ranquing: la lista la mantienes tú. Con esfuerzo alto o extremo se omiten.
+3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go → Luna por API (`agentrelay login --api`). Los de Go tienen los cupos de tu suscripción; Luna por API no tiene tope de gasto.
 
 Si durante una tarea se agota la cuota, faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.
 

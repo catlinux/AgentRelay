@@ -23,11 +23,11 @@ Cada comando se llama igual en el terminal (`agentrelay <comando>`) y en el chat
 
 ## Modelos gratuitos
 
-La revisión diaria (`executors check`, lanzada en segundo plano el primer uso de cada día) evalúa con tres pruebas los modelos gratuitos de todos los proveedores conectados de `src/free-providers.js`. El inventario está en `src/free-models.js`; `src/model-rank.js` calcula el ranquing y `src/free-ranking.js` ordena los utilizables. `src/quota-state.js` guarda la cuota agotada hasta la hora indicada por el error o reintenta a los 10, 30 y 60 minutos. Las pruebas usan tareas de ejemplo, nunca código del usuario. El cambio automático de ejecutor solo ocurre si el usuario activa `routing.mode: "auto"`.
+La evaluación manual (`rank --run` o `executors check`; no hay revisión automática en segundo plano) evalúa con tres pruebas los modelos gratuitos de todos los proveedores conectados de `src/free-providers.js`. El inventario está en `src/free-models.js`; `src/model-rank.js` calcula el ranquing y `src/free-ranking.js` ordena los utilizables. `src/quota-state.js` guarda la cuota agotada hasta la hora indicada por el error o reintenta a los 10, 30 y 60 minutos. Las pruebas usan tareas de ejemplo, nunca código del usuario. El cambio automático de ejecutor solo ocurre si el usuario activa `routing.mode: "auto"`.
 
 ## Enrutado
 
-Con `routing.mode: "auto"`, `src/router.js` ordena primero Luna con cuota gratuita y los gratuitos aptos por nivel y nota; después añade las de pago de `routing.paidOrder`, sin tope de gasto.
+Con `routing.mode: "auto"`, `src/router.js` ordena primero Luna con cuota gratuita, después los gratuitos de `routing.freeOrder` (lista fija que mantiene el usuario, sin depender del ranquing; con esfuerzo alto se omiten) y por último las de pago de `routing.paidOrder` (por defecto DeepSeek V4.1 Flash y V4 Pro de OpenCode Go y Luna por API, esta sin tope de gasto).
 `src/orchestrator.js` puede cambiar de entrada a mitad de tarea sin consumir reintentos, hasta `routing.maxSwitches` cambios.
 Credenciales o un modelo no disponible también hacen pasar a la siguiente entrada, solo para esa ejecución.
 Cada tarea nueva vuelve a probar las entradas gratuitas desde el principio.

@@ -57,7 +57,7 @@ agentrelay rank --run --max 3 # recalcula (prueba hasta 3 modelos por proveedor;
 
 - Se conectan con `agentrelay login opencode` (eliges el proveedor y pegas la clave). AgentRelay no guarda esas claves.
 - **Cada modelo pasa tres pruebas** (fácil, media y difícil, con varios archivos). Es **apto** si supera la media y la difícil. Nivel **A** si además es rápido; nivel **B** si es más lento.
-- Una vez al día, en segundo plano, se repite la evaluación de lo nuevo; un modelo ya probado no se repite hasta pasados 7 días. Los modelos retirados salen solos del ranquing.
+- La evaluación solo se hace cuando la pides (`agentrelay rank --run`); no hay revisión automática en segundo plano. Un modelo ya probado no se repite hasta pasados 7 días.
 - Tus revisiones afectan a la nota: `accept` suma, `fix`, `reject` y `escalate` restan, y eso desempata entre modelos parecidos.
 - Descartados tras probarlos: Groq, NVIDIA y Google (ningún modelo apto), y Cline (OpenCode con DeepSeek rinde igual).
 
@@ -73,8 +73,8 @@ agentrelay set routing off --local    # para desactivarlo
 Cada tarea empieza por el primero disponible de esta lista:
 
 1. Luna con la cuota gratuita de ChatGPT (solo si Codex está conectado con tu cuenta; con clave de API se salta, porque se factura).
-2. Los modelos gratuitos aptos del ranquing, los mejores primero (con esfuerzo alto, solo los de nivel A).
-3. Los de pago, **sin tope de gasto**: DeepSeek Flash, después Luna por API (`agentrelay login --api`) y después DeepSeek Pro.
+2. Los modelos gratuitos de `routing.freeOrder`, en el orden que tú fijes (por defecto Cat Jam y LongCat de OpenCode Go; con esfuerzo alto se omiten).
+3. Los de pago de `routing.paidOrder`: DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go (limitados por tu suscripción) y, al final, Luna por API (`agentrelay login --api`), **sin tope de gasto**.
 
 Si a media tarea se agota la cuota (o falta la sesión, o el modelo ya no existe), sigue con el siguiente sin gastar reintentos, hasta 5 cambios (`routing.maxSwitches`). La siguiente tarea vuelve a empezar por los gratuitos.
 
