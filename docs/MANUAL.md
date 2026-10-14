@@ -16,6 +16,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `start` | Prepara el proyecto y comprueba que todo funciona. |
 | `init` | Añade las instrucciones de AgentRelay al proyecto (y el repositorio git si falta). |
 | `use` | Cambia de IA (ejecutor, modelo, esfuerzo) o aplica un perfil. `use --list` lista todos los modelos. |
+| `orden` | Muestra o cambia el orden del enrutado con nombres claros: `orden pago deepseek-pro-go`, `orden gratis cat-jam longcat-2.5-preview`, `orden reset`. |
 | `evaluar` | Prueba bajo demanda los gratuitos `-free` de tu cuenta de OpenCode Go y aplica el resultado a `routing.freeOrder`; `--no-apply` solo propone, `--revert` deshace, `--models` y `--runs` acotan. |
 | `status` | En qué punto está el proyecto y qué hacer ahora. |
 | `list` · `show [id]` | Tareas delegadas y el informe de una. |
@@ -117,7 +118,9 @@ Está desactivado por defecto (`routing.mode: "off"`): se usa siempre el ejecuto
 2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del esfuerzo de la tarea: la lista la mantienes tú o la actualiza `agentrelay evaluar` cuando se lo pides.
 3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go → Luna por API (`agentrelay login --api`). Los de Go tienen los cupos de tu suscripción; Luna por API no tiene tope de gasto.
 
-Si durante una tarea se agota la cuota, faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.
+**Cómo cambiarlo, fácil:** `agentrelay orden` muestra el orden actual con el estado de cada IA (agotada hasta cuándo, sin configurar). `agentrelay orden pago <nombre>` pone esa IA de pago como la principal (las demás siguen detrás) y con varios nombres fija la lista exacta; `agentrelay orden gratis <modelos>` fija los gratuitos de OpenCode Go; `agentrelay orden reset` vuelve al orden por defecto. Los nombres de pago son: `deepseek-flash-go` y `deepseek-pro-go` (tu suscripción de OpenCode Go), `deepseek-flash-api` y `deepseek-pro-api` (API directa de DeepSeek, con su propio saldo), `luna-go` (Luna por OpenCode Go) y `luna-api` (Luna por la API de OpenAI, con la clave de `agentrelay login --api`). Luna con la cuenta de ChatGPT (`luna-chatgpt`) va siempre la primera mientras haya cuota. Los mismos nombres sirven como atajos de `agentrelay use` (`use deepseek-flash-go`) para fijar el ejecutor cuando el enrutado está apagado.
+
+Si durante una tarea se agota la cuota, el proveedor devuelve un límite de velocidad («Rate limit exceeded»), faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.
 
 ## 4. Revisar y decidir
 
