@@ -71,14 +71,14 @@ test('parseQuotaReset lee JSON, duraciones, horas locales y fechas futuras', () 
   ]) assert.equal(parseQuotaReset(text, now)?.getTime(), expected(milliseconds).getTime(), text);
 
   assert.equal(
-    parseQuotaReset('You have hit your usage limit. Upgrade to Plus to continue using Codex, or try again at Oct 23rd, 2026 10:09 AM.', now)?.getTime(),
+    parseQuotaReset('You have hit your usage limit. Upgrade to Plus to continue using Codex, or try again at Oct 23rd, 2026 10:09 AM.', new Date(2026, 9, 15, 1, 12))?.getTime(),
     new Date(2026, 9, 23, 10, 9).getTime(),
   );
   assert.equal(parseQuotaReset('try again at 3:45 PM', now)?.getTime(), new Date(2026, 9, 5, 15, 45).getTime());
   assert.equal(parseQuotaReset('try again at 10:00', now)?.getTime(), new Date(2026, 9, 6, 10, 0).getTime());
   assert.equal(parseQuotaReset('try again on 2026-10-07T10:00:00Z', now)?.toISOString(), '2026-10-07T10:00:00.000Z');
   assert.equal(parseQuotaReset('try again in 0 seconds', now), null);
-  assert.equal(parseQuotaReset('try again in 9 days', now), null);
+  assert.equal(parseQuotaReset('try again in 15 days', now), null);
   assert.equal(parseQuotaReset('quota exhausted', now), null);
 });
 
