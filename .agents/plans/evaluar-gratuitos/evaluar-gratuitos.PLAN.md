@@ -11,7 +11,7 @@ Fecha: 2026-10-14. Autor del plan: orquestador (Opus). Estado: pendiente de ejec
 
 - **Nada automático:** ni en segundo plano, ni periódico, ni al arrancar. Solo `agentrelay evaluar` o `/ar:evaluar`, y Claude lo lanza cuando el usuario lo pide en lenguaje natural.
 - **Orden del enrutado (fijo por diseño de `src/router.js`):** Luna gratis (Codex con cuenta de ChatGPT) → `routing.freeOrder` → `routing.paidOrder`. `evaluar` **solo reescribe `routing.freeOrder`**. Luna no está en `freeOrder`, así que `evaluar` no puede desplazarla. `paidOrder` no se toca nunca.
-- **«Gratis» = id `opencode-go/*-free`.** Los demás modelos de Go gastan cupo de la suscripción; solo se prueban si el usuario los pide con `--models`, y el informe lo avisa.
+- **«Gratis» = id `opencode-go/*-free`, y solo los que `opencode models` lista en la cuenta de OpenCode Go del usuario (con su suscripción).** Los demás modelos de Go gastan cupo y **nunca se prueban**: `--models` solo admite ids `-free` que estén en esa lista; cualquier otro se rechaza con un error.
 - **Selección:** posiciones 2 y 3 (las dos primeras de `freeOrder`) para los dos mejores que superen el umbral. Una tercera solo si cumple la regla de «especialmente prometedor» (abajo). Si ninguno supera el umbral, no se aplica nada.
 - **Estado de cuota:** se conserva (lo usan el enrutador, Codex y `doctor`), pero sale de los archivos del ranquing a `src/quota-state.js` con su propio archivo `~/.agentrelay/quota.json`. Sin migración: las marcas duran como mucho horas; perderlas solo provoca un reintento.
 - **Archivo antiguo `~/.agentrelay/model-checks.json`:** `doctor` avisa de que sobra y `doctor --fix` lo borra. AgentRelay no lo borra por su cuenta.
@@ -89,7 +89,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 ### Paso 7 — Ejecución, puntuación e informe (delicado) — [ ]
 - Archivos: nuevo `src/evaluar.js`, nuevo `test/evaluar.test.js` (con el `FAKE_OPENCODE` de `test/helpers.js`).
 - Hacer:
-  - Descubrimiento: `opencode models` filtrado a `opencode-go/*-free`; comparar con el catálogo público `https://opencode.ai/inference/go/v1/models` (solo ids; si falla la red, se dice y se sigue) y con el último informe (nuevos, retirados).
+  - Descubrimiento: `opencode models` filtrado a `opencode-go/*-free`; comparar con el catálogo público `https://opencode.ai/inference/go/v1/models` (solo ids, solo para avisar de nuevos o retirados; si falla la red, se dice y se sigue) y con el último informe (nuevos, retirados).
   - Sondeo previo de 1 llamada por modelo (respuesta corta) para separar infraestructura antes de gastar las 4 tareas.
   - Cada tarea se lanza con `startRun` de `src/orchestrator.js` (el mismo flujo que `agentrelay run`), con config `executor.type: opencode`, `model`, `routing.mode: off`, `policy.maxRetries: 1`, `executor.timeoutSeconds: 300`. Secuencial. Sin commits.
   - Puntuación y umbrales de la sección «Criterios».
@@ -99,7 +99,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 
 ### Paso 8 — Comando `evaluar` y aplicación — [ ]
 - Archivos: `src/cli.js`, `src/help.js`, `assets/claude-commands/ar/evaluar.md` (generado), prueba CLI.
-- Hacer: `agentrelay evaluar [--models a,b] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
+- Hacer: `agentrelay evaluar [--models a,b (solo ids -free de tu cuenta)] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
 - Ejecutor: AgentRelay, esfuerzo medio.
 
 ### Paso 9 — Documentación (un archivo por tarea) — [ ]
@@ -113,5 +113,5 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 ## Riesgos
 
 - **Pasos 1-2:** romper el cambio por cuota recién montado. Mitigación: pruebas existentes de enrutado y de Codex deben pasar sin cambios de comportamiento.
-- **Coste de la evaluación:** los `-free` no gastan cupo; los modelos pedidos con `--models` sí. El informe muestra el coste medido.
+- **Coste de la evaluación:** solo se prueban `-free`, que no gastan cupo. El informe muestra el coste medido (debe ser 0).
 - **Gratuitos cambiantes:** son vistas previas; pueden desaparecer. El descubrimiento lo detecta y no se aplica nada sin aptos.
