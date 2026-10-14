@@ -114,7 +114,7 @@ La cuota no se puede consultar. Cuando un modelo indica que se agotó, queda mar
 Está desactivado por defecto (`routing.mode: "off"`): se usa siempre el ejecutor configurado. Actívalo con `agentrelay set routing auto` (o `--local` para un proyecto). Cada tarea empieza por el primer candidato disponible, en este orden:
 
 1. Luna con la cuota gratuita de ChatGPT. Si Codex usa una clave de API en vez de la cuenta de ChatGPT, se omite porque es de pago.
-2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del ranquing: la lista la mantienes tú. Con esfuerzo alto o extremo se omiten.
+2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del ranquing ni del esfuerzo: la lista la mantienes tú.
 3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go → Luna por API (`agentrelay login --api`). Los de Go tienen los cupos de tu suscripción; Luna por API no tiene tope de gasto.
 
 Si durante una tarea se agota la cuota, faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.

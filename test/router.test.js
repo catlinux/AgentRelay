@@ -29,8 +29,8 @@ test('routeEntries ordena Luna gratis, freeOrder y entradas de pago sin duplicad
   });
 });
 
-test('routeEntries con esfuerzo alto omite freeOrder y conserva Luna y las entradas de pago', () => {
-  for (const effort of ['high', 'xhigh', 'max']) {
+test('routeEntries mantiene freeOrder con cualquier esfuerzo', () => {
+  for (const effort of [null, 'low', 'high', 'xhigh', 'max']) {
     const entries = routeEntries({
       config: {
         executor: { type: 'opencode', model: 'configured' },
@@ -40,7 +40,7 @@ test('routeEntries con esfuerzo alto omite freeOrder y conserva Luna y las entra
     });
 
     assert.deepEqual(entries.map((entry) => entry.key), [
-      'codex:gpt-6-luna', 'opencode:fake/paid-a',
+      'codex:gpt-6-luna', 'opencode:provider/free-a', 'opencode:fake/paid-a',
     ]);
   }
 });
