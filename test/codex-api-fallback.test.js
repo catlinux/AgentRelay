@@ -5,8 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { classifyExecutorError } from '../src/executors/common.js';
 import { apiProfileDir, hasApiProfile, run } from '../src/executors/codex.js';
-import { isExhausted } from '../src/free-ranking.js';
-import { loadChecks } from '../src/model-check.js';
+import { isExhausted, loadQuota } from '../src/quota-state.js';
 import { FAKE_CODEX } from './helpers.js';
 
 const ENV_KEYS = ['AGENTRELAY_HOME', 'CODEX_HOME', 'FAKE_CODEX_LOG', 'FAKE_CODEX_QUOTA_UNLESS_HOME'];
@@ -56,7 +55,7 @@ test('codex: reintenta con API al agotar ChatGPT y después usa API directamente
     assert.equal(first.ok, true);
     assert.equal(first.billing, 'api');
     assert.equal(first.fellBackFromQuota, true);
-    assert.equal(isExhausted(loadChecks(context.home), 'codex:chatgpt'), true);
+    assert.equal(isExhausted(loadQuota(context.home), 'codex:chatgpt'), true);
     assert.ok(activity.some((event) => event.kind === 'thinking' && /Cuota gratuita de ChatGPT agotada \(se vuelve a probar a las \d{2}:\d{2}\): sigo con tu clave de API \(de pago\)\./.test(event.text)));
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME, apiProfileDir()]);
 
@@ -81,7 +80,7 @@ test('codex: sin perfil de API devuelve el error de cuota clasificable', async (
     assert.match(result.error, /usage limit/i);
     assert.equal(classifyExecutorError(result.error), 'quota');
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME]);
-    assert.equal(existsSync(path.join(context.home, 'model-checks.json')), false);
+    assert.equal(existsSync(path.join(context.home, 'quota.json')), false);
   } finally {
     context.cleanup();
   }
@@ -95,7 +94,7 @@ test('codex: apiFallback false conserva el error de cuota aunque exista perfil',
     assert.equal(result.billing, 'chatgpt');
     assert.equal(result.fellBackFromQuota, undefined);
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME]);
-    assert.equal(existsSync(path.join(context.home, 'model-checks.json')), false);
+    assert.equal(existsSync(path.join(context.home, 'quota.json')), false);
   } finally {
     context.cleanup();
   }

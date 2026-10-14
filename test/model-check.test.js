@@ -127,10 +127,10 @@ if (args[0] === 'auth' && args[1] === 'list') {
   writeFileSync(path.join(home, 'models-dev.json'), `${JSON.stringify({
     fetchedAt: now.toISOString(), opencode: { models: {} },
   })}\n`);
-  saveChecks({
-    lastRun: null, models: {},
-    exhausted: { 'opencode/beta-free': { until: new Date(now.getTime() + 60_000).toISOString() } },
-  }, home);
+  saveChecks({ lastRun: null, models: {} }, home);
+  writeFileSync(path.join(home, 'quota.json'), JSON.stringify({
+    exhausted: { 'opencode/beta-free': { until: new Date(now.getTime() + 60_000).toISOString() } }, quotaLog: [],
+  }));
   const env = {
     ...process.env,
     AGENTRELAY_HOME: home,

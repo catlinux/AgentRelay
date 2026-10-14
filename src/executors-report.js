@@ -7,6 +7,7 @@ import { CATALOG, isInstalled } from './executors/catalog.js';
 import { getExecutor } from './executors/index.js';
 import { loadChecks } from './model-check.js';
 import { isExhausted, rankedFree, rankPosition } from './free-ranking.js';
+import { loadQuota } from './quota-state.js';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dateOf = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -96,7 +97,7 @@ export function renderReport(data) {
 }
 
 export async function writeReport({ root = packageRoot, home = agentrelayHome(), now = new Date(), balances, checks, env = process.env, fetchFn = globalThis.fetch, ...deps } = {}) {
-  const data = await collectReport({ ...deps, home, now, balances: balances || { deepseek: await fetchDeepSeekBalance({ env, fetchFn }) }, checks: checks || loadChecks(home) });
+  const data = await collectReport({ ...deps, home, now, balances: balances || { deepseek: await fetchDeepSeekBalance({ env, fetchFn }) }, checks: checks || { ...loadChecks(home), ...loadQuota(home) } });
   const file = reportPath(root);
   mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.${process.pid}.${Math.random().toString(16).slice(2)}.tmp`;

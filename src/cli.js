@@ -40,7 +40,7 @@ import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { loadChecks, markDay, saveChecks } from './model-check.js';
 import { loadFreeMetadata, discoverFreeModels, discoverProviderModels } from './free-models.js';
 import { mergeRankEntries, rankModels, renderRanking } from './model-rank.js';
-import { isExhausted, lastQuotaEvent } from './free-ranking.js';
+import { isExhausted as quotaIsExhausted, lastQuotaEvent, loadQuota } from './quota-state.js';
 import { connectedProviders, PROVIDERS } from './free-providers.js';
 import { writeReport } from './executors-report.js';
 import { commandNames, renderCommandHelp } from './help.js';
@@ -446,15 +446,15 @@ async function cmdDoctor(values, rerun = false) {
           ? 'Respaldo por API de pago: configurado (solo se usa si se agota la cuota gratuita de ChatGPT)'
           : 'Respaldo por API de pago: desactivado (executor.apiFallback = false)'
         : 'Respaldo por API de pago: no configurado (para tenerlo: agentrelay login --api)');
-      const checks = loadChecks(agentrelayHome());
+      const quota = loadQuota(agentrelayHome());
       const quotaId = 'codex:chatgpt';
-      if (isExhausted(checks, quotaId)) {
-        const until = new Date(checks.exhausted[quotaId].until);
+      if (quotaIsExhausted(quota, quotaId)) {
+        const until = new Date(quota.exhausted[quotaId].until);
         const hour = `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
         const apiUse = configured && fallbackEnabled ? 'la API de pago' : 'nada: no hay respaldo por API';
         line(true, `Cuota gratuita de ChatGPT: agotada hasta las ${hour} (se vuelve a probar sola; mientras tanto se usa ${apiUse})`);
       }
-      const lastQuota = lastQuotaEvent(checks, quotaId);
+      const lastQuota = lastQuotaEvent(quota, quotaId);
       const recoveredAt = lastQuota?.event === 'restablecida' ? new Date(lastQuota.at) : null;
       const now = new Date();
       if (recoveredAt && Number.isFinite(recoveredAt.getTime())
@@ -955,8 +955,8 @@ async function cmdExecutors(positionals, values) {
         const metadata = await loadFreeMetadata({ home });
         const connected = await freeProvidersConnected(executor);
         const candidates = discoverRankCandidates({ listed, metadata, source: metadata.source, connected, includeUnlisted: false, freeTierProviders: freeTierProviderIds() });
-        const checks = loadChecks(home);
-        const available = candidates.filter(({ id }) => !isExhausted(checks, id));
+        const quota = loadQuota(home);
+        const available = candidates.filter(({ id }) => !quotaIsExhausted(quota, id));
         const now = new Date();
         const result = await rankModels({
           candidates: available, executor, adapter, home, now, force: values.force,

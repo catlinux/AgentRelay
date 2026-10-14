@@ -5,9 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseQuotaReset } from '../src/executors/common.js';
 import { apiProfileDir, run } from '../src/executors/codex.js';
-import { lastQuotaEvent, logQuotaEvent, markExhausted } from '../src/free-ranking.js';
-import { loadChecks } from '../src/model-check.js';
+import { lastQuotaEvent, loadQuota, quotaFile } from '../src/quota-state.js';
 import { FAKE_CODEX } from './helpers.js';
+
+function seedQuota(home, until, resetKnown, logged) {
+  const record = { at: new Date().toISOString(), until: until.toISOString(), reason: 'cuota agotada', resetKnown };
+  const quotaLog = logged ? [{ at: record.at, id: QUOTA_ID, event: 'agotada', until: record.until, resetKnown }] : [];
+  mkdirSync(home, { recursive: true });
+  writeFileSync(quotaFile(home), JSON.stringify({ exhausted: { [QUOTA_ID]: record }, quotaLog }), 'utf8');
+}
 
 const ENV_KEYS = ['AGENTRELAY_HOME', 'CODEX_HOME', 'FAKE_CODEX_LOG', 'FAKE_CODEX_QUOTA_UNLESS_HOME', 'FAKE_CODEX_QUOTA_MESSAGE'];
 const QUOTA_ID = 'codex:chatgpt';
@@ -79,8 +85,8 @@ test('codex: registra la hora de reset conocida y cambia a la API', async () => 
     const activity = [];
     const result = await run({ ...context, onActivity: (event) => activity.push(event) });
     const after = Date.now();
-    const checks = loadChecks(context.home);
-    const exhausted = checks.exhausted[QUOTA_ID];
+    const quota = loadQuota(context.home);
+    const exhausted = quota.exhausted[QUOTA_ID];
     const reset = Date.parse(exhausted.until);
     assert.equal(result.ok, true);
     assert.equal(result.billing, 'api');
@@ -88,7 +94,7 @@ test('codex: registra la hora de reset conocida y cambia a la API', async () => 
     assert.equal(result.quotaResetAt, exhausted.until);
     assert.equal(exhausted.resetKnown, true);
     assert.ok(reset >= before + 179_000 && reset <= after + 181_000);
-    assert.deepEqual(lastQuotaEvent(checks, QUOTA_ID), {
+    assert.deepEqual(lastQuotaEvent(quota, QUOTA_ID), {
       at: exhausted.at, id: QUOTA_ID, event: 'agotada', until: exhausted.until,
       resetKnown: true, reason: 'cuota gratuita de ChatGPT agotada',
     });
@@ -102,13 +108,13 @@ test('codex: sin hora conocida programa el siguiente intento a diez minutos', as
   try {
     const before = Date.now();
     const result = await run(context);
-    const checks = loadChecks(context.home);
-    const exhausted = checks.exhausted[QUOTA_ID];
+    const quota = loadQuota(context.home);
+    const exhausted = quota.exhausted[QUOTA_ID];
     const reset = Date.parse(exhausted.until);
     assert.equal(result.ok, true);
     assert.equal(exhausted.resetKnown, false);
     assert.ok(reset >= before + 599_000 && reset <= Date.now() + 601_000);
-    assert.equal(lastQuotaEvent(checks, QUOTA_ID).resetKnown, false);
+    assert.equal(lastQuotaEvent(quota, QUOTA_ID).resetKnown, false);
   } finally { context.cleanup(); }
 });
 
@@ -116,7 +122,7 @@ test('codex: marca vigente va directamente a la API y expone quotaResetAt', asyn
   const context = makeContext();
   try {
     const until = new Date(Date.now() + 60 * 60_000);
-    markExhausted(QUOTA_ID, { home: context.home, until, resetKnown: true });
+    seedQuota(context.home, until, true, false);
     const result = await run(context);
     assert.equal(result.ok, true);
     assert.equal(result.billing, 'api');
@@ -129,14 +135,13 @@ test('codex: al volver la cuota gratuita limpia la marca y registra restablecida
   const context = makeContext({ quota: false });
   try {
     const expired = new Date(Date.now() - 60_000);
-    markExhausted(QUOTA_ID, { home: context.home, until: expired, resetKnown: false });
-    logQuotaEvent(context.home, { id: QUOTA_ID, event: 'agotada', until: expired, resetKnown: false });
-    const result = await run(context);
-    const checks = loadChecks(context.home);
+    seedQuota(context.home, expired, false, true);
+        const result = await run(context);
+    const quota = loadQuota(context.home);
     assert.equal(result.ok, true);
     assert.equal(result.billing, 'chatgpt');
-    assert.equal(checks.exhausted?.[QUOTA_ID], undefined);
-    assert.equal(lastQuotaEvent(checks, QUOTA_ID).event, 'restablecida');
+    assert.equal(quota.exhausted?.[QUOTA_ID], undefined);
+    assert.equal(lastQuotaEvent(quota, QUOTA_ID).event, 'restablecida');
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME]);
   } finally { context.cleanup(); }
 });
@@ -145,14 +150,13 @@ test('codex: si la cuota sigue agotada tras el reintento se vuelve a marcar y us
   const context = makeContext({ message: 'Usage limit reached; retry later.' });
   try {
     const expired = new Date(Date.now() - 60_000);
-    markExhausted(QUOTA_ID, { home: context.home, until: expired, resetKnown: false });
-    logQuotaEvent(context.home, { id: QUOTA_ID, event: 'agotada', until: expired, resetKnown: false });
-    const result = await run(context);
-    const checks = loadChecks(context.home);
+    seedQuota(context.home, expired, false, true);
+        const result = await run(context);
+    const quota = loadQuota(context.home);
     assert.equal(result.ok, true);
     assert.equal(result.billing, 'api');
-    assert.equal(lastQuotaEvent(checks, QUOTA_ID).event, 'agotada');
-    assert.equal(checks.exhausted[QUOTA_ID].resetKnown, false);
+    assert.equal(lastQuotaEvent(quota, QUOTA_ID).event, 'agotada');
+    assert.equal(quota.exhausted[QUOTA_ID].resetKnown, false);
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME, apiProfileDir()]);
   } finally { context.cleanup(); }
 });
@@ -163,7 +167,7 @@ test('codex: sin perfil API no registra la cuota ni hace un segundo intento', as
     const result = await run(context);
     assert.equal(result.ok, false);
     assert.equal(result.billing, 'chatgpt');
-    assert.equal(existsSync(path.join(context.home, 'model-checks.json')), false);
+    assert.equal(existsSync(path.join(context.home, 'quota.json')), false);
     assert.deepEqual(context.calls().map(({ CODEX_HOME }) => CODEX_HOME), [process.env.CODEX_HOME]);
   } finally { context.cleanup(); }
 });
