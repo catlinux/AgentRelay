@@ -16,8 +16,10 @@ function streams() {
   const err = { value: '', write(text) { this.value += text; } };
   return { out, err };
 }
+// Sin esto, las pruebas leerían la configuración personal (por ejemplo routing.mode: "auto").
+const ISOLATED_HOME = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-output-test-home-'));
 function cli(args, cwd, env = {}) {
-  return spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
+  return spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: 'utf8', env: { ...process.env, AGENTRELAY_HOME: ISOLATED_HOME, ...env } });
 }
 function fakeOpenCodeEnv(repo) {
   return {
