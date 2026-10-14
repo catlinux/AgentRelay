@@ -16,7 +16,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `start` | Prepara el proyecto y comprueba que todo funciona. |
 | `init` | Añade las instrucciones de AgentRelay al proyecto (y el repositorio git si falta). |
 | `use` | Cambia de IA (ejecutor, modelo, esfuerzo) o aplica un perfil. `use --list` lista todos los modelos. |
-| `rank` | Muestra el ranquing de modelos gratuitos de OpenCode; `--run` lo calcula; `--detach` lo lanza en segundo plano. |
+| `evaluar` | Prueba bajo demanda los gratuitos `-free` de tu cuenta de OpenCode Go y aplica el resultado a `routing.freeOrder`; `--no-apply` solo propone, `--revert` deshace, `--models` y `--runs` acotan. |
 | `status` | En qué punto está el proyecto y qué hacer ahora. |
 | `list` · `show [id]` | Tareas delegadas y el informe de una. |
 | `review <id> --decision …` | Acepta, corrige, escala o rechaza una tarea. |
@@ -25,7 +25,7 @@ Cada comando se llama igual en los dos sitios y admite los mismos argumentos. En
 | `doctor [--fix]` | Diagnostica el entorno y arregla lo seguro. |
 | `login` · `login opencode` · `login --api` | Conecta tu cuenta de ChatGPT; `login opencode` conecta OpenCode; `login --api` guarda el respaldo por API de pago de Luna. |
 | `config` · `set` · `unset` | Ver o cambiar ajustes sueltos. |
-| `executors add\|check` | Instala un ejecutor opcional · actualiza el ranquing y el informe diario. |
+| `executors add` | Instala un ejecutor opcional. |
 | `update [--yes]` | Actualiza AgentRelay. |
 | `help [comando]` | Ayuda. |
 
@@ -84,7 +84,7 @@ agentrelay login --api --remove # quita el respaldo
 La clave se guarda en un perfil propio de AgentRelay (`~/.agentrelay/codex-api/`): **tu sesión de ChatGPT no se toca**. Después funciona sola:
 
 - Cada tarea prueba **primero la cuota gratuita**. Solo si se agota (el error de límite de uso de ChatGPT) repite ese intento con la API de pago y lo avisa en el informe.
-- Lee del error la hora de restablecimiento y guarda en `model-checks.json` cuándo se agotó y cuándo se restableció. Mientras no llegue esa hora usa la API; al llegar, **vuelve a la gratuita** sin que hagas nada. Si el error no da la hora, la vuelve a probar cada 10 minutos.
+- Lee del error la hora de restablecimiento y guarda en `quota.json` cuándo se agotó y cuándo se restableció. Mientras no llegue esa hora usa la API; al llegar, **vuelve a la gratuita** sin que hagas nada. Si el error no da la hora, la vuelve a probar cada 10 minutos.
 - `agentrelay doctor` muestra si el respaldo está configurado y, si la cuota está agotada, hasta cuándo. Sin respaldo no cambia nada: el aviso de cuota te propone alternativas.
 - Se desactiva con `agentrelay set executor.apiFallback false --local`. Con el enrutado automático no se usa este respaldo: Luna por API ya está en la lista. Solo se gasta dinero si tú has guardado la clave.
 
@@ -102,11 +102,11 @@ Conecta un proveedor con `agentrelay login opencode` y elige uno en el asistente
 
 La lista se mantiene al día así:
 
-- Metadatos de [models.dev](https://models.dev) (precio, herramientas y contexto) en caché durante 24 horas. En cada evaluación se lee la lista real de tu cuenta (`opencode models`), así los modelos retirados salen del ranquing.
-- No hay evaluación automática ni en segundo plano: `agentrelay rank --run` (o `agentrelay executors check`) evalúa los proveedores conectados cuando tú lo pides. Cada modelo se vuelve a evaluar tras 7 días; `--force` lo repite antes. Los errores 410/404 indican que el modelo ya no está disponible.
+- Metadatos de [models.dev](https://models.dev) (precio, herramientas y contexto) en caché durante 24 horas. En cada evaluación se lee la lista real de tu cuenta (`opencode models`), así los modelos retirados desaparecen de la lista.
+- No hay evaluación automática ni en segundo plano: `agentrelay evaluar` solo se ejecuta cuando tú lo pides. Los errores 410/404 indican que el modelo ya no está disponible.
 - Solo se envían tareas de ejemplo, nunca tu código.
 
-Se prueban solo modelos gratuitos que admiten herramientas y tienen al menos 64k de contexto: tres tareas (fácil, media y difícil; esta última usa varios archivos y un test que arreglar). Apto significa superar las pruebas media y difícil. Nivel A: apto y cada prueba dura 150 s o menos; nivel B: apto y más lento. `--max N` limita cuántos se prueban por proveedor y las pruebas se intercalan entre proveedores. Las revisiones desempatan la nota: `agentrelay review` suma con `accept` y resta con `fix`, `reject` o `escalate`. `agentrelay rank` muestra las columnas Prueba 1-3 y Nivel.
+`agentrelay evaluar` prueba solo los modelos `opencode-go/*-free` que `opencode models` lista en tu cuenta de OpenCode Go (los de pago nunca se prueban, tampoco con `--models`, que rechaza cualquier id que no sea `-free` o no esté en tu cuenta). Antes de las tareas hace un sondeo de una llamada por modelo: si falla por cuota, sesión, red o modelo no disponible, el modelo queda «no evaluado» y no se lanzan sus tareas. Después resuelve cuatro tareas cortas en un repositorio temporal: un contrato con caso límite, un cambio coordinado en tres archivos, una corrección con una regresión oculta y una tarea con un conflicto que obliga a parar. Las pruebas ocultas se copian solo al terminar. Es apto con 3 de 4 aprobadas, sin violación de alcance y sin fallo de infraestructura. Los aptos se ordenan por tareas aprobadas, intentos, tokens sin caché y segundos; con la misma nota e intentos y menos de un 20 % de diferencia en tokens y segundos hay «empate técnico» y manda el orden que ya tenías. Por defecto aplica el resultado: reescribe **solo** `routing.freeOrder` en tu configuración de usuario (los dos mejores, o tres si el tercero aprueba 4 de 4 a la primera y es más rápido o gasta menos), tras guardar el valor anterior en `~/.agentrelay/evaluar/history.json`. `--no-apply` solo muestra la propuesta; `--revert` restaura el valor anterior; `--runs N` (1 a 3) repite cada tarea y usa la media. Si no hay ningún apto no cambia nada. Si un `agentrelay.config.json` de proyecto fija `routing.freeOrder`, avisa de que anula el cambio en ese proyecto. El informe se imprime y se guarda en `~/.agentrelay/evaluar/AAAA-MM-DD-HHMM.md`, separando lo medido de la conclusión, con el coste (debe ser 0).
 
 La cuota no se puede consultar. Cuando un modelo indica que se agotó, queda marcado hasta la hora indicada por el error; si no da una hora, se reintenta a los 10, 30 y 60 minutos. Un éxito restablece la marca.
 
@@ -114,7 +114,7 @@ La cuota no se puede consultar. Cuando un modelo indica que se agotó, queda mar
 Está desactivado por defecto (`routing.mode: "off"`): se usa siempre el ejecutor configurado. Actívalo con `agentrelay set routing auto` (o `--local` para un proyecto). Cada tarea empieza por el primer candidato disponible, en este orden:
 
 1. Luna con la cuota gratuita de ChatGPT. Si Codex usa una clave de API en vez de la cuenta de ChatGPT, se omite porque es de pago.
-2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del ranquing ni del esfuerzo: la lista la mantienes tú.
+2. Modelos gratuitos de `routing.freeOrder`, en el orden indicado; por defecto `opencode-go/cat-jam-free` y `opencode-go/longcat-2.5-preview-free`. No dependen del esfuerzo de la tarea: la lista la mantienes tú o la actualiza `agentrelay evaluar` cuando se lo pides.
 3. Modelos de pago de `routing.paidOrder`, por defecto DeepSeek V4.1 Flash y DeepSeek V4 Pro de OpenCode Go → Luna por API (`agentrelay login --api`). Los de Go tienen los cupos de tu suscripción; Luna por API no tiene tope de gasto.
 
 Si durante una tarea se agota la cuota, faltan credenciales o el modelo ya no existe, continúa con el siguiente candidato sobre el mismo árbol de trabajo, sin gastar reintentos y hasta `routing.maxSwitches` veces (5 por defecto). Cada tarea nueva empieza de nuevo por arriba y vuelve a los gratuitos cuando estén disponibles. `agentrelay watch` muestra los cambios (⇄); el informe incluye la sección «Enrutado» con los cambios, si hubo gasto y el aviso de privacidad. Una tarea que fija `model` no se enruta.

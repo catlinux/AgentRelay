@@ -102,7 +102,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Hacer: `agentrelay evaluar [--models a,b (solo ids -free de tu cuenta)] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
 - Ejecutor: AgentRelay, esfuerzo medio.
 
-### Paso 9 — Documentación (un archivo por tarea) — [ ]
+### Paso 9 — Documentación (un archivo por tarea) — [x]
 - `docs/MANUAL.md`, `docs/GUIA.md`, `docs/DISENO.md`, `README.md`, `README.en.md`: quitar todo lo del ranquing, explicar `evaluar`.
 - `CHANGELOG.md` («Sin publicar»: Añadido `evaluar`; Eliminado `rank`, `executors check`, informe diario, notas por revisiones; Cambiado: estado de cuota en `quota.json`) y `TODO.md`: los hace el orquestador.
 - Ejecutor: AgentRelay, esfuerzo bajo, un archivo por encargo.

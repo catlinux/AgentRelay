@@ -44,7 +44,7 @@ AgentRelay nunca hace commits ni push: los cambios quedan en tu carpeta para que
 | **Codex** (por defecto, incluido) | Tu cuenta de ChatGPT, modelo GPT-6 Luna | Incluido en el plan gratuito |
 | **OpenCode** (opcional) | Modelos gratuitos de varios proveedores (OpenCode Zen, Mistral, OpenRouter, Z.AI) y DeepSeek de pago | Gratis o lo que cobre el proveedor |
 
-Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. `agentrelay providers` muestra los proveedores conectados, sus límites y un aviso de privacidad; `agentrelay rank --run` evalúa a mano con tres pruebas los modelos gratuitos de los proveedores conectados (no hay revisión automática) y `agentrelay rank` muestra el ranquing. Con `agentrelay set routing auto`, AgentRelay pasa automáticamente de los gratuitos a los de pago cuando se agota la cuota; consulta [el manual](docs/MANUAL.md) para más detalles.
+Cambias de uno a otro con un solo comando: `agentrelay use` (interactivo) o `agentrelay use opencode`. `agentrelay providers` muestra los proveedores conectados, sus límites y un aviso de privacidad; `agentrelay evaluar` prueba a mano, con cuatro tareas cortas, los modelos gratuitos de tu cuenta de OpenCode Go y propone el orden de `routing.freeOrder` (no hay evaluación automática). Con `agentrelay set routing auto`, AgentRelay pasa automáticamente de los gratuitos a los de pago cuando se agota la cuota; consulta [el manual](docs/MANUAL.md) para más detalles.
 
 ## Requisitos
 
@@ -76,7 +76,7 @@ agentrelay watch    # 2. (en otro terminal) mira trabajar al ejecutor
 
 Para cambiar de IA: `agentrelay use`. Para ver dónde estás: `agentrelay status`. Si algo falla: `agentrelay doctor`.
 
-**Los mismos comandos en el terminal y en el chat de Claude Code:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay rank` ↔ `/ar:rank`… (todos menos `watch`). `agentrelay help` los lista.
+**Los mismos comandos en el terminal y en el chat de Claude Code:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay evaluar` ↔ `/ar:evaluar`… (todos menos `watch`). `agentrelay help` los lista.
 
 **Todo lo demás, con ejemplos: [Manual de uso](docs/MANUAL.md).**
 
