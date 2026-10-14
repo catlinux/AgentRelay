@@ -1,16 +1,16 @@
-# Plan: benchmark bajo demanda de los gratuitos de OpenCode Go y retirada del ranquing antiguo
+# Plan: evaluación bajo demanda de los gratuitos de OpenCode Go y retirada del ranquing antiguo
 
 Fecha: 2026-10-14. Autor del plan: orquestador (Opus). Estado: pendiente de ejecutar desde el paso 1.
 
 ## Objetivo
 
 1. Eliminar **sin rastro** el ranquing antiguo (pruebas sintéticas, `rank`, `executors check`, informe diario, notas por revisiones).
-2. Sustituirlo por `agentrelay bench` (y `/ar:bench`): solo bajo demanda, descubre los modelos gratuitos de OpenCode Go, los prueba con tareas cortas pero exigentes, propone un ranking y aplica la selección a `routing.freeOrder` con copia para deshacer.
+2. Sustituirlo por `agentrelay evaluar` (y `/ar:evaluar`): solo bajo demanda, descubre los modelos gratuitos de OpenCode Go, los prueba con tareas cortas pero exigentes, propone un ranking y aplica la selección a `routing.freeOrder` con copia para deshacer.
 
 ## Decisiones ya tomadas (no reabrir)
 
-- **Nada automático:** ni en segundo plano, ni periódico, ni al arrancar. Solo `agentrelay bench` o `/ar:bench`, y Claude lo lanza cuando el usuario lo pide en lenguaje natural.
-- **Orden del enrutado (fijo por diseño de `src/router.js`):** Luna gratis (Codex con cuenta de ChatGPT) → `routing.freeOrder` → `routing.paidOrder`. El bench **solo reescribe `routing.freeOrder`**. Luna no está en `freeOrder`, así que el bench no puede desplazarla. `paidOrder` no se toca nunca.
+- **Nada automático:** ni en segundo plano, ni periódico, ni al arrancar. Solo `agentrelay evaluar` o `/ar:evaluar`, y Claude lo lanza cuando el usuario lo pide en lenguaje natural.
+- **Orden del enrutado (fijo por diseño de `src/router.js`):** Luna gratis (Codex con cuenta de ChatGPT) → `routing.freeOrder` → `routing.paidOrder`. `evaluar` **solo reescribe `routing.freeOrder`**. Luna no está en `freeOrder`, así que `evaluar` no puede desplazarla. `paidOrder` no se toca nunca.
 - **«Gratis» = id `opencode-go/*-free`.** Los demás modelos de Go gastan cupo de la suscripción; solo se prueban si el usuario los pide con `--models`, y el informe lo avisa.
 - **Selección:** posiciones 2 y 3 (las dos primeras de `freeOrder`) para los dos mejores que superen el umbral. Una tercera solo si cumple la regla de «especialmente prometedor» (abajo). Si ninguno supera el umbral, no se aplica nada.
 - **Estado de cuota:** se conserva (lo usan el enrutador, Codex y `doctor`), pero sale de los archivos del ranquing a `src/quota-state.js` con su propio archivo `~/.agentrelay/quota.json`. Sin migración: las marcas duran como mucho horas; perderlas solo provoca un reintento.
@@ -19,7 +19,7 @@ Fecha: 2026-10-14. Autor del plan: orquestador (Opus). Estado: pendiente de ejec
 - **Se conserva:** `providers` (inventario y privacidad, no depende del ranquing), `executors add`, `src/free-providers.js`.
 - **Versión:** excepción del proyecto, sin subir versión; todo a «Sin publicar» del CHANGELOG. (Al liberar será menor: elimina comandos.)
 
-## Criterios de evaluación del bench (fijados antes de medir)
+## Criterios de la evaluación (fijados antes de medir)
 
 Por cada modelo y tarea se registra: aprobada (pruebas ocultas + alcance + árbol limpio salvo lo pedido), intentos, segundos, tokens de entrada/salida/caché y coste (si OpenCode los da), y la clase de fallo: **infraestructura** (cuota, sin sesión, modelo no disponible, red, tiempo agotado antes del primer evento) o **modelo** (pruebas ocultas, alcance, informe ausente).
 
@@ -31,7 +31,7 @@ Por cada modelo y tarea se registra: aprobada (pruebas ocultas + alcance + árbo
 
 ## Las cuatro tareas (fixture Node, ES modules, `node --test`, sin dependencias)
 
-Fixture en un directorio temporal fuera de cualquier repo (`os.tmpdir()/agentrelay-bench-*`), con `git init` y un commit base. Cada tarea parte de ese commit (reset + clean). Las **pruebas ocultas** viven en el código del bench, no en el fixture: se copian al acabar la tarea, se ejecutan y se borran.
+Fixture en un directorio temporal fuera de cualquier repo (`os.tmpdir()/agentrelay-evaluar-*`), con `git init` y un commit base. Cada tarea parte de ese commit (reset + clean). Las **pruebas ocultas** viven en el código de `evaluar`, no en el fixture: se copian al acabar la tarea, se ejecutan y se borran.
 
 Archivos del fixture:
 - `src/text.js`: `slugify(s)`, `truncate(s, n)` con fallo deliberado (`s.slice(0, n - 1) + '…'` deja el resultado en n caracteres solo por casualidad y no admite sufijo).
@@ -73,7 +73,7 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 
 ### Paso 4 — Retirar comandos y módulos del ranquing — [ ]
 - Archivos: `src/cli.js` (`cmdRank`, `discoverRankCandidates`, `freeProvidersConnected`, `freeTierProviderIds`, rama `check` de `cmdExecutors`, imports), `src/help.js` (entradas `rank` y `executors check`), `src/claude-commands.js` (añadir `rank.md` a `RETIRED_COMMANDS` para que `setup` borre el `/ar:rank` instalado), `assets/claude-commands/ar/rank.md` y `executors.md` (regenerar con el mecanismo del repo), y borrar `src/model-rank.js`, `src/free-ranking.js`, `src/model-check.js`, `src/free-models.js`, `src/executors-report.js` con sus pruebas (`model-rank*.test.js`, `free-ranking.test.js`, `model-check.test.js`, `free-models.test.js`, `executors-report.test.js`).
-- Terminado: `grep -ri "rank\|ranquing\|model-checks\|executors check\|informe diario"` en `src/`, `test/`, `assets/` solo devuelve lo que pertenece a `bench` (aún inexistente) o nada; `npm test` verde.
+- Terminado: `grep -ri "rank\|ranquing\|model-checks\|executors check\|informe diario"` en `src/`, `test/`, `assets/` solo devuelve lo que pertenece a `evaluar` (aún inexistente) o nada; `npm test` verde.
 - Ejecutor: AgentRelay, esfuerzo medio. Si agota el tiempo, dividir en 4a (cli/help/assets) y 4b (borrados y pruebas).
 
 ### Paso 5 — `doctor` y el archivo antiguo — [ ]
@@ -81,37 +81,37 @@ Ejecutor por defecto: AgentRelay con el enrutado actual. Para los pasos marcados
 - Hacer: si existe `~/.agentrelay/model-checks.json`, `doctor` avisa («archivo del ranquing antiguo, ya no se usa») y `doctor --fix` lo borra. Ninguna otra ruta lo borra.
 - Ejecutor: AgentRelay, esfuerzo bajo.
 
-### Paso 6 — Fixture y pruebas ocultas del bench (delicado) — [ ]
-- Archivos: nuevo `src/bench-tasks.js` (fixture como objeto `{ ruta: contenido }`, las 4 tareas con su JSON de tarea y sus pruebas ocultas como archivos `node:test`), nuevo `test/bench-tasks.test.js`.
+### Paso 6 — Fixture y pruebas ocultas de la evaluación (delicado) — [ ]
+- Archivos: nuevo `src/evaluar-tareas.js` (fixture como objeto `{ ruta: contenido }`, las 4 tareas con su JSON de tarea y sus pruebas ocultas como archivos `node:test`), nuevo `test/evaluar-tareas.test.js`.
 - Hacer: exactamente las tareas de la sección anterior. La prueba del repo comprueba que el fixture base **suspende** las pruebas ocultas de 1-3 y que una solución de referencia (incluida en el test, no en el módulo) las **aprueba**.
 - Ejecutor: AgentRelay, esfuerzo alto. Revisión del orquestador: que las pruebas ocultas no se filtren al prompt.
 
 ### Paso 7 — Ejecución, puntuación e informe (delicado) — [ ]
-- Archivos: nuevo `src/bench.js`, nuevo `test/bench.test.js` (con el `FAKE_OPENCODE` de `test/helpers.js`).
+- Archivos: nuevo `src/evaluar.js`, nuevo `test/evaluar.test.js` (con el `FAKE_OPENCODE` de `test/helpers.js`).
 - Hacer:
   - Descubrimiento: `opencode models` filtrado a `opencode-go/*-free`; comparar con el catálogo público `https://opencode.ai/inference/go/v1/models` (solo ids; si falla la red, se dice y se sigue) y con el último informe (nuevos, retirados).
   - Sondeo previo de 1 llamada por modelo (respuesta corta) para separar infraestructura antes de gastar las 4 tareas.
   - Cada tarea se lanza con `startRun` de `src/orchestrator.js` (el mismo flujo que `agentrelay run`), con config `executor.type: opencode`, `model`, `routing.mode: off`, `policy.maxRetries: 1`, `executor.timeoutSeconds: 300`. Secuencial. Sin commits.
   - Puntuación y umbrales de la sección «Criterios».
-  - Informe Markdown: fecha y hora, catálogo, accesibles y no evaluados con motivo, tareas, tabla por modelo, errores principales, ranking y justificación, diferencias con el anterior, cambios aplicados o propuestos. Separar «medido» de «conclusión». Se imprime y se guarda en `~/.agentrelay/bench/AAAA-MM-DD-HHMM.md`, con `history.json` (resultados resumidos y `freeOrder` previo).
+  - Informe Markdown: fecha y hora, catálogo, accesibles y no evaluados con motivo, tareas, tabla por modelo, errores principales, ranking y justificación, diferencias con el anterior, cambios aplicados o propuestos. Separar «medido» de «conclusión». Se imprime y se guarda en `~/.agentrelay/evaluar/AAAA-MM-DD-HHMM.md`, con `history.json` (resultados resumidos y `freeOrder` previo).
   - Limpieza en `finally` y en SIGINT: borra el directorio temporal; nunca toca el repo del usuario.
 - Ejecutor: AgentRelay, esfuerzo alto.
 
-### Paso 8 — Comando `bench` y aplicación — [ ]
-- Archivos: `src/cli.js`, `src/help.js`, `assets/claude-commands/ar/bench.md` (generado), prueba CLI.
-- Hacer: `agentrelay bench [--models a,b] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
+### Paso 8 — Comando `evaluar` y aplicación — [ ]
+- Archivos: `src/cli.js`, `src/help.js`, `assets/claude-commands/ar/evaluar.md` (generado), prueba CLI.
+- Hacer: `agentrelay evaluar [--models a,b] [--runs N] [--no-apply] [--revert]`. Por defecto aplica: escribe `routing.freeOrder` en `~/.agentrelay/config.json` con `setConfigValue` (conserva comentarios) tras guardar el anterior en `history.json`. `--revert` restaura el último anterior. Avisa si un `agentrelay.config.json` de proyecto fija `routing.freeOrder` y lo anula. Tras aplicar, comprueba que `routeEntries` da Luna → nuevos gratuitos → `paidOrder` intacto, y lo muestra.
 - Ejecutor: AgentRelay, esfuerzo medio.
 
 ### Paso 9 — Documentación (un archivo por tarea) — [ ]
-- `docs/MANUAL.md`, `docs/GUIA.md`, `docs/DISENO.md`, `README.md`, `README.en.md`: quitar todo lo del ranquing, explicar `bench`.
-- `CHANGELOG.md` («Sin publicar»: Añadido `bench`; Eliminado `rank`, `executors check`, informe diario, notas por revisiones; Cambiado: estado de cuota en `quota.json`) y `TODO.md`: los hace el orquestador.
+- `docs/MANUAL.md`, `docs/GUIA.md`, `docs/DISENO.md`, `README.md`, `README.en.md`: quitar todo lo del ranquing, explicar `evaluar`.
+- `CHANGELOG.md` («Sin publicar»: Añadido `evaluar`; Eliminado `rank`, `executors check`, informe diario, notas por revisiones; Cambiado: estado de cuota en `quota.json`) y `TODO.md`: los hace el orquestador.
 - Ejecutor: AgentRelay, esfuerzo bajo, un archivo por encargo.
 
 ### Paso 10 — Prueba real y aplicación (orquestador) — [ ]
-- `agentrelay bench --no-apply` con los gratuitos de Go reales; revisar el informe; si es coherente, `agentrelay bench --revert` no hace falta y se aplica con `agentrelay bench` (o se aplica la propuesta). Comprobar con una tarea real que el enrutado usa el nuevo orden. Push solo con aprobación del usuario y `agentrelay update` después.
+- `agentrelay evaluar --no-apply` con los gratuitos de Go reales; revisar el informe; si es coherente, `agentrelay evaluar --revert` no hace falta y se aplica con `agentrelay evaluar` (o se aplica la propuesta). Comprobar con una tarea real que el enrutado usa el nuevo orden. Push solo con aprobación del usuario y `agentrelay update` después.
 
 ## Riesgos
 
 - **Pasos 1-2:** romper el cambio por cuota recién montado. Mitigación: pruebas existentes de enrutado y de Codex deben pasar sin cambios de comportamiento.
-- **Coste del bench:** los `-free` no gastan cupo; los modelos pedidos con `--models` sí. El informe muestra el coste medido.
+- **Coste de la evaluación:** los `-free` no gastan cupo; los modelos pedidos con `--models` sí. El informe muestra el coste medido.
 - **Gratuitos cambiantes:** son vistas previas; pueden desaparecer. El descubrimiento lo detecta y no se aplica nada sin aptos.
