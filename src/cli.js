@@ -1150,13 +1150,6 @@ async function cmdSetup(values) {
         return 1;
       }
     }
-    // Gemini es la segunda IA gratuita del enrutado por defecto: se instala sin preguntar.
-    // Si falla (sin red), setup sigue y lo dice; login gemini lo vuelve a intentar.
-    if (!requested.includes('gemini') && !await isInstalled('gemini', { dir })) {
-      if (await installOptionalExecutor('gemini', dir) !== 0 && !values.quiet) {
-        process.stdout.write('Gemini no se pudo instalar ahora; se instalará al ejecutar: agentrelay login gemini\n');
-      }
-    }
     let noTtyNotice = false;
     for (const entry of CATALOG.filter((item) => !item.bundled && !requested.includes(item.name))) {
       if (await isInstalled(entry.name, { dir })) continue;

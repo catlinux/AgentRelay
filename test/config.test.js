@@ -121,7 +121,7 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     const defaults = loadConfig({ cwd: dir, home: path.join(dir, 'home') }).config.routing;
     assert.deepEqual(defaults, {
       mode: 'off',
-      freeOrder: ['gemini:auto'],
+      freeOrder: [],
       paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'],
       maxSwitches: 5,
     });
