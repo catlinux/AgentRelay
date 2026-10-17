@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runProcess } from '../proc.js';
+import { installCommand, installedPaths } from './antigravity.js';
 
 /** Carpeta de los ejecutores opcionales (AGENTRELAY_EXECUTORS_DIR la sustituye). */
 export function executorsDir(env = process.env, home = os.homedir()) {
@@ -27,7 +28,7 @@ export const CATALOG = [
   {
     name: 'antigravity',
     title: 'Antigravity CLI (Google)',
-    description: 'Gemini y Claude con tu cuenta de Google y su cuota semanal gratuita, sin clave de API. Se instala aparte: curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    description: 'Gemini y Claude con tu cuenta de Google y su cuota semanal gratuita, sin clave de API. Se instala con su propio instalador, no con AgentRelay.',
     bundled: false,
     cost: 'cuenta de Google',
     npmPackage: null,
@@ -71,8 +72,9 @@ export async function isInstalled(name, options = {}) {
   // OpenCode puede estar instalado en la carpeta gestionada o en el PATH.
   // agy se instala con su propio instalador en ~/.local/bin, que puede no estar aún en el PATH.
   if (name === 'antigravity') {
-    const binary = (options.platform || process.platform) === 'win32' ? 'agy.exe' : 'agy';
-    return Boolean(findOnPath('agy', options)) || (options.exists || existsSync)(path.join(options.home || os.homedir(), '.local', 'bin', binary));
+    const exists = options.exists || existsSync;
+    return Boolean(findOnPath('agy', options))
+      || installedPaths({ home: options.home, platform: options.platform, env: options.env }).some((file) => exists(file));
   }
   if (!entry.npmPackage) return Boolean(findOnPath(entry.name, options));
   const dir = options.dir || executorsDir(options.env, options.home);
@@ -88,7 +90,10 @@ export async function installExecutor(name, { dir = executorsDir(), run = runPro
   const entry = getCatalogEntry(name, dir);
   if (!entry) throw new Error(`Ejecutor desconocido: ${name}`);
   if (entry.bundled) throw new Error(`${entry.title} ya viene incluido con AgentRelay.`);
-  if (!entry.npmPackage) throw new Error(`${entry.title} no se instala con AgentRelay; instálalo aparte en el PATH (${entry.connect}).`);
+  if (!entry.npmPackage) {
+    const how = name === 'antigravity' ? `Instálalo con: ${installCommand()}` : 'Instálalo aparte en el PATH';
+    throw new Error(`${entry.title} no se instala con AgentRelay. ${how} y abre una terminal nueva. Después: ${entry.connect}`);
+  }
 
   mkdirSync(dir, { recursive: true });
   const packageJson = path.join(dir, 'package.json');

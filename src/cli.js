@@ -749,7 +749,7 @@ async function cmdExecutors(positionals, values) {
 
 async function installOptionalExecutor(name, dir = executorsDir()) {
   const entry = getCatalogEntry(name, dir);
-  process.stdout.write(`Se instalará ${entry.title} en ${dir}.\n`);
+  if (entry.npmPackage) process.stdout.write(`Se instalará ${entry.title} en ${dir}.\n`);
   const result = await installExecutor(name, { dir });
   if (!result.ok) {
     process.stderr.write(`No se pudo instalar ${entry.title}: ${result.error}\n`);
@@ -1097,6 +1097,12 @@ async function cmdSetup(values) {
     let noTtyNotice = false;
     for (const entry of CATALOG.filter((item) => !item.bundled && !requested.includes(item.name))) {
       if (await isInstalled(entry.name, { dir })) continue;
+      // Los que tienen instalador propio (Antigravity) no se ofrecen: se explica cómo instalarlos y setup sigue.
+      if (!entry.npmPackage) {
+        const hint = getExecutor(entry.name).installHint;
+        if (!values.quiet) process.stdout.write(`${entry.title} no está instalado (opcional). ${hint} Después: ${entry.connect}\n`);
+        continue;
+      }
       const answer = await confirm(`¿Instalar también ${entry.title}? ${entry.description}`, { yes: false });
       if (answer === null) {
         if (!noTtyNotice) {

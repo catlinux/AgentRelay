@@ -29,6 +29,7 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 agentrelay setup              # instrucciones y comandos /ar: de Claude Code
 agentrelay login              # cuenta de ChatGPT para Luna (se abre el navegador)
 curl -fsSL https://antigravity.google/cli/install.sh | bash   # instala Antigravity (Linux y macOS)
+# en Windows (PowerShell): irm https://antigravity.google/cli/install.ps1 | iex   y abre una terminal nueva
 agentrelay login antigravity  # cuenta de Google: elige «Google OAuth» y sal con /quit
 agentrelay set routing auto   # Luna; si se agota, Antigravity; si también, la de pago
 agentrelay cuota              # comprueba cuánto queda
@@ -60,7 +61,7 @@ El ejecutor las lee y las sigue sin que el orquestador copie su contenido; no pu
 
 | Mensaje | Qué hacer |
 |---|---|
-| «Antigravity CLI no está instalado» | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` y abre una terminal nueva |
+| «Antigravity CLI no está instalado» | Linux y macOS: `curl -fsSL https://antigravity.google/cli/install.sh \| bash`; Windows (PowerShell): `irm https://antigravity.google/cli/install.ps1 \| iex`. Después abre una terminal nueva |
 | Antigravity pregunta si confías en una carpeta | `agentrelay login antigravity` lo abre en una carpeta vacía de AgentRelay: responde «Yes» ahí, nunca en tu carpeta personal |
 | Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a Antigravity |
 | «sin sesión de ChatGPT» | `agentrelay login` |

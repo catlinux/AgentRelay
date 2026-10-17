@@ -109,3 +109,14 @@ test('antigravity: la comprobación del modelo acepta auto y los ids de agy mode
   assert.equal((await checkExecutorModel({ type: 'antigravity', model: 'claude-sonnet-4-6' }, { adapter })).ok, true);
   assert.equal((await checkExecutorModel({ type: 'antigravity', model: 'claude-sonnet' }, { adapter })).ok, false);
 });
+
+test('antigravity: se busca agy donde lo deja su instalador en cada sistema y el aviso de instalación es el de ese sistema', async () => {
+  const { commandParts, installCommand, installedPaths } = await import('../src/executors/antigravity.js');
+  const winPaths = installedPaths({ home: 'C:\\Users\\yo', platform: 'win32', env: { LOCALAPPDATA: 'C:\\Users\\yo\\AppData\\Local' } });
+  assert.ok(winPaths[0].endsWith(path.join('Antigravity', 'agy.exe')));
+  const local = winPaths[0];
+  assert.deepEqual(commandParts('agy', { platform: 'win32', home: 'C:\\Users\\yo', env: { PATH: '', LOCALAPPDATA: 'C:\\Users\\yo\\AppData\\Local' }, exists: (file) => file === local }), [local]);
+  assert.deepEqual(commandParts('agy', { platform: 'linux', home: '/home/yo', env: { PATH: '/usr/bin' }, exists: () => false }), ['agy']);
+  assert.match(installCommand('win32'), /irm https:\/\/antigravity\.google\/cli\/install\.ps1 \| iex/);
+  assert.match(installCommand('linux'), /curl -fsSL https:\/\/antigravity\.google\/cli\/install\.sh \| bash/);
+});

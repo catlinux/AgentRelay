@@ -1,5 +1,6 @@
 import { agentrelayHome } from './config.js';
 import { listarCuentas } from './cuentas.js';
+import { installCommand } from './executors/antigravity.js';
 import { isExhausted, loadQuota } from './quota-state.js';
 
 /**
@@ -20,7 +21,7 @@ export function alternativesHint({ current, config, installed }) {
 
   if (current?.type !== 'antigravity' || current?.model === 'claude-sonnet-4-6') {
     if (!installed?.antigravity) {
-      lines.push('- Antigravity (cuenta de Google, cuota semanal gratuita): instálalo con curl -fsSL https://antigravity.google/cli/install.sh | bash y conéctalo con agentrelay login antigravity');
+      lines.push(`- Antigravity (cuenta de Google, cuota semanal gratuita): instálalo con ${installCommand()} y conéctalo con agentrelay login antigravity`);
     } else if (!agotada('antigravity:gemini')) {
       lines.push('- Antigravity con Gemini (cuota semanal gratuita): agentrelay use antigravity');
     }

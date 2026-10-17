@@ -50,6 +50,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- **`update` y `setup` se cortaban en Windows al ofrecer instalar Antigravity**, que no se instala con npm («no se instala con AgentRelay»). Ahora no se ofrece: si falta, se explica cómo instalarlo con el instalador oficial de cada sistema (`irm https://antigravity.google/cli/install.ps1 | iex` en Windows, `curl … install.sh | bash` en Linux y macOS) y `setup` sigue. AgentRelay encuentra `agy` también donde lo deja su instalador en Windows (`%LOCALAPPDATA%\Antigravity\agy.exe`).
 - **Al agotarse la cuota, las alternativas propuestas eran comandos inválidos** (`agentrelay use opencode antigravity:auto`) y no conocían Antigravity ni las cuentas de Luna: ahora proponen Antigravity con Gemini o con Claude según su cupo, otra cuenta de Luna y DeepSeek.
 - **Codex: la hora de reinicio de la cuota con fecha y ordinal («try again at Oct 23rd, 2026 10:09 AM») ahora se entiende**, y el tope de espera pasa de 8 a 14 días. Antes se ignoraba y se volvía a probar Luna cada 10, 30 y 60 minutos aunque faltaran días; ahora queda agotada hasta esa fecha.
 - **Enrutado: un límite de velocidad ya no agota los reintentos en el mismo modelo.** Con `routing.mode: "auto"`, un error «Rate limit exceeded» / 429 / «too many requests» se trata como cuota agotada: el modelo queda en espera unos minutos y la tarea sigue con el siguiente de la lista. Fuera del enrutado el comportamiento no cambia (el límite de velocidad no se toma por cuota agotada).

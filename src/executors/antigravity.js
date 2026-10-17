@@ -16,7 +16,13 @@ import { extractAgentReport, instructionFor, tail } from './common.js';
 
 export const name = 'antigravity';
 
-export const installHint = 'Instálalo con: curl -fsSL https://antigravity.google/cli/install.sh | bash (Linux y macOS)';
+/** Cómo instalar agy en este sistema (su instalador oficial; no es un paquete npm). */
+export function installCommand(platform = process.platform) {
+  return platform === 'win32'
+    ? 'irm https://antigravity.google/cli/install.ps1 | iex   (en PowerShell)'
+    : 'curl -fsSL https://antigravity.google/cli/install.sh | bash';
+}
+export const installHint = `Instálalo con: ${installCommand()} y abre una terminal nueva.`;
 export const loginHint = 'Ejecuta "agentrelay login antigravity" y elige «Google OAuth» con tu cuenta de Google.';
 
 /** Carpeta de Antigravity CLI con la sesión (~/.gemini/antigravity-cli). */
@@ -25,12 +31,19 @@ export function antigravityDir(home = os.homedir()) {
 }
 
 /** Ruta de agy: el PATH o, si no está, ~/.local/bin/agy (donde lo deja su instalador). */
-export function commandParts(command, { exists = existsSync, home = os.homedir(), platform = process.platform } = {}) {
+/** Dónde deja agy su instalador: ~/.local/bin (Linux y macOS) o %LOCALAPPDATA%\\Antigravity (Windows). */
+export function installedPaths({ home = os.homedir(), platform = process.platform, env = process.env } = {}) {
+  if (platform !== 'win32') return [path.join(home, '.local', 'bin', 'agy')];
+  const localAppData = env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+  return [path.join(localAppData, 'Antigravity', 'agy.exe'), path.join(home, '.local', 'bin', 'agy.exe')];
+}
+
+export function commandParts(command, { exists = existsSync, home = os.homedir(), platform = process.platform, env = process.env } = {}) {
   if (command === 'agy') {
-    const local = path.join(home, '.local', 'bin', platform === 'win32' ? 'agy.exe' : 'agy');
-    const onPath = String(process.env.PATH || process.env.Path || '').split(path.delimiter)
-      .some((dir) => dir && exists(path.join(dir, platform === 'win32' ? 'agy.exe' : 'agy')));
-    if (!onPath && exists(local)) return [local];
+    const binary = platform === 'win32' ? 'agy.exe' : 'agy';
+    const onPath = String(env.PATH || env.Path || '').split(path.delimiter).some((dir) => dir && exists(path.join(dir, binary)));
+    const local = installedPaths({ home, platform, env }).find((file) => exists(file));
+    if (!onPath && local) return [local];
   }
   const parts = Array.isArray(command) ? command.map(String) : [String(command)];
   if (!parts.length || !parts[0]) throw new Error('executor.command está vacío');
