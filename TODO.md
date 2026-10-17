@@ -18,7 +18,13 @@ Necesitan al usuario en casa o una clave:
 - [ ] Añadir OpenCode Go a `src/free-providers.js` (hoy sale sin dato de privacidad) y corregir el nombre antiguo `deepseek-v4-flash` en el catálogo y en `src/alternatives.js` (ahora `deepseek-flash` o `opencode-go/deepseek-v4.1-flash`).
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe).
 
+- [ ] **Probar Gemini en casa** (integrado sin cuenta de Google: solo probado con simulados y hasta el paso de autenticación). `agentrelay executors add gemini`, `agentrelay login gemini`, `agentrelay cuota` (comprobar que salen los modelos, el porcentaje y la hora de renovación) y una tarea real con `agentrelay use gemini`. Confirmar el texto real del error de cuota agotada.
+- [ ] **Probar `agentrelay cuota` con Luna** con sesión de ChatGPT real: confirmar que salen la ventana de 5 h y la semanal con su hora de renovación.
+- [ ] Prueba que ya fallaba antes de integrar Gemini: `ejecutarTarea sin cambios suspende con fallo modelo` (test/evaluar.test.js:273).
+
 Mejoras acordadas:
+
+- [ ] Grok Build (xAI) como ejecutor: **en espera, no se integra por ahora**. Técnicamente encaja (`grok -p` y `--output-format streaming-json`), pero la cuota gratuita no está publicada y es dudosa (necesita una suscripción de X), y en julio de 2026 se descubrió que subía repositorios enteros con `.env` a xAI. Reabrir si xAI publica la cuota gratuita y aclara la privacidad.
 
 - [ ] Enrutado de ejecutores: inventario y evaluación de IA gratuitas (Zen, Mistral, OpenRouter, Z AI), estado de cuota en tiempo real y rotación gratuitos → pago (DeepSeek Flash → Luna API → DeepSeek Pro, sin tope), aviso de privacidad (no bloqueo). Se prueban todos los proveedores y se quitan los que fallen; Hechos todos los pasos salvo el 7 (prueba real con tus claves durante unos días). Plan: [.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md](.agents/plans/proveedores-gratuitos/proveedores-gratuitos.PLAN.md).
 

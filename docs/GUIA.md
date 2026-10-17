@@ -16,9 +16,16 @@ Tú sigues hablando solo con el orquestador. Cuando hay que programar algo, este
 | Ejecutor | Qué es | Coste |
 |---|---|---|
 | **Codex** (por defecto) | GPT-6 Luna con tu cuenta de ChatGPT | Cuota gratuita de ChatGPT; con clave de API, lo que cobre OpenAI |
+| **Gemini CLI** | Gemini con tu cuenta de Google (`agentrelay executors add gemini` y `agentrelay login gemini`) | Cuota diaria gratuita de Google; sin clave de API |
 | **OpenCode** | Modelos gratuitos de OpenCode Zen, Mistral, OpenRouter y Z.AI, y DeepSeek de pago | Gratis (con límites) o lo que cobre DeepSeek |
 
 Se cambia con `agentrelay use` (interactivo) o, por ejemplo, `agentrelay use opencode mistral/codestral-2508`.
+
+## Flujo recomendado (gratis primero)
+
+1. Una vez por equipo: `agentrelay login` (cuenta de ChatGPT, para Luna), `agentrelay executors add gemini` y `agentrelay login gemini` (cuenta de Google).
+2. Activa el enrutado: `agentrelay set routing auto`. Cada tarea va a **Luna**; si se agota, a **Gemini**; si también, a la IA de pago, y si esa falla se te pregunta.
+3. Para saber en cualquier momento cuánto queda: `agentrelay cuota` (en el chat, `/ar:cuota`). Muestra el porcentaje que queda de Luna (ventana de 5 h y semanal) y de Gemini (diaria, por modelo) y cuándo se renueva cada una. La consulta no gasta peticiones.
 
 ## Uso del día a día
 
@@ -77,7 +84,7 @@ agentrelay set routing off --local    # para desactivarlo
 Cada tarea empieza por el primero disponible de esta lista:
 
 1. Luna con la cuota gratuita de ChatGPT (solo si Codex está conectado con tu cuenta; con clave de API se salta, porque se factura).
-2. Los modelos gratuitos de `routing.freeOrder`, en el orden que tú fijes (por defecto Cat Jam y LongCat de OpenCode Go; no dependen del esfuerzo de la tarea).
+2. Las gratuitas de `routing.freeOrder`, en el orden que tú fijes: por defecto solo Gemini con tu cuenta de Google (`gemini:auto`). Puedes añadir modelos `-free` de OpenCode Go con `agentrelay orden gratis gemini cat-jam`.
 3. La de pago de `routing.paidOrder`: por defecto solo DeepSeek V4.1 Flash de OpenCode Go (limitada por tu suscripción). Se cambia con `agentrelay orden pago <nombre>`.
 
 Cada **gratuita** se prueba dos veces seguidas (con 5 s de pausa) si falla por cuota, saldo, límite de velocidad o un fallo pasajero de conexión, y a la segunda salta a la siguiente; si el error ya dice cuándo se restablece la cuota, salta sin reintentar. La **IA de pago** se prueba hasta tres veces (pausas de 5 y 15 s) solo ante un fallo pasajero (límite de velocidad, red, 502/503/504, saturación); un error definitivo (saldo insuficiente, credenciales, modelo inexistente) la detiene a la primera. Si la IA de pago sigue fallando, la tarea **se detiene y se te pregunta qué IA usar**: nunca continúa sola con otra. La siguiente tarea vuelve a empezar por los gratuitos.
@@ -101,5 +108,6 @@ El gasto de cada ejecución (tokens y coste estimado) está en su informe, en la
 | «El modelo … no está disponible para el ejecutor» | `agentrelay use opencode <modelo>`; `agentrelay providers` para ver qué está conectado |
 | Todos los modelos salen «no evaluados» en `evaluar` | Que OpenCode no tenga procesos colgados (`opencode` en el administrador de tareas) y `agentrelay update --yes` |
 | «El repositorio tiene cambios sin confirmar» | Confirma o guarda los cambios antes de delegar, o usa `--allow-dirty` |
-| Una cuota gratuita se ha agotado | Se repone sola (la hora sale en `agentrelay doctor` para Luna); con el enrutado activo se pasa al siguiente |
+| Una cuota gratuita se ha agotado | Se repone sola (la hora sale en `agentrelay cuota`); con el enrutado activo se pasa al siguiente |
+| Gemini dice «Manual authorization is required» | Falta la sesión de Google: `agentrelay login gemini` en un terminal con navegador |
 | El enrutado se salta Luna gratis | Codex tiene sesión con clave de API: `agentrelay login` con tu cuenta de ChatGPT |

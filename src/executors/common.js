@@ -17,6 +17,7 @@ export function classifyExecutorError(text) {
   const value = String(text ?? '').toLowerCase();
   if (/\b(?:unauthorized|authentication fails?|invalid api key|incorrect api key|invalid_api_key|not logged in|session expired)\b/.test(value)
     || /\b401\s+unauthorized\b/.test(value)
+    || /\bfatalauthenticationerror\b|\bmanual authorization is required\b/.test(value)
     || /\b(?:status|http|error|code)[^a-z0-9]{0,3}401\b/.test(value)) {
     return 'credentials';
   }
@@ -30,6 +31,8 @@ export function classifyExecutorError(text) {
     || /\busage_limit_reached\b/.test(value)
     || /\busage[\s_-]+limit\b[\s\S]{0,120}\btry again\s+(?:in|at)\b/.test(value)
     || /\bplan\s+limit\b/.test(value)
+    || /\bexhausted your (?:daily )?(?:capacity|quota)\b/.test(value)
+    || /\bterminalquotaerror\b/.test(value)
     || /\b(?:\d+\s*[- ]?hour|weekly)\s+usage\s+limit\b/.test(value)) {
     return 'quota';
   }
@@ -95,7 +98,7 @@ export function parseQuotaReset(text, now = new Date()) {
     if (date) return date;
   }
 
-  const duration = value.match(/\btry again in\s+((?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|days?|d|seconds?|secs?|s)\s*(?:and\s*)?)+)/i);
+  const duration = value.match(/\b(?:try again in|reset after|resets? in)\s+((?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|days?|d|seconds?|secs?|s)\s*(?:and\s*)?)+)/i);
   if (duration) {
     let milliseconds = 0;
     const units = /([\d.]+)\s*(hours?|hrs?|h|minutes?|mins?|m|days?|d|seconds?|secs?|s)/gi;
