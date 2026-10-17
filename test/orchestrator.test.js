@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applyReview, startRun } from '../src/orchestrator.js';
 import { readEvents } from '../src/events.js';
-import { listRunIds, runDir, saveState } from '../src/store.js';
+import { listRunIds, runDir } from '../src/store.js';
 import { normalizeTask } from '../src/task.js';
 import { baseTask, fakePlan, git, makeRepo, testConfig } from './helpers.js';
 

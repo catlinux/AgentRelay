@@ -383,12 +383,3 @@ export function renderCommandHelp(name) {
     '',
   ].join('\n');
 }
-
-export function renderHelpIndex() {
-  const lines = ['Comandos de AgentRelay:', ''];
-  for (const [name, command] of Object.entries(COMMANDS)) {
-    lines.push(`  agentrelay ${name.padEnd(10)} ${command.summary}`);
-  }
-  lines.push('', 'Ayuda de un comando: agentrelay help <comando>', '');
-  return lines.join('\n');
-}

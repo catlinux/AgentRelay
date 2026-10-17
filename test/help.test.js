@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { commandNames, renderCommandHelp, renderHelpIndex } from '../src/help.js';
+import { commandNames, renderCommandHelp } from '../src/help.js';
 
 const bin = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 const cliSource = readFileSync(new URL('../src/cli.js', import.meta.url), 'utf8');
@@ -36,12 +36,6 @@ test('hay ayuda para cada comando listado en la ayuda general', () => {
     assert.match(rendered, /Uso:/);
     assert.match(rendered, /Ejemplos:/);
   }
-});
-
-test('renderHelpIndex lista comandos y explica cómo abrir la ayuda detallada', () => {
-  const rendered = renderHelpIndex();
-  for (const name of commandNames()) assert.match(rendered, new RegExp(`agentrelay ${name}\\s`));
-  assert.match(rendered, /Ayuda de un comando: agentrelay help <comando>/);
 });
 
 test('agentrelay help funciona fuera de un repositorio git', () => {

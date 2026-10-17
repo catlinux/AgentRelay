@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createOutput } from '../src/output.js';
 import { FAKE_OPENCODE, git, makeRepo, fakePlan, baseTask } from './helpers.js';
 import { GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js';
-import { commandsSourceDir, commandsTargetDir, listCommands, MANAGED_MARK } from '../src/claude-commands.js';
+import { commandsSourceDir, commandsTargetDir, listCommands } from '../src/claude-commands.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 function streams() {
