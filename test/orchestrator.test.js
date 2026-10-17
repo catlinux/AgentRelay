@@ -320,3 +320,38 @@ test('registra eventos estructurados en events.ndjson y los emite en orden', asy
     repo.cleanup();
   }
 });
+
+test('references: el ejecutor recibe las guías en el prompt, no puede tocarlas y una ruta inexistente se rechaza antes de empezar', async () => {
+  const repo = makeRepo();
+  try {
+    await assert.rejects(run(repo, { task: { references: ['docs/no-existe.md'] }, plan: { implement: GOOD } }), /No existen estos archivos de "references": docs\/no-existe\.md/);
+    assert.deepEqual(listRunIds(repo.dir), [], 'no se crea ninguna ejecución');
+
+    writeFileSync(path.join(repo.dir, 'guia.md'), 'Usa siempre minúsculas.\n');
+    git(repo.dir, 'add', 'guia.md');
+    git(repo.dir, 'commit', '-q', '-m', 'guia');
+    const ok = await run(repo, { task: { references: ['guia.md'] }, plan: { implement: GOOD } });
+    assert.equal(ok.status, 'awaiting_review');
+    assert.match(prompt(repo, ok, 1), /## Reference documents\nRead these files before starting and follow them; they are guidance, do not modify them:\n- guia\.md/);
+    git(repo.dir, 'reset', '-q', '--hard');
+    git(repo.dir, 'clean', '-qfd', '-e', '.agentrelay');
+
+    const touched = await run(repo, {
+      task: { references: ['guia.md'] },
+      plan: { implement: { write: { 'hello.txt': 'hi\n', 'guia.md': 'cambiada\n' } } },
+    });
+    assert.deepEqual(touched.lastCheck.scopeViolations, ['guia.md']);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('references: una tarea sin guías no añade la sección al prompt', async () => {
+  const repo = makeRepo();
+  try {
+    const state = await run(repo, { plan: { implement: GOOD } });
+    assert.doesNotMatch(prompt(repo, state, 1), /Reference documents/);
+  } finally {
+    repo.cleanup();
+  }
+});

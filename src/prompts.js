@@ -20,6 +20,9 @@ function taskSections(task, validationCommands) {
   return [
     section('Objective', task.objective),
     section('Context', task.context),
+    section('Reference documents', task.references.length
+      ? `Read these files before starting and follow them; they are guidance, do not modify them:\n${bullets(task.references)}`
+      : ''),
     section('Relevant files or areas', bullets(task.files)),
     section('Constraints', bullets(task.constraints)),
     section('Do not modify', bullets(task.doNotModify)),

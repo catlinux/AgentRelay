@@ -137,7 +137,7 @@ ${task.objective}
 
 **Criterios de aceptación:**
 ${list(task.acceptanceCriteria)}
-
+${task.references?.length ? `\n**Guías de referencia:** ${task.references.map((file) => `\`${file}\``).join(', ')}\n` : ''}
 ## Orquestación
 
 - Revisión: ${policy.review} · reintentos: ${state.retriesUsed}/${policy.maxRetries}
