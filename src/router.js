@@ -6,22 +6,12 @@
 //   - quotaId es la clave de src/quota-state.js con la que se marca y consulta su cuota.
 
 import { EXECUTOR_DEFAULTS } from './config.js';
-import { getProvider } from './free-providers.js';
 import { quotaIdCuenta } from './cuentas.js';
 import { quotaGroup } from './executors/antigravity.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
 export const GEMINI_FREE_QUOTA = 'gemini:google';
 
-function providerOf(model) {
-  const slash = typeof model === 'string' ? model.indexOf('/') : -1;
-  return slash > 0 ? model.slice(0, slash) : null;
-}
-
-function trainsOnDataFor(type, model) {
-  if (type !== 'opencode') return false;
-  return getProvider(providerOf(model))?.trainsOnData ?? null;
-}
 
 /** Convierte "tipo:modelo" de routing.paidOrder en una entrada de pago. */
 export function parsePaidEntry(spec) {
@@ -32,7 +22,7 @@ export function parsePaidEntry(spec) {
   const type = api ? 'codex' : kind;
   return {
     key: spec, type, model, api, paid: true, quotaId: `paid:${spec}`, tier: null,
-    trainsOnData: trainsOnDataFor(type, model), label: api ? `${model} por API (pago)` : `${model} (pago)`,
+    trainsOnData: null, label: api ? `${model} por API (pago)` : `${model} (pago)`,
   };
 }
 
@@ -74,7 +64,7 @@ export function routeEntries({ config } = {}) {
       quotaId: quotaIdCuenta('gemini'), tier: 'A', trainsOnData: true, label: `Gemini ${model} (cuota gratuita de Google)`,
     } : {
       key, type, model, api: false, paid: false,
-      quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,
+      quotaId: model, tier: null, trainsOnData: null, label: `${model} (gratis)`,
     });
     keys.add(key);
   }

@@ -28,7 +28,6 @@ import { loadTask } from './task.js';
 import { VERSION } from './version.js';
 import { watchRuns } from './watch.js';
 import { cmdUse } from './use.js';
-import { cmdEvaluar } from './evaluar-cmd.js';
 import { cmdOrden } from './orden.js';
 import { cmdCuota } from './cuota.js';
 import { cmdCuenta } from './cuenta-cmd.js';
@@ -43,9 +42,8 @@ import { collectProjectState, refreshProjectState, renderProjectState, writeProj
 import { hookDecision, projectUsesAgentRelay } from './hook.js';
 import { hookStatus, installHook, removeHook } from './claude-hook.js';
 import { isExhausted as quotaIsExhausted, lastQuotaEvent, loadQuota } from './quota-state.js';
-import { connectedProviders, PROVIDERS } from './free-providers.js';
 import { commandNames, renderCommandHelp } from './help.js';
-import { commandParts as opencodeCommandParts, connectedProviderIds } from './executors/opencode.js';
+import { commandParts as opencodeCommandParts } from './executors/opencode.js';
 import { apiProfileDir, commandParts as codexCommandParts, hasApiProfile } from './executors/codex.js';
 import { maskSecrets } from './executors/common.js';
 
@@ -68,12 +66,9 @@ Uso:
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay cuota [--json]         Cuánto queda de cada IA gratuita (Luna, Gemini) y cuándo se renueva
   agentrelay cuenta [luna|gemini [add|use|remove <nombre>]]
-                                    Varias cuentas gratuitas de Luna y Gemini (OpenCode no se toca)
-  agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
+                                    Varias cuentas gratuitas de Luna (OpenCode no se toca)
   agentrelay orden [gratis <modelos> | pago <nombres> | reset]
-                                    Muestra o cambia el orden del enrutado (Luna, Gemini, otros gratuitos, pago)
-  agentrelay evaluar [--models a,b] [--runs N] [--no-apply] [--revert]
-                                    Prueba los gratuitos de OpenCode Go y propone routing.freeOrder
+                                    Muestra o cambia el orden del enrutado (Luna, Antigravity, pago)
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
@@ -470,11 +465,6 @@ async function cmdDoctor(values, rerun = false) {
         line(true, `Cuota gratuita de ChatGPT: restablecida (${recoveredAt.toLocaleString()})`);
       }
     }
-    if (executor.type === 'opencode') {
-      const opencodeAuth = await connectedProviderIds(executor);
-      const providers = connectedProviders({ env: process.env, opencodeAuth });
-      line(true, `Proveedores conectados: ${providers.length ? providers.map(({ name }) => name).join(', ') : 'ninguno'}`);
-    }
     if (modelCheckAllowed) {
       const modelCheck = await checkExecutorModel(executor, { adapter });
       if (!modelCheck.unknown) {
@@ -727,52 +717,6 @@ async function cmdUnset(positionals, values) {
   const key = canonicalSetting(positionals[0]);
   if (!key) throw new Error(`Opción no ajustable: ${positionals[0]}`);
   return applySetting(key, { unset: true }, values);
-}
-
-async function cmdProviders(positionals, values) {
-  if (positionals.length) {
-    process.stderr.write('Uso: agentrelay providers [--json]\n');
-    return 1;
-  }
-  const { config } = loadConfig({ cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config });
-  const executor = config.executor.type === 'opencode'
-    ? config.executor : { ...EXECUTOR_DEFAULTS.opencode, type: 'opencode' };
-  const opencodeAuth = await connectedProviderIds(executor);
-  const connected = new Set(connectedProviders({ env: process.env, opencodeAuth }).map(({ id }) => id));
-  const providers = PROVIDERS.map((provider) => {
-    const isConnected = connected.has(provider.id);
-    const dataNotice = provider.trainsOnData === false ? null
-      : provider.trainsOnData === true
-        ? 'puede usar tus prompts para entrenar'
-        : 'política de datos sin verificar';
-    const connection = isConnected ? null : provider.id === 'opencode'
-      ? { command: 'agentrelay login opencode' }
-      : { env: provider.env, signupUrl: provider.signupUrl };
-    return {
-      id: provider.id,
-      name: provider.name,
-      connected: isConnected,
-      status: isConnected ? 'conectado' : 'no conectado',
-      tier: provider.tier === 'free' ? 'gratuito' : 'de pago',
-      ...(values.json ? { freeTier: provider.freeTier } : {}),
-      limits: provider.limits,
-      dataNotice,
-      connection,
-    };
-  });
-  if (values.json) {
-    process.stdout.write(`${JSON.stringify(providers, null, 2)}\n`);
-    return 0;
-  }
-  for (const provider of providers) {
-    const details = [provider.status, provider.tier];
-    if (provider.limits) details.push(`Límites: ${provider.limits}`);
-    if (provider.dataNotice) details.push(provider.dataNotice);
-    if (provider.connection?.command) details.push(`Conecta con: ${provider.connection.command}`);
-    else if (provider.connection) details.push(`Configura ${provider.connection.env.join(' o ')} y crea una cuenta: ${provider.connection.signupUrl}`);
-    process.stdout.write(`${provider.name}: ${details.join(' · ')}\n`);
-  }
-  return 0;
 }
 
 async function cmdExecutors(positionals, values) {
@@ -1626,14 +1570,12 @@ export async function main(argv, runtime = {}) {
       case 'doctor': return await cmdDoctor(values);
       case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
-      case 'evaluar': return await cmdEvaluar(rest, values);
       case 'orden': return cmdOrden(rest, values);
       case 'cuota': return await cmdCuota(rest, values);
       case 'cuenta': return await cmdCuenta(rest, values);
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);
-      case 'providers': return await cmdProviders(rest, values);
       case 'executors': return await cmdExecutors(rest, values);
       case 'login': return await cmdLogin(rest, values);
       case 'setup': return await cmdSetup(values);
