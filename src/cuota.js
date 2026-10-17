@@ -7,8 +7,8 @@
 import { loadConfig } from './config.js';
 import { isInstalled } from './executors/catalog.js';
 import { readRateLimits } from './executors/codex.js';
-import { cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
-import { authStatus as geminiAuth, readQuota as readGeminiQuota } from './executors/gemini.js';
+import { correoLuna, cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
+import { accountEmail, readQuota as readGeminiQuota } from './executors/gemini.js';
 import { getQuotaState } from './quota-state.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -51,10 +51,11 @@ export async function collectQuotas({ config, now = new Date(), readers = {} } =
   const readGemini = readers.gemini ?? ((cuenta) => readGeminiQuota({ dir: geminiDirCuenta(cuenta) }));
   const cuentas = readers.cuentas ?? ((servicio) => listarCuentas(servicio));
   const activa = readers.activa ?? ((servicio) => cuentaActiva(servicio));
+  const correo = readers.correo ?? ((servicio, cuenta) => (servicio === 'luna' ? correoLuna(cuenta) : accountEmail({ dir: geminiDirCuenta(cuenta) })));
+  // Con varias cuentas se muestra el correo de cada una y cuál está en uso.
   const etiqueta = (servicio, cuenta) => {
-    const varias = cuentas(servicio).length > 1;
-    if (!varias) return '';
-    return ` [${cuenta}${cuenta === activa(servicio) ? ', activa' : ''}]`;
+    if (cuentas(servicio).length < 2) return '';
+    return ` · ${correo(servicio, cuenta) || cuenta}${cuenta === activa(servicio) ? ' (en uso)' : ''}`;
   };
   const result = [];
 

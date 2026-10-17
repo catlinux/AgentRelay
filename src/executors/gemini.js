@@ -11,7 +11,7 @@
 // cuándo se renueva. Las credenciales se leen de ~/.gemini/oauth_creds.json y
 // nunca se reescriben.
 
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, renameSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runInteractive, runProcess } from '../proc.js';
@@ -172,19 +172,45 @@ export function readCredentials({ dir = geminiDirCuenta() } = {}) {
   }
 }
 
-/** Comprueba si hay sesión de Google guardada (no la valida contra Google). */
-export async function authStatus(executor, { dir = geminiDirCuenta() } = {}) {
-  if (readCredentials({ dir })) {
-    let account = '';
-    try { account = JSON.parse(readFileSync(path.join(dir, 'google_accounts.json'), 'utf8')).active || ''; } catch { /* Sin cuenta visible. */ }
-    return { ok: true, message: account ? `Cuenta de Google: ${account}` : 'Sesión de Google guardada' };
+/** Correo de la cuenta de Google con la que inició sesión Gemini CLI (o null). */
+export function accountEmail({ dir = geminiDirCuenta() } = {}) {
+  try { return JSON.parse(readFileSync(path.join(dir, 'google_accounts.json'), 'utf8')).active || null; } catch { return null; }
+}
+
+/**
+ * Sesión de Google: { ok, expired, email }. Si el token guardado ha caducado se intenta renovar en
+ * memoria; si Google lo rechaza (invalid_grant), la sesión está caducada y hay que volver a entrar.
+ * Un fallo de red no se toma por sesión caducada.
+ */
+export async function checkSession({ dir = geminiDirCuenta(), fetchImpl = fetch, now = new Date(), client } = {}) {
+  const creds = readCredentials({ dir });
+  const email = accountEmail({ dir });
+  if (!creds) return { ok: false, expired: false, email };
+  try {
+    await accessToken(creds, fetchImpl, now, client === undefined ? oauthClient() : client);
+    return { ok: true, expired: false, email };
+  } catch (error) {
+    const expired = /invalid_grant|sesión de Google ha caducado/.test(String(error?.message));
+    return { ok: !expired, expired, email };
   }
+}
+
+/** Comprueba la sesión de Google de Gemini CLI, validándola con Google. */
+export async function authStatus(executor, { dir = geminiDirCuenta(), check = checkSession } = {}) {
+  const session = await check({ dir });
+  if (session.ok) return { ok: true, message: session.email ? `Cuenta de Google: ${session.email}` : 'Sesión de Google guardada' };
+  if (session.expired) return { ok: false, expired: true, message: `La sesión de Google${session.email ? ` (${session.email})` : ''} ha caducado. ${loginHint}` };
   return { ok: false, message: `Gemini CLI no tiene sesión de Google. ${loginHint}` };
 }
 
 /** Abre Gemini CLI para iniciar sesión con Google; se cierra con /quit al terminar. */
-export async function login(executor, { env = entornoCuenta('gemini') } = {}) {
+export async function login(executor, { env = entornoCuenta('gemini'), dir = geminiDirCuenta() } = {}) {
   const [command, ...prefix] = commandParts(executor.command);
+  // Con una credencial caducada Gemini CLI no vuelve a pedir el inicio de sesión: se aparta (no se borra).
+  const creds = path.join(dir, 'oauth_creds.json');
+  if (existsSync(creds) && (await checkSession({ dir })).expired) {
+    try { renameSync(creds, path.join(dir, 'oauth_creds.caducado.json')); } catch { /* Se intenta igualmente. */ }
+  }
   const res = await runInteractive(command, prefix, { env: { ...GOOGLE_LOGIN_ENV, ...env } });
   return res.code;
 }

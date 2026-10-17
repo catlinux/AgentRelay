@@ -406,7 +406,7 @@ export function parseRateLimits(result) {
 }
 
 /**
- * Cuota de la cuenta de ChatGPT en Codex (ventana de 5 h y semanal): porcentaje usado y hora de
+ * Cuota de la cuenta de ChatGPT en Codex (sus ventanas de uso) y su correo: porcentaje usado y hora de
  * renovación. Pregunta al servidor local de Codex (codex app-server), sin gastar cuota.
  */
 export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl = spawn, env = entornoCuenta('luna') } = {}) {
@@ -416,6 +416,7 @@ export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl =
   return new Promise((resolve) => {
     let settled = false;
     let buffer = '';
+    let email = null;
     const options = { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, env: { ...process.env, ...env } };
     if (process.platform === 'win32' && /\.cmd$/i.test(command)) options.shell = true;
     let child;
@@ -445,10 +446,13 @@ export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl =
         try { message = JSON.parse(line); } catch { continue; }
         if (message.id === 0) {
           child.stdin.write(`${JSON.stringify({ method: 'initialized' })}\n`);
+          child.stdin.write(`${JSON.stringify({ id: 2, method: 'account/read', params: {} })}\n`);
           child.stdin.write(`${JSON.stringify({ id: 1, method: 'account/rateLimits/read' })}\n`);
+        } else if (message.id === 2) {
+          email = message.result?.account?.email ?? null;
         } else if (message.id === 1) {
-          if (message.error) finish({ ok: false, message: /authentication required/i.test(message.error.message) ? `sin sesión de ChatGPT. ${loginHint}` : String(message.error.message) });
-          else finish({ ok: true, ...parseRateLimits(message.result) });
+          if (message.error) finish({ ok: false, email, message: /authentication required/i.test(message.error.message) ? `sin sesión de ChatGPT. ${loginHint}` : String(message.error.message) });
+          else finish({ ok: true, email, ...parseRateLimits(message.result) });
         }
       }
     });

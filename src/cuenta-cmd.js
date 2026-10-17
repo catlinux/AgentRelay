@@ -1,91 +1,171 @@
-// `agentrelay cuenta`: ver, añadir, activar y borrar cuentas gratuitas de Luna y Gemini.
+// `agentrelay cuenta`: cuentas gratuitas de Luna (ChatGPT) y Gemini (Google), numeradas.
+//
+//   agentrelay cuenta                lista numerada con el correo y lo que queda; en un terminal pregunta cuál usar
+//   agentrelay cuenta 2              usa la cuenta 2 (si su sesión caducó, abre el inicio de sesión)
+//   agentrelay cuenta nueva luna     inicia sesión con otra cuenta de ChatGPT (o gemini) y la deja en uso
+//   agentrelay cuenta quitar 2       borra esa cuenta y su sesión (la principal no se puede quitar)
+//
 // Las sesiones de OpenCode no se tocan: viven en su propia configuración.
 
+import readline from 'node:readline/promises';
 import { EXECUTOR_DEFAULTS, loadConfig } from './config.js';
 import {
-  activarCuenta, borrarCuenta, crearCuenta, cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, SERVICIOS,
+  activarCuenta, borrarCuenta, correoLuna, crearCuenta, cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas,
+  nombreLibre, PRINCIPAL, SERVICIOS,
 } from './cuentas.js';
+import { formatReset } from './cuota.js';
 import { executorsDir, isInstalled } from './executors/catalog.js';
+import { readRateLimits } from './executors/codex.js';
+import { checkSession, readQuota } from './executors/gemini.js';
 import { getExecutor } from './executors/index.js';
 
-const TITULO = { luna: 'Luna (cuenta de ChatGPT)', gemini: 'Gemini (cuenta de Google)' };
+const TITULO = { luna: 'Luna (ChatGPT)', gemini: 'Gemini (Google)' };
 
 function executorDe(servicio, config) {
   const type = servicio === 'luna' ? 'codex' : 'gemini';
   return config.executor.type === type ? config.executor : { ...EXECUTOR_DEFAULTS[type], type };
 }
 
-async function sesion(servicio, cuenta, executor) {
-  const adapter = getExecutor(executor.type);
-  const status = servicio === 'luna'
-    ? await adapter.authStatus(executor, { env: entornoCuenta('luna', cuenta) })
-    : await adapter.authStatus(executor, { dir: geminiDirCuenta(cuenta) });
-  return status.ok ? status.message : 'sin sesión';
+/** Resumen de una ventana o modelo con menos cuota: "queda 40 % · se renueva mañana 09:00". */
+function resumen(items, now) {
+  const peor = items.filter((item) => item.pct != null).sort((a, b) => a.pct - b.pct)[0];
+  if (!peor) return '';
+  const reset = peor.resetAt ? ` · se renueva ${formatReset(peor.resetAt, now)}` : '';
+  return peor.pct === 0 ? `agotada${reset}` : `queda ${peor.pct} %${reset}`;
 }
 
-async function mostrar(config, out) {
+async function estadoLuna(executor, cuenta, now) {
+  const correo = correoLuna(cuenta);
+  const res = await readRateLimits(executor, { env: entornoCuenta('luna', cuenta) });
+  if (!res.ok) return { correo: res.email || correo, ok: false, estado: 'sin sesión' };
+  return {
+    correo: res.email || correo,
+    ok: true,
+    estado: resumen(res.windows.map((w) => ({ pct: w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent), resetAt: w.resetAt })), now) || 'con sesión',
+  };
+}
+
+async function estadoGemini(cuenta, now) {
+  const dir = geminiDirCuenta(cuenta);
+  const session = await checkSession({ dir });
+  if (!session.ok) return { correo: session.email, ok: false, estado: session.expired ? 'sesión caducada' : 'sin sesión' };
+  const quota = await readQuota({ dir });
+  return {
+    correo: session.email,
+    ok: true,
+    estado: quota.ok ? resumen(quota.models.map((m) => ({ pct: m.remainingPercent, resetAt: m.resetAt })), now) || 'con sesión' : 'con sesión',
+  };
+}
+
+/** Lista numerada de todas las cuentas: [{ n, servicio, cuenta, activa, correo, ok, estado }]. */
+export async function listarTodas(config, { now = new Date(), geminiInstalado } = {}) {
+  const filas = [];
+  const conGemini = geminiInstalado ?? await isInstalled('gemini', { dir: executorsDir() });
   for (const servicio of SERVICIOS) {
+    if (servicio === 'gemini' && !conGemini) continue;
     const activa = cuentaActiva(servicio);
-    out(`${TITULO[servicio]}:`);
-    if (servicio === 'gemini' && !await isInstalled('gemini', { dir: executorsDir() })) {
-      out('  (Gemini CLI no instalado: agentrelay executors add gemini)');
-      continue;
-    }
     for (const cuenta of listarCuentas(servicio)) {
-      out(`  ${cuenta === activa ? '●' : '○'} ${cuenta} — ${await sesion(servicio, cuenta, executorDe(servicio, config))}`);
+      const estado = servicio === 'luna' ? await estadoLuna(executorDe('luna', config), cuenta, now) : await estadoGemini(cuenta, now);
+      filas.push({ n: filas.length + 1, servicio, cuenta, activa: cuenta === activa, ...estado });
+    }
+  }
+  return filas;
+}
+
+function pintar(filas, out, conGemini) {
+  out('Cuentas gratuitas (● = la que se usa)');
+  for (const servicio of SERVICIOS) {
+    const propias = filas.filter((fila) => fila.servicio === servicio);
+    out('');
+    out(TITULO[servicio]);
+    if (!propias.length) out('     Gemini CLI no está instalado: agentrelay executors add gemini');
+    for (const fila of propias) {
+      const correo = (fila.correo || (fila.cuenta === PRINCIPAL ? 'cuenta principal' : fila.cuenta)).padEnd(30);
+      out(`  ${fila.activa ? '●' : ' '} ${String(fila.n).padStart(2)}  ${correo} ${fila.estado}`);
     }
   }
   out('');
-  out('Añadir:   agentrelay cuenta luna add <nombre>     (o gemini) — abre el inicio de sesión en una carpeta propia');
-  out('Cambiar:  agentrelay cuenta luna use <nombre>     (principal = la cuenta de siempre)');
-  out('Borrar:   agentrelay cuenta luna remove <nombre>');
-  out('Cuánto queda en cada una: agentrelay cuota');
+  out('Usar otra:       agentrelay cuenta <número>');
+  out(`Añadir otra:     agentrelay cuenta nueva luna${conGemini ? '   ·   agentrelay cuenta nueva gemini' : ''}`);
+  out('Quitar:          agentrelay cuenta quitar <número>');
+}
+
+async function iniciarSesion(servicio, cuenta, config, values, out) {
+  const executor = executorDe(servicio, config);
+  out(servicio === 'luna'
+    ? 'Se abre el navegador: entra con la cuenta de ChatGPT que quieras usar.'
+    : 'Se abre Gemini CLI: elige «Sign in with Google», entra con la cuenta que quieras usar y sal con /quit.');
+  await getExecutor(executor.type).login(executor, {
+    device: Boolean(values.device), env: entornoCuenta(servicio, cuenta), ...(servicio === 'gemini' ? { dir: geminiDirCuenta(cuenta) } : {}),
+  });
+}
+
+async function usar(fila, config, values, out) {
+  if (!fila.ok) {
+    await iniciarSesion(fila.servicio, fila.cuenta, config, values, out);
+    const [nueva] = (await listarTodas(config)).filter((f) => f.servicio === fila.servicio && f.cuenta === fila.cuenta);
+    if (!nueva?.ok) throw new Error('No se completó el inicio de sesión; la cuenta en uso no ha cambiado.');
+    fila = nueva;
+  }
+  activarCuenta(fila.servicio, fila.cuenta);
+  out(`✔ ${TITULO[fila.servicio]}: ahora se usa ${fila.correo || fila.cuenta} (${fila.estado}).`);
+}
+
+async function preguntar(texto) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return '';
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try { return (await rl.question(texto)).trim().toLowerCase(); } finally { rl.close(); }
 }
 
 export async function cmdCuenta(positionals, values, { out = (line) => process.stdout.write(`${line}\n`), err = (line) => process.stderr.write(`${line}\n`) } = {}) {
   const { config } = loadConfig({ cwd: values.cwd || process.cwd(), configPath: values.config });
-  const [servicio, accion, nombre] = positionals;
+  const [primero, segundo] = positionals;
   try {
-    if (!servicio) {
-      await mostrar(config, out);
-      return 0;
-    }
-    if (!SERVICIOS.includes(servicio)) throw new Error(`Servicio desconocido: ${servicio}. Usa: agentrelay cuenta luna|gemini …`);
-    if (!accion) {
-      for (const cuenta of listarCuentas(servicio)) out(`${cuenta === cuentaActiva(servicio) ? '●' : '○'} ${cuenta}`);
-      return 0;
-    }
-    if (!nombre) throw new Error(`Falta el nombre. Uso: agentrelay cuenta ${servicio} ${accion} <nombre>`);
-    const executor = executorDe(servicio, config);
-    if (accion === 'add') {
-      if (servicio === 'gemini' && !await isInstalled('gemini', { dir: executorsDir() })) throw new Error('Gemini CLI no está instalado. Instálalo con: agentrelay executors add gemini');
-      if (listarCuentas(servicio).includes(nombre)) throw new Error(`La cuenta "${nombre}" ya existe. Para iniciar sesión otra vez, bórrala y vuelve a añadirla.`);
-      crearCuenta(servicio, nombre);
-      out(servicio === 'luna'
-        ? 'Inicia sesión con la otra cuenta de ChatGPT en el navegador.'
-        : 'Se abre Gemini CLI: elige «Sign in with Google» con la otra cuenta y sal con /quit.');
-      const adapter = getExecutor(executor.type);
-      await adapter.login(executor, { device: Boolean(values.device), env: entornoCuenta(servicio, nombre) });
-      const estado = await sesion(servicio, nombre, executor);
-      if (estado === 'sin sesión') {
-        borrarCuenta(servicio, nombre);
-        throw new Error('No se completó el inicio de sesión; no se ha creado la cuenta.');
+    const conGemini = await isInstalled('gemini', { dir: executorsDir() });
+
+    if (primero === 'nueva') {
+      if (!SERVICIOS.includes(segundo)) throw new Error('Indica cuál: agentrelay cuenta nueva luna   o   agentrelay cuenta nueva gemini');
+      if (segundo === 'gemini' && !conGemini) throw new Error('Gemini CLI no está instalado. Instálalo con: agentrelay executors add gemini');
+      const cuenta = nombreLibre(segundo);
+      crearCuenta(segundo, cuenta);
+      try {
+        await iniciarSesion(segundo, cuenta, config, values, out);
+      } finally {
+        const [fila] = (await listarTodas(config, { geminiInstalado: conGemini })).filter((f) => f.servicio === segundo && f.cuenta === cuenta);
+        if (!fila?.ok) {
+          borrarCuenta(segundo, cuenta);
+          err('No se completó el inicio de sesión; no se ha añadido ninguna cuenta.');
+        } else {
+          activarCuenta(segundo, cuenta);
+          out(`✔ Añadida y en uso: ${fila.correo || cuenta} (${fila.estado}). Para volver a otra: agentrelay cuenta`);
+        }
       }
-      activarCuenta(servicio, nombre);
-      out(`✔ Cuenta "${nombre}" añadida y activa (${estado}). Vuelve a la de siempre con: agentrelay cuenta ${servicio} use ${PRINCIPAL}`);
       return 0;
     }
-    if (accion === 'use') {
-      activarCuenta(servicio, nombre);
-      out(`✔ ${TITULO[servicio]}: ahora se usa la cuenta "${nombre}".`);
+
+    const filas = await listarTodas(config, { geminiInstalado: conGemini });
+    const buscar = (texto) => {
+      const fila = filas.find((f) => String(f.n) === String(texto));
+      if (!fila) throw new Error(`No hay ninguna cuenta con el número ${texto}. Mira la lista con: agentrelay cuenta`);
+      return fila;
+    };
+
+    if (primero === 'quitar') {
+      const fila = buscar(segundo);
+      if (fila.cuenta === PRINCIPAL) throw new Error('La cuenta principal no se quita desde AgentRelay (es la sesión normal de Codex o Gemini).');
+      borrarCuenta(fila.servicio, fila.cuenta);
+      out(`✔ Quitada ${fila.correo || fila.cuenta} y su sesión guardada.`);
       return 0;
     }
-    if (accion === 'remove') {
-      borrarCuenta(servicio, nombre);
-      out(`✔ Cuenta "${nombre}" borrada (con su sesión guardada). Activa: ${cuentaActiva(servicio)}.`);
+    if (primero) {
+      await usar(buscar(primero), config, values, out);
       return 0;
     }
-    throw new Error(`Acción desconocida: ${accion}. Usa add, use o remove.`);
+
+    pintar(filas, out, conGemini);
+    const respuesta = await preguntar('\n¿Qué cuenta quieres usar? (número, Enter para salir) ');
+    if (respuesta) await usar(buscar(respuesta), config, values, out);
+    return 0;
   } catch (error) {
     err(error.message);
     return 1;

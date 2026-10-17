@@ -305,17 +305,17 @@ const COMMANDS = {
   },
   cuenta: {
     summary: 'Muestra, añade y cambia las cuentas gratuitas de Luna y Gemini.',
-    usage: ['agentrelay cuenta', 'agentrelay cuenta <luna|gemini> add|use|remove <nombre>'],
-    description: 'Permite tener varias cuentas de ChatGPT (Luna) y de Google (Gemini), cada una con su propia sesión en una carpeta de AgentRelay, y elegir cuál se usa. «principal» es la cuenta de siempre (~/.codex y ~/.gemini). Cada cuenta lleva su propio registro de cuota. Las sesiones de OpenCode no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.',
+    usage: ['agentrelay cuenta', 'agentrelay cuenta <número>', 'agentrelay cuenta nueva <luna|gemini>', 'agentrelay cuenta quitar <número>'],
+    description: 'Lista numerada de tus cuentas de ChatGPT (Luna) y de Google (Gemini), con su correo, lo que queda de cuota y cuál está en uso; en un terminal pregunta qué número usar. Elegir una cuenta con la sesión caducada abre el inicio de sesión. Cada cuenta extra guarda su sesión en una carpeta propia de AgentRelay y tiene su propio registro de cuota. Las sesiones de OpenCode no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.',
     options: [
-      ['--device', 'Con luna add, inicia sesión con el código de dispositivo.'],
+      ['--device', 'Con una cuenta de Luna, inicia sesión con el código de dispositivo.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],
     examples: [
-      ['agentrelay cuenta', 'Lista las cuentas de Luna y Gemini, cuál está activa y su sesión.'],
-      ['agentrelay cuenta gemini add trabajo', 'Inicia sesión con otra cuenta de Google y la deja activa.'],
-      ['agentrelay cuenta luna use principal', 'Vuelve a la cuenta de ChatGPT de siempre.'],
+      ['agentrelay cuenta', 'Muestra las cuentas numeradas y pregunta cuál usar.'],
+      ['agentrelay cuenta 2', 'Usa la cuenta número 2.'],
+      ['agentrelay cuenta nueva gemini', 'Entra con otra cuenta de Google y la deja en uso.'],
     ],
   },
   cuota: {
