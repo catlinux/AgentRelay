@@ -53,7 +53,8 @@ async function estadoGemini(cuenta, now) {
   return {
     correo: session.email,
     ok: true,
-    estado: quota.ok ? resumen(quota.models.map((m) => ({ pct: m.remainingPercent, resetAt: m.resetAt })), now) || 'con sesión' : 'con sesión',
+    // Si la cuota no se puede leer, se dice por qué (p. ej. Google ya no admite la cuenta en Gemini CLI).
+    estado: quota.ok ? resumen(quota.models.map((m) => ({ pct: m.remainingPercent, resetAt: m.resetAt })), now) || 'con sesión' : `sin cuota: ${quota.message}`,
   };
 }
 
