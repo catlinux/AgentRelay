@@ -18,14 +18,9 @@ process.env.GIT_CONFIG_COUNT = String(gitConfigCount + 1);
 process.env[`GIT_CONFIG_KEY_${gitConfigCount}`] = 'safe.directory';
 process.env[`GIT_CONFIG_VALUE_${gitConfigCount}`] = '*';
 
-/**
- * Carpeta de ejecutores con un Gemini CLI de mentira: setup instala Gemini si falta, y los tests
- * no deben instalar nada de verdad ni tocar ~/.agentrelay del usuario.
- */
+/** Carpeta de ejecutores temporal: los tests nunca instalan nada ni tocan ~/.agentrelay del usuario. */
 export function fakeExecutorsDir(dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-ex-'))) {
-  const bin = path.join(dir, 'node_modules', '.bin');
-  mkdirSync(bin, { recursive: true });
-  for (const name of ['gemini', 'gemini.cmd']) writeFileSync(path.join(bin, name), '');
+  mkdirSync(dir, { recursive: true });
   return dir;
 }
 if (!process.env.AGENTRELAY_EXECUTORS_DIR) process.env.AGENTRELAY_EXECUTORS_DIR = fakeExecutorsDir();

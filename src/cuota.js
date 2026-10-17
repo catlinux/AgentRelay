@@ -1,14 +1,12 @@
 // `agentrelay cuota`: estado en directo de las IA gratuitas (cuánto queda y cuándo se renueva).
 //
-// Luna se consulta al servidor local de Codex y Gemini a la API de cuota de Google; ninguna
-// consulta gasta peticiones del modelo. Los gratuitos de OpenCode no publican su cuota: de ellos
+// Luna se consulta en directo al servidor local de Codex, sin gastar peticiones del modelo.
+// Antigravity y los gratuitos de OpenCode no publican su cuota fuera de su propia ventana: de ellos
 // solo se sabe lo que dejó registrado el último error (src/quota-state.js).
 
 import { loadConfig } from './config.js';
-import { isInstalled } from './executors/catalog.js';
 import { readRateLimits } from './executors/codex.js';
-import { correoLuna, cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
-import { accountEmail, readQuota as readGeminiQuota } from './executors/gemini.js';
+import { correoLuna, cuentaActiva, entornoCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
 import { quotaGroup } from './executors/antigravity.js';
 import { getQuotaState } from './quota-state.js';
 
@@ -48,11 +46,9 @@ function recordedState(quotaId, now) {
  */
 export async function collectQuotas({ config, now = new Date(), readers = {} } = {}) {
   const readLuna = readers.luna ?? ((cuenta) => readRateLimits(config.executor.type === 'codex' ? config.executor : { command: 'codex' }, { env: entornoCuenta('luna', cuenta) }));
-  const geminiInstalled = readers.geminiInstalled ?? (() => isInstalled('gemini'));
-  const readGemini = readers.gemini ?? ((cuenta) => readGeminiQuota({ dir: geminiDirCuenta(cuenta) }));
   const cuentas = readers.cuentas ?? ((servicio) => listarCuentas(servicio));
   const activa = readers.activa ?? ((servicio) => cuentaActiva(servicio));
-  const correo = readers.correo ?? ((servicio, cuenta) => (servicio === 'luna' ? correoLuna(cuenta) : accountEmail({ dir: geminiDirCuenta(cuenta) })));
+  const correo = readers.correo ?? ((servicio, cuenta) => correoLuna(cuenta));
   // Con varias cuentas se muestra el correo de cada una y cuál está en uso.
   const etiqueta = (servicio, cuenta) => {
     if (cuentas(servicio).length < 2) return '';
@@ -72,24 +68,6 @@ export async function collectQuotas({ config, now = new Date(), readers = {} } =
       })) : [],
       registro: recordedState(quotaIdCuenta('luna', cuenta), now),
     });
-  }
-
-  const usesGemini = (config.routing?.freeOrder ?? []).some((spec) => spec.startsWith('gemini:')) || config.executor.type === 'gemini';
-  if (usesGemini || await geminiInstalled()) {
-    const installed = await geminiInstalled();
-    for (const cuenta of cuentas('gemini')) {
-      const gemini = installed ? await readGemini(cuenta) : { ok: false, message: 'no instalado (agentrelay executors add gemini)' };
-      result.push({
-        id: cuenta === PRINCIPAL ? 'gemini' : `gemini@${cuenta}`,
-        nombre: `Gemini · cuenta de Google${etiqueta('gemini', cuenta)}`,
-        ok: gemini.ok,
-        mensaje: gemini.ok ? (gemini.tier ? `plan ${gemini.tier}` : '') : gemini.message,
-        ventanas: gemini.ok ? gemini.models.map((m) => ({
-          nombre: m.model, quedaPct: m.remainingPercent, quedan: m.remaining, limite: m.limit, resetAt: m.resetAt,
-        })) : [],
-        registro: recordedState(quotaIdCuenta('gemini', cuenta), now),
-      });
-    }
   }
 
   // Antigravity no ofrece consulta de cuota fuera de su ventana: se muestra lo registrado y cómo verla.

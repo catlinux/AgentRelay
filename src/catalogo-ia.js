@@ -74,8 +74,6 @@ export function resolverPago(texto) {
 export function resolverGratuito(texto) {
   const antigravity = /^(?:antigravity|agy)(?::(\S+))?$/.exec(String(texto).trim());
   if (antigravity) return `antigravity:${antigravity[1] || 'auto'}`;
-  const gemini = /^gemini(?::(\S+))?$/.exec(String(texto).trim());
-  if (gemini) return `gemini:${gemini[1] || 'auto'}`;
   let valor = String(texto).trim().replace(/^opencode:/, '');
   if (!valor.includes('/')) valor = `opencode-go/${valor.endsWith('-free') ? valor : `${valor}-free`}`;
   if (!esGratuito(valor)) {

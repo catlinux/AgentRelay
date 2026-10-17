@@ -1,6 +1,6 @@
 ---
-description: Muestra y cambia las cuentas gratuitas de Luna y Gemini
-argument-hint: [número | nueva luna|gemini | quitar número]
+description: Muestra y cambia las cuentas de ChatGPT que usa Luna
+argument-hint: [número | nueva | quitar número]
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku

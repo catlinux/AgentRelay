@@ -185,8 +185,8 @@ const COMMANDS = {
   },
   login: {
     summary: 'Conecta una cuenta del ejecutor o configura el respaldo por API de pago.',
-    usage: ['agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device]'],
-    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
+    usage: ['agentrelay login [antigravity | opencode | --api [--remove]] [--device]'],
+    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
     options: [
       ['--device', 'Usa el código de dispositivo.'],
       ['--browser', 'Fuerza el inicio de sesión con navegador.'],
@@ -198,7 +198,6 @@ const COMMANDS = {
     examples: [
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
       ['agentrelay login antigravity', 'Conecta tu cuenta de Google en Antigravity (Gemini y Claude con cuota semanal gratuita).'],
-      ['agentrelay login gemini', 'Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).'],
       ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],
       ['agentrelay login --api', 'Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.'],
@@ -287,9 +286,9 @@ const COMMANDS = {
   },
 
   cuenta: {
-    summary: 'Muestra, añade y cambia las cuentas gratuitas de Luna y Gemini.',
-    usage: ['agentrelay cuenta', 'agentrelay cuenta <número>', 'agentrelay cuenta nueva <luna|gemini>', 'agentrelay cuenta quitar <número>'],
-    description: 'Lista numerada de tus cuentas de ChatGPT (Luna) y de Google (Gemini), con su correo, lo que queda de cuota y cuál está en uso; en un terminal pregunta qué número usar. Elegir una cuenta con la sesión caducada abre el inicio de sesión. Cada cuenta extra guarda su sesión en una carpeta propia de AgentRelay y tiene su propio registro de cuota. Las sesiones de OpenCode no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.',
+    summary: 'Muestra, añade y cambia las cuentas de ChatGPT que usa Luna.',
+    usage: ['agentrelay cuenta', 'agentrelay cuenta <número>', 'agentrelay cuenta nueva', 'agentrelay cuenta quitar <número>'],
+    description: 'Lista numerada de tus cuentas de ChatGPT para Luna, con su correo, lo que queda de cuota y cuál está en uso; en un terminal pregunta qué número usar. Elegir una cuenta sin sesión abre el inicio de sesión. Cada cuenta extra guarda su sesión en una carpeta propia de AgentRelay y tiene su propio registro de cuota. Las sesiones de OpenCode y Antigravity no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.',
     options: [
       ['--device', 'Con una cuenta de Luna, inicia sesión con el código de dispositivo.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
@@ -298,20 +297,20 @@ const COMMANDS = {
     examples: [
       ['agentrelay cuenta', 'Muestra las cuentas numeradas y pregunta cuál usar.'],
       ['agentrelay cuenta 2', 'Usa la cuenta número 2.'],
-      ['agentrelay cuenta nueva gemini', 'Entra con otra cuenta de Google y la deja en uso.'],
+      ['agentrelay cuenta nueva', 'Entra con otra cuenta de ChatGPT y la deja en uso.'],
     ],
   },
   cuota: {
     summary: 'Muestra cuánto queda de cada IA gratuita y cuándo se renueva.',
     usage: ['agentrelay cuota [--json]'],
-    description: 'Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.',
+    description: 'Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) con el porcentaje que queda y la hora de renovación. De Antigravity muestra si está agotada según el último error (el porcentaje exacto solo se ve con /usage dentro de agy).',
     options: [
       ['--json', 'Imprime el estado en JSON.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
       ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
     ],
     examples: [
-      ['agentrelay cuota', 'Muestra lo que queda de Luna y Gemini y cuándo se renueva.'],
+      ['agentrelay cuota', 'Muestra lo que queda de Luna y el estado de Antigravity.'],
     ],
   },
 

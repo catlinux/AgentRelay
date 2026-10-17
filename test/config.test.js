@@ -132,7 +132,7 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     });
     assert.ok(!result.warnings.some((warning) => warning.includes('routing')));
     writeFileSync(file, JSON.stringify({ routing: { freeOrder: ['codex:model'] } }));
-    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.freeOrder debe ser una lista de entradas antigravity:modelo, gemini:modelo u opencode:modelo válidas/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.freeOrder debe ser una lista de entradas antigravity:modelo u opencode:modelo válidas/);
     writeFileSync(file, JSON.stringify({ routing: { paidOrder: ['cline:deepseek/model'] } }));
     assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.paidOrder debe ser una lista de entradas tipo:modelo válidas/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -241,5 +241,17 @@ test('doctor muestra avisos de configuración sin cambiar su código de salida',
     });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /\[aviso\].*modle.*model/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('una configuración con Gemini CLI (retirado) se lee sin fallar y avisa', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-gemini-retirado-'));
+  try {
+    writeFileSync(path.join(dir, 'agentrelay.config.json'), JSON.stringify({ executor: { type: 'gemini', model: 'auto' }, routing: { freeOrder: ['gemini:auto', 'antigravity:auto'] } }));
+    const result = loadConfig({ cwd: dir, home: path.join(dir, 'home') });
+    assert.equal(result.config.executor.type, 'codex');
+    assert.deepEqual(result.config.routing.freeOrder, ['antigravity:auto']);
+    assert.ok(result.warnings.some((w) => /Gemini CLI se ha retirado.*executor\.type/.test(w)));
+    assert.ok(result.warnings.some((w) => /Gemini CLI se ha retirado.*freeOrder/.test(w)));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

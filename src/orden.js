@@ -37,7 +37,6 @@ function mostrar(loaded, out, now = new Date()) {
     const estado = estadoDe(entry, now);
     const spec = entry.api ? `codex-api:${entry.model}` : entry.type === 'opencode' ? `opencode:${entry.model}` : null;
     const nombre = entry.type === 'antigravity' ? `Antigravity · cuenta de Google (${entry.model === 'auto' ? 'Gemini' : entry.model})`
-      : entry.type === 'gemini' ? `Gemini · cuenta de Google${entry.model === 'auto' ? '' : ` (${entry.model})`}`
       : spec && !gratis.has(entry.model) ? nombreDeRuta(spec) : (entry.type === 'codex' && !entry.api ? 'Luna · cuenta de ChatGPT (Codex)' : entry.model);
     out(`  ${index + 1}. ${nombre} · ${tipo}${estado ? ` · ${estado}` : ''}`);
   });

@@ -34,16 +34,6 @@ export const CATALOG = [
     connect: 'agentrelay login antigravity',
   },
   {
-    name: 'gemini',
-    title: 'Gemini CLI (Google)',
-    description: 'Gemini con cuenta de Google. Desde junio de 2026 Google ya no lo admite con cuentas personales gratuitas: solo con licencia de empresa.',
-    bundled: false,
-    cost: 'cuenta de Google',
-    // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).
-    npmPackage: '@google/gemini-cli@0',
-    connect: 'agentrelay login gemini',
-  },
-  {
     name: 'opencode',
     title: 'OpenCode',
     description: 'Con los modelos gratuitos de OpenCode (p. ej. opencode/nemotron-3-ultra-free).',
@@ -86,8 +76,8 @@ export async function isInstalled(name, options = {}) {
   }
   if (!entry.npmPackage) return Boolean(findOnPath(entry.name, options));
   const dir = options.dir || executorsDir(options.env, options.home);
-  if (name === 'opencode' || name === 'gemini') {
-    const link = path.join(dir, 'node_modules', '.bin', `${name}${(options.platform || process.platform) === 'win32' ? '.cmd' : ''}`);
+  if (name === 'opencode') {
+    const link = path.join(dir, 'node_modules', '.bin', `opencode${(options.platform || process.platform) === 'win32' ? '.cmd' : ''}`);
     if ((options.exists || existsSync)(link)) return true;
     return Boolean(findOnPath(entry.name, options));
   }
