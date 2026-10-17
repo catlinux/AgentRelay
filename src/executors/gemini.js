@@ -211,7 +211,7 @@ export async function login(executor, { env = entornoCuenta('gemini'), dir = gem
   if (existsSync(creds) && (await checkSession({ dir })).expired) {
     try { renameSync(creds, path.join(dir, 'oauth_creds.caducado.json')); } catch { /* Se intenta igualmente. */ }
   }
-  const res = await runInteractive(command, prefix, { env: { ...GOOGLE_LOGIN_ENV, ...env } });
+  const res = await runInteractive(command, [...prefix, '--skip-trust'], { env: { ...GOOGLE_LOGIN_ENV, ...env } });
   return res.code;
 }
 
