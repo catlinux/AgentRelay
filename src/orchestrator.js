@@ -474,6 +474,12 @@ async function preflight(config) {
 /** Inicia una ejecución nueva para una tarea. */
 export async function startRun({ root, task, config, allowDirty = false, onEvent }) {
   // Las guías de "references" se comprueban antes de gastar nada: una ruta mal escrita es un error del orquestador.
+  // Solo archivos del propio repositorio: una guía fuera de él (../, ruta absoluta) haría leer al ejecutor archivos ajenos.
+  const outside = (task.references ?? []).filter((file) => {
+    const relative = path.relative(root, path.resolve(root, file));
+    return path.isAbsolute(file) || relative.startsWith('..') || path.isAbsolute(relative);
+  });
+  if (outside.length) throw new Error(`"references" solo admite archivos del repositorio: ${outside.join(', ')}`);
   const missing = (task.references ?? []).filter((file) => !existsSync(path.resolve(root, file)));
   if (missing.length) throw new Error(`No existen estos archivos de "references": ${missing.join(', ')}`);
   const pending = await pendingChanges(root);

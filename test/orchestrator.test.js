@@ -326,6 +326,8 @@ test('references: el ejecutor recibe las guías en el prompt, no puede tocarlas 
   try {
     await assert.rejects(run(repo, { task: { references: ['docs/no-existe.md'] }, plan: { implement: GOOD } }), /No existen estos archivos de "references": docs\/no-existe\.md/);
     assert.deepEqual(listRunIds(repo.dir), [], 'no se crea ninguna ejecución');
+    await assert.rejects(run(repo, { task: { references: ['../fuera.md'] }, plan: { implement: GOOD } }), /solo admite archivos del repositorio: \.\.\/fuera\.md/);
+    await assert.rejects(run(repo, { task: { references: [path.join(os.tmpdir(), 'x.md')] }, plan: { implement: GOOD } }), /solo admite archivos del repositorio/);
 
     writeFileSync(path.join(repo.dir, 'guia.md'), 'Usa siempre minúsculas.\n');
     git(repo.dir, 'add', 'guia.md');
