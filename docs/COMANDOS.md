@@ -13,7 +13,6 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 | Dejar AgentRelay listo en un equipo nuevo | `agentrelay setup` |
 | Actualizar AgentRelay | `agentrelay update --yes` |
 | Conectar la cuenta de ChatGPT (Luna) | `agentrelay login` |
-| Conectar la cuenta de Google (Gemini) | `agentrelay login gemini` |
 | Saber cuánto me queda de cada IA gratuita | `agentrelay cuota` |
 | Ver mis cuentas y cambiar de una a otra | `agentrelay cuenta` |
 | Añadir otra cuenta de ChatGPT o de Google | `agentrelay cuenta nueva luna` · `agentrelay cuenta nueva gemini` |
@@ -26,11 +25,10 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 ## Primeros pasos en un equipo
 
 ```sh
-agentrelay setup              # instrucciones y comandos /ar: de Claude Code; instala Gemini CLI si falta
+agentrelay setup              # instrucciones y comandos /ar: de Claude Code
 agentrelay login              # cuenta de ChatGPT para Luna (se abre el navegador)
-agentrelay login gemini       # cuenta de Google para Gemini: elige «Sign in with Google» y sal con /quit
-agentrelay set routing auto   # cada tarea va a Luna; si se agota, a Gemini; si también, a la de pago
-agentrelay cuota              # comprueba que ambas responden
+agentrelay set routing auto   # cada tarea va a Luna; si se agota, a la de pago
+agentrelay cuota              # comprueba cuánto queda
 ```
 
 Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code).
@@ -40,7 +38,7 @@ Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code).
 Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA disponible:
 
 1. **Luna** con tu cuenta de ChatGPT (gratis, con una cuota que se renueva sola).
-2. **Gemini** con tu cuenta de Google (gratis, cuota diaria).
+2. Las gratuitas que añadas con `agentrelay orden gratis` (por defecto ninguna).
 3. **La IA de pago** (por defecto DeepSeek V4.1 Flash de OpenCode Go). Si también falla, la tarea se detiene y se te pregunta qué hacer.
 
 `agentrelay cuota` dice en cualquier momento cuánto queda de cada una y cuándo se renueva, sin gastar peticiones. Si una cuenta se agota, puedes cambiar a otra con `agentrelay cuenta` (lista numerada: escribes el número). Cada cuenta lleva su propia cuota. Las sesiones de OpenCode nunca se tocan. Revisa las condiciones de OpenAI y Google antes de usar varias cuentas.
@@ -49,10 +47,10 @@ Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA dis
 
 | Mensaje | Qué hacer |
 |---|---|
-| «Gemini CLI no está instalado» | `agentrelay login gemini` lo instala solo; también `agentrelay executors add gemini` |
+| «This client is no longer supported for Gemini Code Assist for individuals» | Google cerró Gemini CLI gratis para cuentas personales (junio de 2026); solo funciona con licencia de empresa. Se estudia Antigravity CLI como sustituto |
 | «La sesión de Google … ha caducado» o `invalid_grant` | `agentrelay login gemini` y vuelve a entrar con Google |
 | Gemini pregunta «Do you trust the files in this folder?» | Elige «Don't trust»: no hace falta para iniciar sesión |
-| Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a Gemini |
+| Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a la de pago |
 | «sin sesión de ChatGPT» | `agentrelay login` |
 
 ---
@@ -67,7 +65,7 @@ Instala las instrucciones globales y los comandos de Claude Code. En el chat de 
 agentrelay setup [opciones]
 ```
 
-Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Instala también Gemini CLI si falta (es la segunda IA gratuita del enrutado) y ofrece conectar las cuentas de ChatGPT y de Google. También puede retirar la instalación o instalar ejecutores opcionales.
+Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Ofrece conectar la cuenta de ChatGPT (y la de Google si Gemini CLI está instalado). También puede retirar la instalación o instalar ejecutores opcionales.
 
 | Opción | Qué hace |
 |---|---|
@@ -284,7 +282,7 @@ Sin argumento, inicia sesión con Codex usando el navegador o el código de disp
 Ejemplos:
 
 - `agentrelay login`: Inicia sesión con el método disponible.
-- `agentrelay login gemini`: Conecta tu cuenta de Google para usar Gemini gratis.
+- `agentrelay login gemini`: Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).
 - `agentrelay login opencode`: Abre el asistente para conectar una cuenta de OpenCode.
 - `agentrelay login --device`: Inicia sesión usando el código de dispositivo.
 - `agentrelay login --api`: Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.
@@ -323,7 +321,7 @@ Muestra cuánto queda de cada IA gratuita y cuándo se renueva. En el chat de Cl
 agentrelay cuota [--json]
 ```
 
-Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: ventana de 5 h y semanal) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.
+Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.
 
 | Opción | Qué hace |
 |---|---|

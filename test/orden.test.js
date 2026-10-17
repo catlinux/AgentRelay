@@ -31,16 +31,15 @@ function entorno() {
   };
 }
 
-test('sin argumentos muestra el orden efectivo: Luna gratis, Gemini gratis y pago', () => {
+test('sin argumentos muestra el orden efectivo: Luna gratis y pago', () => {
   const env = entorno();
   try {
     writeFileSync(path.join(env.home, 'config.json'), '{\n  "routing": {\n    "mode": "auto"\n  }\n}\n');
     assert.equal(env.ejecutar(), 0);
     const texto = env.texto();
     assert.match(texto, /1\. Luna · cuenta de ChatGPT \(Codex\) · gratis/);
-    assert.match(texto, /2\. Gemini · cuenta de Google · gratis/);
-    assert.match(texto, /3\. DeepSeek Flash · suscripción de OpenCode Go · de pago/);
-    assert.doesNotMatch(texto, /4\. /);
+    assert.match(texto, /2\. DeepSeek Flash · suscripción de OpenCode Go · de pago/);
+    assert.doesNotMatch(texto, /3\. /);
   } finally { env.limpiar(); }
 });
 
@@ -57,7 +56,7 @@ test('pago con un solo nombre cambia la IA de pago y no deja otras detrás', () 
   try {
     assert.equal(env.ejecutar('pago', 'deepseek-pro-go'), 0, env.errores.join('\n'));
     assert.deepEqual(env.config().routing.paidOrder, ['opencode:opencode-go/deepseek-v4-pro']);
-    assert.deepEqual(env.config().routing.freeOrder, ['gemini:auto']);
+    assert.deepEqual(env.config().routing.freeOrder, []);
   } finally { env.limpiar(); }
 });
 
@@ -91,7 +90,7 @@ test('reset vuelve al orden por defecto y los comentarios del archivo se conserv
     assert.equal(env.ejecutar('reset'), 0, env.errores.join('\n'));
     const defecto = loadConfig({ cwd: env.cwd }).config.routing;
     assert.deepEqual(env.config().routing.paidOrder, defecto.paidOrder);
-    assert.ok(env.config().routing.freeOrder.includes('gemini:auto'));
+    assert.deepEqual(env.config().routing.freeOrder, []);
     assert.match(readFileSync(path.join(env.home, 'config.json'), 'utf8'), /\/\/ mi comentario/);
   } finally { env.limpiar(); }
 });

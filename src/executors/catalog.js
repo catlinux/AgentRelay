@@ -27,7 +27,7 @@ export const CATALOG = [
   {
     name: 'gemini',
     title: 'Gemini CLI (Google)',
-    description: 'Usa tu cuenta de Google, sin clave de API: el plan gratuito de Gemini Code Assist da una cuota diaria.',
+    description: 'Gemini con cuenta de Google. Desde junio de 2026 Google ya no lo admite con cuentas personales gratuitas: solo con licencia de empresa.',
     bundled: false,
     cost: 'cuenta de Google',
     // Sin "^": proc.js rechaza ese carácter en Windows (metacarácter de cmd.exe).

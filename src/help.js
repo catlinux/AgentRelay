@@ -197,7 +197,7 @@ const COMMANDS = {
     ],
     examples: [
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
-      ['agentrelay login gemini', 'Conecta tu cuenta de Google para usar Gemini gratis.'],
+      ['agentrelay login gemini', 'Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).'],
       ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],
       ['agentrelay login --api', 'Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.'],
@@ -207,7 +207,7 @@ const COMMANDS = {
   setup: {
     summary: 'Instala las instrucciones globales y los comandos de Claude Code.',
     usage: ['agentrelay setup [opciones]'],
-    description: 'Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Instala también Gemini CLI si falta (es la segunda IA gratuita del enrutado) y ofrece conectar las cuentas de ChatGPT y de Google. También puede retirar la instalación o instalar ejecutores opcionales.',
+    description: 'Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Ofrece conectar la cuenta de ChatGPT (y la de Google si Gemini CLI está instalado). También puede retirar la instalación o instalar ejecutores opcionales.',
     options: [
       ['--uninstall', 'Retira las instrucciones, comandos y hook de Claude Code.'],
       ['--no-commands', 'No instala los comandos de Claude Code.'],
@@ -321,7 +321,7 @@ const COMMANDS = {
   cuota: {
     summary: 'Muestra cuánto queda de cada IA gratuita y cuándo se renueva.',
     usage: ['agentrelay cuota [--json]'],
-    description: 'Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: ventana de 5 h y semanal) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.',
+    description: 'Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.',
     options: [
       ['--json', 'Imprime el estado en JSON.'],
       ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],

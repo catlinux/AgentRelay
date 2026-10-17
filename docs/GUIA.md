@@ -85,7 +85,7 @@ agentrelay set routing off --local    # para desactivarlo
 Cada tarea empieza por el primero disponible de esta lista:
 
 1. Luna con la cuota gratuita de ChatGPT (solo si Codex está conectado con tu cuenta; con clave de API se salta, porque se factura).
-2. Las gratuitas de `routing.freeOrder`, en el orden que tú fijes: por defecto solo Gemini con tu cuenta de Google (`gemini:auto`). Puedes añadir modelos `-free` de OpenCode Go con `agentrelay orden gratis gemini cat-jam`.
+2. Las gratuitas de `routing.freeOrder`, si añades alguna (por defecto ninguna): modelos `-free` de OpenCode Go con `agentrelay orden gratis cat-jam`. Gemini CLI ya no funciona gratis con cuentas personales (Google lo cerró en junio de 2026); se está estudiando Antigravity CLI como sustituto.
 3. La de pago de `routing.paidOrder`: por defecto solo DeepSeek V4.1 Flash de OpenCode Go (limitada por tu suscripción). Se cambia con `agentrelay orden pago <nombre>`.
 
 Cada **gratuita** se prueba dos veces seguidas (con 5 s de pausa) si falla por cuota, saldo, límite de velocidad o un fallo pasajero de conexión, y a la segunda salta a la siguiente; si el error ya dice cuándo se restablece la cuota, salta sin reintentar. La **IA de pago** se prueba hasta tres veces (pausas de 5 y 15 s) solo ante un fallo pasajero (límite de velocidad, red, 502/503/504, saturación); un error definitivo (saldo insuficiente, credenciales, modelo inexistente) la detiene a la primera. Si la IA de pago sigue fallando, la tarea **se detiene y se te pregunta qué IA usar**: nunca continúa sola con otra. La siguiente tarea vuelve a empezar por los gratuitos.

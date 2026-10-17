@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
   routing: {
     mode: 'off',
-    freeOrder: ['gemini:auto'],
+    freeOrder: [],
     paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'],
     maxSwitches: 5,
   },
