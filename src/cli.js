@@ -77,7 +77,7 @@ Uso:
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
-  agentrelay login [gemini | opencode | --api [--remove]] [--device] Conecta la cuenta del ejecutor o configura el respaldo por API
+  agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device] Conecta la cuenta del ejecutor o configura el respaldo por API
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
@@ -1001,10 +1001,11 @@ async function cmdLogin(positionals, values) {
     return 1;
   }
   if (positionals.length === 1 && positionals[0] === 'gemini') return loginGemini(values);
+  if (positionals.length === 1 && ['antigravity', 'agy'].includes(positionals[0])) return loginAntigravity();
   if (positionals.length) {
     if (positionals.length !== 1 || positionals[0] !== 'opencode') {
       const executorName = positionals[0] === 'opencode' ? positionals.slice(1).join(' ') : positionals[0];
-      process.stderr.write(`Ejecutor no admitido para login: ${executorName}. Usa: agentrelay login [gemini | opencode]\n`);
+      process.stderr.write(`Ejecutor no admitido para login: ${executorName}. Usa: agentrelay login [antigravity | gemini | opencode]\n`);
       return 1;
     }
     const cwd = path.resolve(values.cwd || process.cwd());
@@ -1053,6 +1054,30 @@ async function cmdLogin(positionals, values) {
     return 0;
   }
   return signIn(adapter, executor, { device: values.device, browser: values.browser, showAccountHint: !values.quiet });
+}
+
+/** Abre Antigravity CLI para iniciar sesión con Google y confirma que quedó guardada. */
+async function loginAntigravity() {
+  const adapter = getExecutor('antigravity');
+  const executor = { ...EXECUTOR_DEFAULTS.antigravity, type: 'antigravity' };
+  if (!await isInstalled('antigravity')) {
+    process.stderr.write(`Antigravity CLI no está instalado. ${adapter.installHint}\nDespués, vuelve a ejecutar: agentrelay login antigravity\n`);
+    return 1;
+  }
+  const current = await adapter.authStatus(executor);
+  if (current.ok) {
+    process.stdout.write(`✔ ${current.message}. Para ver la cuota: agentrelay cuota\n`);
+    return 0;
+  }
+  process.stdout.write('Se abre Antigravity CLI: elige «1. Google OAuth», entra con tu cuenta en el navegador, responde «Yes» a la carpeta (es una carpeta vacía de AgentRelay) y sal con /quit o Ctrl+C.\n');
+  await adapter.login(executor);
+  const auth = await adapter.authStatus(executor);
+  if (auth.ok) {
+    process.stdout.write(`✔ ${auth.message}. Actívalo en el enrutado con: agentrelay set routing auto\n`);
+    return 0;
+  }
+  process.stderr.write(`No se pudo conectar Antigravity: ${auth.message}\n`);
+  return 1;
 }
 
 /** Abre Gemini CLI para iniciar sesión con Google y confirma que quedó guardada. */

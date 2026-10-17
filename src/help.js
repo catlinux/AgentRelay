@@ -185,8 +185,8 @@ const COMMANDS = {
   },
   login: {
     summary: 'Conecta una cuenta del ejecutor o configura el respaldo por API de pago.',
-    usage: ['agentrelay login [gemini | opencode | --api [--remove]] [--device]'],
-    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
+    usage: ['agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device]'],
+    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
     options: [
       ['--device', 'Usa el código de dispositivo.'],
       ['--browser', 'Fuerza el inicio de sesión con navegador.'],
@@ -197,6 +197,7 @@ const COMMANDS = {
     ],
     examples: [
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
+      ['agentrelay login antigravity', 'Conecta tu cuenta de Google en Antigravity (Gemini y Claude con cuota semanal gratuita).'],
       ['agentrelay login gemini', 'Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).'],
       ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],

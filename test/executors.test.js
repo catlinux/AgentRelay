@@ -132,7 +132,7 @@ test('use --list muestra el estado, el ejecutor activo y una instalación del di
     assert.match(codex.stdout, /Codex ya viene incluido con AgentRelay/);
     const unknown = cli(cwd, ['executors', 'add', 'foo'], env);
     assert.equal(unknown.status, 1);
-    assert.match(unknown.stderr, /codex, gemini, opencode/);
+    assert.match(unknown.stderr, /codex, antigravity, gemini, opencode/);
     const retired = cli(cwd, ['executors', 'add', 'cline'], env);
     assert.equal(retired.status, 1);
     assert.match(retired.stderr, /Ejecutor desconocido: cline[\s\S]*Cline se retiró; usa: agentrelay use opencode deepseek\/deepseek-flash/);

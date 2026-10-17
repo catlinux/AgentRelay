@@ -13,6 +13,7 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 | Dejar AgentRelay listo en un equipo nuevo | `agentrelay setup` |
 | Actualizar AgentRelay | `agentrelay update --yes` |
 | Conectar la cuenta de ChatGPT (Luna) | `agentrelay login` |
+| Conectar la cuenta de Google (Antigravity) | `agentrelay login antigravity` |
 | Saber cuánto me queda de cada IA gratuita | `agentrelay cuota` |
 | Ver mis cuentas y cambiar de una a otra | `agentrelay cuenta` |
 | Añadir otra cuenta de ChatGPT o de Google | `agentrelay cuenta nueva luna` · `agentrelay cuenta nueva gemini` |
@@ -27,7 +28,9 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 ```sh
 agentrelay setup              # instrucciones y comandos /ar: de Claude Code
 agentrelay login              # cuenta de ChatGPT para Luna (se abre el navegador)
-agentrelay set routing auto   # cada tarea va a Luna; si se agota, a la de pago
+curl -fsSL https://antigravity.google/cli/install.sh | bash   # instala Antigravity (Linux y macOS)
+agentrelay login antigravity  # cuenta de Google: elige «Google OAuth» y sal con /quit
+agentrelay set routing auto   # cada tarea va a Luna; si se agota, a Antigravity; si también, a la de pago
 agentrelay cuota              # comprueba cuánto queda
 ```
 
@@ -38,7 +41,7 @@ Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code).
 Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA disponible:
 
 1. **Luna** con tu cuenta de ChatGPT (gratis, con una cuota que se renueva sola).
-2. Las gratuitas que añadas con `agentrelay orden gratis` (por defecto ninguna).
+2. **Antigravity** con tu cuenta de Google (gratis, cuota semanal; Gemini y, en un cupo aparte, Claude y GPT).
 3. **La IA de pago** (por defecto DeepSeek V4.1 Flash de OpenCode Go). Si también falla, la tarea se detiene y se te pregunta qué hacer.
 
 `agentrelay cuota` dice en cualquier momento cuánto queda de cada una y cuándo se renueva, sin gastar peticiones. Si una cuenta se agota, puedes cambiar a otra con `agentrelay cuenta` (lista numerada: escribes el número). Cada cuenta lleva su propia cuota. Las sesiones de OpenCode nunca se tocan. Revisa las condiciones de OpenAI y Google antes de usar varias cuentas.
@@ -47,10 +50,11 @@ Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA dis
 
 | Mensaje | Qué hacer |
 |---|---|
-| «This client is no longer supported for Gemini Code Assist for individuals» | Google cerró Gemini CLI gratis para cuentas personales (junio de 2026); solo funciona con licencia de empresa. Se estudia Antigravity CLI como sustituto |
+| «This client is no longer supported for Gemini Code Assist for individuals» | Google cerró Gemini CLI gratis para cuentas personales (junio de 2026); solo funciona con licencia de empresa. Usa Antigravity: `agentrelay login antigravity` |
+| «Antigravity CLI no está instalado» | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` y abre una terminal nueva |
 | «La sesión de Google … ha caducado» o `invalid_grant` | `agentrelay login gemini` y vuelve a entrar con Google |
 | Gemini pregunta «Do you trust the files in this folder?» | Elige «Don't trust»: no hace falta para iniciar sesión |
-| Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a la de pago |
+| Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a Antigravity |
 | «sin sesión de ChatGPT» | `agentrelay login` |
 
 ---
@@ -265,10 +269,10 @@ Ejemplos:
 Conecta una cuenta del ejecutor o configura el respaldo por API de pago. En el chat de Claude Code: `/ar:login`.
 
 ```
-agentrelay login [gemini | opencode | --api [--remove]] [--device]
+agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device]
 ```
 
-Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.
+Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.
 
 | Opción | Qué hace |
 |---|---|
@@ -282,6 +286,7 @@ Sin argumento, inicia sesión con Codex usando el navegador o el código de disp
 Ejemplos:
 
 - `agentrelay login`: Inicia sesión con el método disponible.
+- `agentrelay login antigravity`: Conecta tu cuenta de Google en Antigravity (Gemini y Claude con cuota semanal gratuita).
 - `agentrelay login gemini`: Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).
 - `agentrelay login opencode`: Abre el asistente para conectar una cuenta de OpenCode.
 - `agentrelay login --device`: Inicia sesión usando el código de dispositivo.

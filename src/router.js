@@ -8,6 +8,7 @@
 import { EXECUTOR_DEFAULTS } from './config.js';
 import { getProvider } from './free-providers.js';
 import { quotaIdCuenta } from './cuentas.js';
+import { quotaGroup } from './executors/antigravity.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
 export const GEMINI_FREE_QUOTA = 'gemini:google';
@@ -52,12 +53,22 @@ export function routeEntries({ config } = {}) {
   entries.push(luna);
   keys.add(luna.key);
   for (const spec of config.routing?.freeOrder ?? []) {
-    const match = /^(opencode|gemini):(\S+)$/.exec(String(spec));
+    const match = /^(opencode|gemini|antigravity):(\S+)$/.exec(String(spec));
     if (!match) continue;
     const [, type, model] = match;
     const key = `${type}:${model}`;
     if (keys.has(key)) continue;
     // Gemini con cuenta de Google: la cuota es de la cuenta, no del modelo.
+    // Antigravity: cuota semanal de la cuenta de Google, con un cupo para Gemini y otro para Claude y GPT.
+    if (type === 'antigravity') {
+      const group = quotaGroup(model);
+      entries.push({
+        key, type, model, api: false, paid: false, quotaId: `antigravity:${group}`, tier: 'A', trainsOnData: true,
+        label: `Antigravity ${model === 'auto' ? 'Gemini' : model} (cuota semanal gratuita de Google)`,
+      });
+      keys.add(key);
+      continue;
+    }
     entries.push(type === 'gemini' ? {
       key, type, model, api: false, paid: false,
       quotaId: quotaIdCuenta('gemini'), tier: 'A', trainsOnData: true, label: `Gemini ${model} (cuota gratuita de Google)`,

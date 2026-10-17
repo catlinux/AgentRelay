@@ -138,3 +138,29 @@ test('gemini: una sesión que Google rechaza (invalid_grant) se da por caducada,
     assert.equal(offline.ok, true, 'sin red no se declara caducada');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('antigravity: argumentos, lectura del JSON final y grupo de cuota', async () => {
+  const { buildArgs: args, parseOutput: parse, quotaGroup } = await import('../src/executors/antigravity.js');
+  assert.deepEqual(args({ model: 'auto', thinking: 'high', timeoutSeconds: 600 }, 'lee x'), [
+    '-p', 'lee x', '--output-format', 'json', '--dangerously-skip-permissions', '--disable-slash-commands', '--effort', 'high', '--print-timeout', '600s',
+  ]);
+  assert.deepEqual(args({ model: 'claude-sonnet' }, 'x').slice(-2), ['--model', 'claude-sonnet']);
+  // Salida real de agy 1.4.0 en modo -p --output-format json.
+  const real = '{"conversation_id":"f4bf1e6d","status":"SUCCESS","response":"hola\\n","duration_seconds":2.43,"num_turns":1,"usage":{"input_tokens":11756,"output_tokens":37,"thinking_tokens":36,"cache_read_tokens":0,"total_tokens":11793}}';
+  const parsed = parse(`aviso previo\n${real}\n`);
+  assert.equal(parsed.status, 'SUCCESS');
+  assert.equal(parsed.text, 'hola\n');
+  assert.deepEqual(parsed.usage, { inputTokens: 11756, outputTokens: 37, cacheReadTokens: 0 });
+  assert.equal(parse('').status, null);
+  assert.equal(quotaGroup('auto'), 'gemini');
+  assert.equal(quotaGroup('Claude Sonnet 4.6'), 'claude');
+  assert.equal(quotaGroup('gpt-oss-120b'), 'claude');
+});
+
+test('enrutado: Antigravity va detrás de Luna con un cupo por grupo de modelos', () => {
+  const entries = routeEntries({ config: config({ freeOrder: ['antigravity:auto', 'antigravity:claude-sonnet'] }) });
+  assert.deepEqual(entries.slice(1, 3).map((e) => [e.key, e.quotaId, e.paid]), [
+    ['antigravity:auto', 'antigravity:gemini', false],
+    ['antigravity:claude-sonnet', 'antigravity:claude', false],
+  ]);
+});

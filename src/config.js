@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   },
   routing: {
     mode: 'off',
-    freeOrder: [],
+    freeOrder: ['antigravity:auto'],
     paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'],
     maxSwitches: 5,
   },
@@ -52,6 +52,7 @@ export const DEFAULT_CONFIG = Object.freeze({
 // puede sobrescribirlos.
 export const EXECUTOR_DEFAULTS = Object.freeze({
   codex: { command: 'codex', provider: null, model: 'gpt-6-luna' },
+  antigravity: { command: 'agy', provider: null, model: 'auto' },
   gemini: { command: 'gemini', provider: null, model: 'auto' },
   opencode: { command: 'opencode', provider: null, model: 'opencode/nemotron-3-ultra-free' },
 });
@@ -266,7 +267,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
   if (!['off', 'auto'].includes(config.routing.mode)) invalid('routing.mode', 'debe ser off o auto');
-  if (!Array.isArray(config.routing.freeOrder) || !config.routing.freeOrder.every((v) => typeof v === 'string' && /^(opencode|gemini):\S+$/.test(v))) invalid('routing.freeOrder', 'debe ser una lista de entradas gemini:modelo u opencode:modelo válidas');
+  if (!Array.isArray(config.routing.freeOrder) || !config.routing.freeOrder.every((v) => typeof v === 'string' && /^(opencode|gemini|antigravity):\S+$/.test(v))) invalid('routing.freeOrder', 'debe ser una lista de entradas antigravity:modelo, gemini:modelo u opencode:modelo válidas');
   if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
   if (!Number.isInteger(config.routing.maxSwitches) || config.routing.maxSwitches < 0 || config.routing.maxSwitches > 20) invalid('routing.maxSwitches', 'debe ser un entero entre 0 y 20');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }
