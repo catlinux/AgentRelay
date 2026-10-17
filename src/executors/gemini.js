@@ -206,9 +206,16 @@ async function postJson(fetchImpl, url, token, body) {
 export function oauthClient({ command = 'gemini', executorsDir } = {}) {
   try {
     const bin = realpathSync(commandParts(command, executorsDir ? { executorsDir } : undefined)[0]);
-    let dir = path.dirname(bin);
-    for (let i = 0; i < 4 && !existsSync(path.join(dir, 'bundle')); i += 1) dir = path.dirname(dir);
-    const bundle = path.join(dir, 'bundle');
+    // Linux/macOS: el enlace lleva al paquete. Windows: gemini.cmd está en node_modules/.bin o en la
+    // carpeta global de npm, junto a node_modules/@google/gemini-cli.
+    const candidates = [
+      path.join(path.dirname(bin), '..', '@google', 'gemini-cli'),
+      path.join(path.dirname(bin), 'node_modules', '@google', 'gemini-cli'),
+    ];
+    for (let dir = path.dirname(bin), i = 0; i < 4; i += 1, dir = path.dirname(dir)) candidates.push(dir);
+    const root = candidates.find((dir) => existsSync(path.join(dir, 'bundle')));
+    if (!root) return null;
+    const bundle = path.join(root, 'bundle');
     for (const file of readdirSync(bundle).filter((name) => name.endsWith('.js'))) {
       const text = readFileSync(path.join(bundle, file), 'utf8');
       const id = /OAUTH_CLIENT_ID = "([^"]+)"/.exec(text)?.[1];
