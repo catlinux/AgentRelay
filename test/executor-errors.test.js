@@ -68,7 +68,7 @@ test('no clasifica límites de velocidad ni errores normales', () => {
 test('detiene errores de credenciales, cuota y modelo no disponible sin reintentos ni self-review', async () => {
   for (const [error, reason] of [
     ['invalid api key', /credenciales.*agentrelay doctor.*agentrelay login/],
-    ['insufficient_quota', /cuota o saldo.*elige otro ejecutor\.[\s\S]*Alternativas \(no se cambia nada solo; elige una\):[\s\S]*agentrelay use codex[\s\S]*Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>\./],
+    ['insufficient_quota', /cuota o saldo.*elige otro ejecutor\.[\s\S]*Alternativas \(no se cambia nada solo; elige una\):[\s\S]*agentrelay use codex[\s\S]*Con el enrutado automático \(agentrelay set routing auto\) este cambio se hace solo\./],
     ['ProviderModelNotFoundError: provider/model', /el modelo configurado ya no está disponible en el proveedor: elige otro con agentrelay use/],
   ]) {
     const repo = makeRepo();

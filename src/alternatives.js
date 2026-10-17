@@ -1,36 +1,38 @@
 import { agentrelayHome } from './config.js';
+import { listarCuentas } from './cuentas.js';
 import { isExhausted, loadQuota } from './quota-state.js';
 
-/** Describe opciones disponibles sin cambiar la configuración del ejecutor. */
+/**
+ * Qué hacer cuando el ejecutor actual se queda sin cuota (fuera del enrutado automático).
+ * Solo sugiere: nunca cambia la configuración.
+ */
 export function alternativesHint({ current, config, installed }) {
   const lines = ['Alternativas (no se cambia nada solo; elige una):'];
-
-  const routing = config?.routing || {};
-  const freeIds = (routing.freeOrder || []).map((spec) => String(spec).replace(/^opencode:/, ''));
   const quota = loadQuota(agentrelayHome());
   const now = new Date();
+  const agotada = (id) => isExhausted(quota, id, now);
 
   if (current?.type !== 'codex') {
-    lines.push('- Codex (cuenta de ChatGPT, cuota gratuita por cuenta): agentrelay use codex');
+    lines.push('- Luna (cuenta de ChatGPT, cuota gratuita): agentrelay use codex');
+  } else if (listarCuentas('luna').length > 1) {
+    lines.push('- Otra cuenta de ChatGPT para Luna: agentrelay cuenta');
   }
 
-  if (installed?.opencode) {
-    const suggestions = freeIds
-      .filter((id) => id !== current?.model)
-      .filter((id) => !isExhausted(quota, id, now))
-      .slice(0, 3);
-    for (const id of suggestions) {
-      lines.push(`- OpenCode gratis: agentrelay use opencode ${id}`);
+  if (current?.type !== 'antigravity' || current?.model === 'claude-sonnet-4-6') {
+    if (!installed?.antigravity) {
+      lines.push('- Antigravity (cuenta de Google, cuota semanal gratuita): instálalo con curl -fsSL https://antigravity.google/cli/install.sh | bash y conéctalo con agentrelay login antigravity');
+    } else if (!agotada('antigravity:gemini')) {
+      lines.push('- Antigravity con Gemini (cuota semanal gratuita): agentrelay use antigravity');
     }
-  } else {
-    lines.push('- OpenCode gratis: agentrelay executors add opencode');
+  }
+  if (installed?.antigravity && current?.model !== 'claude-sonnet-4-6' && !agotada('antigravity:claude')) {
+    lines.push('- Antigravity con Claude Sonnet (otro cupo semanal gratuito): agentrelay use antigravity claude-sonnet-4-6');
   }
 
   const currentModel = String(current?.model || '');
   if (!currentModel.toLowerCase().includes('deepseek')) {
-    lines.push('- DeepSeek de pago (Flash): agentrelay use opencode opencode-go/deepseek-v4.1-flash (necesita su clave de API)');
+    lines.push('- DeepSeek de pago (Flash): agentrelay use deepseek-flash-go (necesita la suscripción de OpenCode Go)');
   }
-
-  lines.push('Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>.');
+  lines.push('Con el enrutado automático (agentrelay set routing auto) este cambio se hace solo.');
   return lines.join('\n');
 }

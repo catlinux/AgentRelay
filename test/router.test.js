@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EXECUTOR_DEFAULTS } from '../src/config.js';
-import { CODEX_FREE_QUOTA, executorFor, parsePaidEntry, pickEntry, routeEntries } from '../src/router.js';
+import { executorFor, parsePaidEntry, pickEntry, routeEntries } from '../src/router.js';
 
 test('routeEntries ordena Luna gratis, freeOrder y entradas de pago sin duplicados', () => {
   const entries = routeEntries({
@@ -22,7 +22,7 @@ test('routeEntries ordena Luna gratis, freeOrder y entradas de pago sin duplicad
     'codex-api:gpt-paid',
     'opencode:provider/paid',
   ]);
-  assert.equal(entries[0].quotaId, CODEX_FREE_QUOTA);
+  assert.equal(entries[0].quotaId, 'codex:chatgpt');
   assert.deepEqual(entries[1], {
     key: 'opencode:provider/free-a', type: 'opencode', model: 'provider/free-a', api: false, paid: false,
     quotaId: 'provider/free-a', tier: null, trainsOnData: null, label: 'provider/free-a (gratis)',

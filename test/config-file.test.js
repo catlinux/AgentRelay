@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_CONFIG, parseJsonc } from '../src/config.js';
+import { parseJsonc } from '../src/config.js';
 import { configTemplate } from '../src/config-template.js';
 import { setConfigValue, unsetConfigValue } from '../src/config-file.js';
 

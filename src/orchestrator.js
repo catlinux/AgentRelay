@@ -255,9 +255,7 @@ async function continueCycle(ctx, result) {
             } catch {}
           }
           try {
-            const installed = {
-              opencode: await isInstalled('opencode'),
-            };
+            const installed = { antigravity: await isInstalled('antigravity') };
             reason += `\n${alternativesHint({ current: ctx.config.executor, config: ctx.config, installed })}`;
           } catch {}
         }

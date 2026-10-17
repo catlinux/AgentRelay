@@ -5,77 +5,50 @@ import os from 'node:os';
 import path from 'node:path';
 import { alternativesHint } from '../src/alternatives.js';
 
-const lastLine = 'Cuando se renueve la cuota puedes volver con agentrelay use <ejecutor>.';
-
-test('propone añadir OpenCode si no está instalado y omite el ejecutor actual', () => {
-  const hint = alternativesHint({
-    current: { type: 'opencode', model: 'opencode-go/deepseek-v4.1-flash' },
-    config: { routing: { freeOrder: ['opencode:opencode-go/cat-jam-free'] } },
-    installed: { opencode: false },
-  });
-
-  assert.deepEqual(hint.split('\n'), [
-    'Alternativas (no se cambia nada solo; elige una):',
-    '- Codex (cuenta de ChatGPT, cuota gratuita por cuenta): agentrelay use codex',
-    '- OpenCode gratis: agentrelay executors add opencode',
-    lastLine,
-  ]);
-});
-
-test('sugiere hasta tres entradas de freeOrder no agotadas', () => {
-  const hint = alternativesHint({
-    current: { type: 'codex', model: 'gpt-6-luna' },
-    config: { routing: { freeOrder: [
-      'opencode:opencode-go/a-free',
-      'opencode:opencode-go/b-free',
-      'opencode:opencode-go/c-free',
-      'opencode:opencode-go/d-free',
-    ] } },
-    installed: { opencode: true },
-  });
-
-  assert.deepEqual(hint.split('\n'), [
-    'Alternativas (no se cambia nada solo; elige una):',
-    '- OpenCode gratis: agentrelay use opencode opencode-go/a-free',
-    '- OpenCode gratis: agentrelay use opencode opencode-go/b-free',
-    '- OpenCode gratis: agentrelay use opencode opencode-go/c-free',
-    '- DeepSeek de pago (Flash): agentrelay use opencode opencode-go/deepseek-v4.1-flash (necesita su clave de API)',
-    lastLine,
-  ]);
-});
-
-test('omite el modelo actual y los agotados de freeOrder', () => {
+function conHogar(t, quota = null) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-alt-'));
-  try {
-    process.env.AGENTRELAY_HOME = path.join(dir, 'home');
-    mkdirSync(process.env.AGENTRELAY_HOME, { recursive: true });
-    writeFileSync(path.join(process.env.AGENTRELAY_HOME, 'quota.json'), JSON.stringify({
-      exhausted: { 'opencode-go/exhausted-free': { until: new Date(Date.now() + 60_000).toISOString() } },
-      quotaLog: [],
-    }));
-    const hint = alternativesHint({
-      current: { type: 'codex', model: 'opencode-go/current-free' },
-      config: { routing: { freeOrder: [
-        'opencode:opencode-go/current-free',
-        'opencode:opencode-go/exhausted-free',
-        'opencode:opencode-go/remaining-free',
-      ] } },
-      installed: { opencode: true },
-    });
-    assert.match(hint, /agentrelay use opencode opencode-go\/remaining-free/);
-    assert.doesNotMatch(hint, /opencode-go\/current-free|opencode-go\/exhausted-free/);
-  } finally {
-    delete process.env.AGENTRELAY_HOME;
+  const previous = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = path.join(dir, 'home');
+  mkdirSync(process.env.AGENTRELAY_HOME, { recursive: true });
+  if (quota) writeFileSync(path.join(process.env.AGENTRELAY_HOME, 'quota.json'), JSON.stringify(quota));
+  t.after(() => {
+    if (previous === undefined) delete process.env.AGENTRELAY_HOME; else process.env.AGENTRELAY_HOME = previous;
     rmSync(dir, { recursive: true, force: true });
-  }
+  });
+  return process.env.AGENTRELAY_HOME;
+}
+
+test('con Luna agotada propone Antigravity (Gemini y Claude) y DeepSeek, con comandos que funcionan', (t) => {
+  conHogar(t);
+  const hint = alternativesHint({ current: { type: 'codex', model: 'gpt-6-luna' }, config: {}, installed: { antigravity: true } });
+  assert.deepEqual(hint.split('\n'), [
+    'Alternativas (no se cambia nada solo; elige una):',
+    '- Antigravity con Gemini (cuota semanal gratuita): agentrelay use antigravity',
+    '- Antigravity con Claude Sonnet (otro cupo semanal gratuito): agentrelay use antigravity claude-sonnet-4-6',
+    '- DeepSeek de pago (Flash): agentrelay use deepseek-flash-go (necesita la suscripción de OpenCode Go)',
+    'Con el enrutado automático (agentrelay set routing auto) este cambio se hace solo.',
+  ]);
 });
 
-test('no sugiere pago si el ejecutor actual ya es deepseek', () => {
-  const hint = alternativesHint({
-    current: { type: 'opencode', model: 'opencode-go/deepseek-v4.1-flash' },
-    config: { routing: { freeOrder: [] } },
-    installed: { opencode: true },
-  });
+test('sin Antigravity instalado explica cómo instalarlo; con varias cuentas de Luna propone cambiar de cuenta', (t) => {
+  const home = conHogar(t);
+  mkdirSync(path.join(home, 'cuentas', 'luna', 'cuenta-2'), { recursive: true });
+  const hint = alternativesHint({ current: { type: 'codex', model: 'gpt-6-luna' }, config: {}, installed: { antigravity: false } });
+  assert.match(hint, /Otra cuenta de ChatGPT para Luna: agentrelay cuenta/);
+  assert.match(hint, /install\.sh \| bash y conéctalo con agentrelay login antigravity/);
+  assert.doesNotMatch(hint, /agentrelay use antigravity/);
+});
 
-  assert.doesNotMatch(hint, /deepseek-v4\.1-flash \(necesita/);
+test('con el cupo de Gemini agotado propone solo Claude; desde Antigravity propone volver a Luna', (t) => {
+  conHogar(t, { exhausted: { 'antigravity:gemini': { until: new Date(Date.now() + 60_000).toISOString() } }, quotaLog: [] });
+  const hint = alternativesHint({ current: { type: 'antigravity', model: 'auto' }, config: {}, installed: { antigravity: true } });
+  assert.match(hint, /Luna \(cuenta de ChatGPT, cuota gratuita\): agentrelay use codex/);
+  assert.match(hint, /agentrelay use antigravity claude-sonnet-4-6/);
+  assert.doesNotMatch(hint, /Antigravity con Gemini/);
+});
+
+test('no sugiere pago si el ejecutor actual ya es DeepSeek', (t) => {
+  conHogar(t);
+  const hint = alternativesHint({ current: { type: 'opencode', model: 'opencode-go/deepseek-v4.1-flash' }, config: {}, installed: { antigravity: true } });
+  assert.doesNotMatch(hint, /DeepSeek de pago/);
 });

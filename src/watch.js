@@ -4,7 +4,7 @@
 
 import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import path from 'node:path';
-import { formatEvent, useColor } from './events.js';
+import { formatEvent } from './events.js';
 import { latestRunId, runDir } from './store.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
 import { loadState } from './store.js';

@@ -1,16 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CONFIG_FILE, LOCAL_CONFIG_FILE, loadConfig } from '../src/config.js';
-import {
-  authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity,
-} from '../src/executors/codex.js';
-import {
-  buildArgs as opencodeBuildArgs, parseOutput as opencodeParseOutput, run as opencodeRun, toActivity as opencodeToActivity,
-} from '../src/executors/opencode.js';
+import { authStatus as codexAuthStatus, buildArgs as codexBuildArgs, findCodex, login as codexLogin, parseOutput as codexParseOutput, toActivity as codexToActivity } from '../src/executors/codex.js';
+import { buildArgs as opencodeBuildArgs, parseOutput as opencodeParseOutput, run as opencodeRun, toActivity as opencodeToActivity } from '../src/executors/opencode.js';
 import { extractAgentReport } from '../src/executors/common.js';
 import { appendEvent, describeCommand, formatEvent, readEvents, supportsLinks, useColor } from '../src/events.js';
 import { decideReview, decideSelfReview, resolvePolicy, shouldRunSelfReviewPass } from '../src/policy.js';

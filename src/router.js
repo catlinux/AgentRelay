@@ -9,7 +9,6 @@ import { EXECUTOR_DEFAULTS } from './config.js';
 import { quotaIdCuenta } from './cuentas.js';
 import { quotaGroup } from './executors/antigravity.js';
 
-export const CODEX_FREE_QUOTA = 'codex:chatgpt';
 
 
 /** Convierte "tipo:modelo" de routing.paidOrder en una entrada de pago. */
