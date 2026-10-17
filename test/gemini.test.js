@@ -164,3 +164,16 @@ test('enrutado: Antigravity va detrás de Luna con un cupo por grupo de modelos'
     ['antigravity:claude-sonnet', 'antigravity:claude', false],
   ]);
 });
+
+test('antigravity: mientras trabaja avisa de los archivos nuevos que cambia y, si no, de cuánto lleva', async () => {
+  const { watchProgress } = await import('../src/executors/antigravity.js');
+  const snapshots = [new Set(['ya.txt']), new Set(['ya.txt', 'a.sql']), new Set(['ya.txt', 'a.sql']), new Set(['ya.txt', 'a.sql'])];
+  let clock = 0;
+  const events = [];
+  const stop = watchProgress('/r', (e) => events.push(e), { intervalMs: 5, quietMs: 1, list: async () => snapshots.shift() ?? new Set(['ya.txt', 'a.sql']), now: () => (clock += 60_000) });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  stop();
+  assert.deepEqual(events[0], { kind: 'tool', tool: 'edit', detail: 'a.sql' });
+  assert.ok(events.slice(1).some((e) => e.kind === 'thinking' && /sigue trabajando \(\d+ min\)/.test(e.text)));
+  assert.ok(!events.some((e) => e.detail === 'ya.txt'), 'los cambios que ya había antes no se anuncian');
+});

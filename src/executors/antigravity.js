@@ -79,14 +79,60 @@ export function parseOutput(output) {
   };
 }
 
+async function changedFiles(cwd) {
+  const res = await runProcess('git', ['status', '--porcelain', '-uall'], { cwd, timeoutMs: 15_000 });
+  if (res.code !== 0) return null;
+  return new Set(res.stdout.split(/\r?\n/).map((line) => line.slice(3).trim()).filter((file) => file && !file.startsWith('.agentrelay/')));
+}
+
+/**
+ * agy no informa de sus pasos hasta terminar: mientras trabaja se mira el repositorio cada 20 s y se
+ * avisa de los archivos que va cambiando, o, si no cambia nada, cada 2 min de cuánto lleva.
+ * Devuelve la función que lo detiene.
+ */
+export function watchProgress(cwd, onActivity, { intervalMs = 20_000, quietMs = 120_000, list = changedFiles, now = Date.now } = {}) {
+  if (!onActivity) return () => {};
+  const start = now();
+  let seen = null;
+  let lastNotice = start;
+  let busy = false;
+  const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const files = await list(cwd);
+      if (!files) return;
+      if (!seen) { seen = files; return; }
+      const nuevos = [...files].filter((file) => !seen.has(file));
+      seen = files;
+      const minutes = Math.round((now() - start) / 60_000);
+      if (nuevos.length) {
+        onActivity({ kind: 'tool', tool: 'edit', detail: nuevos.slice(0, 8).join(', ') + (nuevos.length > 8 ? ` y ${nuevos.length - 8} más` : '') });
+        lastNotice = now();
+      } else if (now() - lastNotice >= quietMs) {
+        onActivity({ kind: 'thinking', text: `Antigravity sigue trabajando (${minutes} min)…` });
+        lastNotice = now();
+      }
+    } catch { /* Un fallo al mirar el repositorio no afecta a la ejecución. */ } finally { busy = false; }
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+
 /** Ejecuta agy sobre `cwd` con el prompt guardado en `promptFile` (ruta relativa). */
 export async function run({ executor, cwd, promptFile, onActivity }) {
   const [command, ...prefix] = commandParts(executor.command);
   const args = [...prefix, ...buildArgs(executor, instructionFor(promptFile))];
   // agy aplica su propio --print-timeout; el de AgentRelay queda como red de seguridad un poco después.
   const timeoutMs = executor.timeoutSeconds ? (executor.timeoutSeconds + 60) * 1000 : undefined;
-  onActivity?.({ kind: 'thinking', text: `Antigravity (${executor.model || 'modelo por defecto'}) trabajando; agy no informa de los pasos hasta terminar.` });
-  const res = await runProcess(command, args, { cwd, timeoutMs });
+  onActivity?.({ kind: 'thinking', text: `Antigravity (${executor.model && executor.model !== 'auto' ? executor.model : 'Gemini'}) empieza; aquí verás los archivos que vaya cambiando.` });
+  const stop = watchProgress(cwd, onActivity);
+  let res;
+  try {
+    res = await runProcess(command, args, { cwd, timeoutMs });
+  } finally {
+    stop();
+  }
   const parsed = parseOutput(res.stdout);
   const ok = res.code === 0 && parsed.status === 'SUCCESS';
 
