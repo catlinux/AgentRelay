@@ -16,6 +16,7 @@ import { runInteractive, runProcess } from '../proc.js';
 import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, parseQuotaReset, relativize, tail } from './common.js';
 import { agentrelayHome } from '../config.js';
 import { isExhausted, loadQuota, markQuotaAvailable, markQuotaExhausted } from '../quota-state.js';
+import { entornoCuenta, quotaIdCuenta } from '../cuentas.js';
 
 export const name = 'codex';
 
@@ -250,10 +251,13 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   const timeoutMs = executor.timeoutSeconds ? executor.timeoutSeconds * 1000 : undefined;
 
   const apiEnabled = executor.apiFallback !== false && hasApiProfile();
+  // Cuenta de ChatGPT activa (agentrelay cuenta luna): cada una tiene su carpeta y su cuota.
+  const freeQuotaId = quotaIdCuenta('luna');
+  const accountEnv = entornoCuenta('luna');
   let quotaExhausted = false;
   if (apiEnabled) {
     try {
-      quotaExhausted = isExhausted(loadQuota(agentrelayHome()), 'codex:chatgpt');
+      quotaExhausted = isExhausted(loadQuota(agentrelayHome()), freeQuotaId);
     } catch {
       quotaExhausted = false;
     }
@@ -262,7 +266,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
     const res = await runProcess(command, args, {
       cwd,
       timeoutMs,
-      ...(useApi ? { env: { CODEX_HOME: apiProfileDir() } } : {}),
+      env: useApi ? { CODEX_HOME: apiProfileDir() } : accountEnv,
       onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
     });
     const parsed = parseOutput(`${res.stdout}\n${res.stderr}`);
@@ -302,7 +306,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   };
 
   const exhaustedRecord = () => {
-    try { return loadQuota(agentrelayHome()).exhausted['codex:chatgpt'] ?? null; } catch { return null; }
+    try { return loadQuota(agentrelayHome()).exhausted[freeQuotaId] ?? null; } catch { return null; }
   };
   const quotaResetAt = () => {
     const until = exhaustedRecord()?.until;
@@ -318,7 +322,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
 
   const result = await runCodex(false);
   if (result.ok) {
-    try { markQuotaAvailable('codex:chatgpt', { home: agentrelayHome() }); } catch { /* El registro no debe alterar la ejecución gratuita. */ }
+    try { markQuotaAvailable(freeQuotaId, { home: agentrelayHome() }); } catch { /* El registro no debe alterar la ejecución gratuita. */ }
     return result;
   }
   if (!apiEnabled || classifyExecutorError(`${result.error ?? ''} ${result.rawError ?? ''}`) !== 'quota') return result;
@@ -331,7 +335,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
     : 10 * 60 * 1000;
   const until = new Date(now.getTime() + delayMs);
   try {
-    markQuotaExhausted('codex:chatgpt', {
+    markQuotaExhausted(freeQuotaId, {
       home: agentrelayHome(),
       now,
       errorText,
@@ -362,10 +366,10 @@ export async function version(executor) {
 }
 
 /** Comprueba si Codex tiene una sesión de ChatGPT activa. */
-export async function authStatus(executor) {
+export async function authStatus(executor, { env = entornoCuenta('luna') } = {}) {
   try {
     const [command, ...prefix] = commandParts(executor.command);
-    const res = await runProcess(command, [...prefix, 'login', 'status'], { timeoutMs: 60_000 });
+    const res = await runProcess(command, [...prefix, 'login', 'status'], { timeoutMs: 60_000, env });
     const message = maskSecrets(`${res.stdout}\n${res.stderr}`.split(/\r?\n/).find((line) => line.trim())?.trim());
     if (res.code === 0) return { ok: true, message: message || 'Sesión activa' };
     return { ok: false, message: maskSecrets(res.error?.message || `No hay sesión iniciada. ${loginHint}`) };
@@ -375,9 +379,9 @@ export async function authStatus(executor) {
 }
 
 /** Inicia sesión con el navegador o con un código de dispositivo. */
-export async function login(executor, { device = false } = {}) {
+export async function login(executor, { device = false, env = entornoCuenta('luna') } = {}) {
   const [command, ...prefix] = commandParts(executor.command);
-  const res = await runInteractive(command, [...prefix, 'login', ...(device ? ['--device-auth'] : [])]);
+  const res = await runInteractive(command, [...prefix, 'login', ...(device ? ['--device-auth'] : [])], { env });
   return res.code;
 }
 
@@ -405,14 +409,14 @@ export function parseRateLimits(result) {
  * Cuota de la cuenta de ChatGPT en Codex (ventana de 5 h y semanal): porcentaje usado y hora de
  * renovación. Pregunta al servidor local de Codex (codex app-server), sin gastar cuota.
  */
-export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl = spawn } = {}) {
+export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl = spawn, env = entornoCuenta('luna') } = {}) {
   let parts;
   try { parts = commandParts(executor?.command ?? 'codex'); } catch (error) { return { ok: false, message: error.message }; }
   const [command, ...prefix] = parts;
   return new Promise((resolve) => {
     let settled = false;
     let buffer = '';
-    const options = { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true };
+    const options = { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, env: { ...process.env, ...env } };
     if (process.platform === 'win32' && /\.cmd$/i.test(command)) options.shell = true;
     let child;
     const finish = (value) => {

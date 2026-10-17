@@ -7,6 +7,7 @@
 
 import { EXECUTOR_DEFAULTS } from './config.js';
 import { getProvider } from './free-providers.js';
+import { quotaIdCuenta } from './cuentas.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
 export const GEMINI_FREE_QUOTA = 'gemini:google';
@@ -46,7 +47,7 @@ export function routeEntries({ config } = {}) {
     ? config.executor.model : EXECUTOR_DEFAULTS.codex.model;
   const luna = {
     key: `codex:${codexModel}`, type: 'codex', model: codexModel, api: false, paid: false,
-    quotaId: CODEX_FREE_QUOTA, tier: 'A', trainsOnData: false, label: `${codexModel} (cuota gratuita de ChatGPT)`,
+    quotaId: quotaIdCuenta('luna'), tier: 'A', trainsOnData: false, label: `${codexModel} (cuota gratuita de ChatGPT)`,
   };
   entries.push(luna);
   keys.add(luna.key);
@@ -59,7 +60,7 @@ export function routeEntries({ config } = {}) {
     // Gemini con cuenta de Google: la cuota es de la cuenta, no del modelo.
     entries.push(type === 'gemini' ? {
       key, type, model, api: false, paid: false,
-      quotaId: GEMINI_FREE_QUOTA, tier: 'A', trainsOnData: true, label: `Gemini ${model} (cuota gratuita de Google)`,
+      quotaId: quotaIdCuenta('gemini'), tier: 'A', trainsOnData: true, label: `Gemini ${model} (cuota gratuita de Google)`,
     } : {
       key, type, model, api: false, paid: false,
       quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,

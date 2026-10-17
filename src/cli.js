@@ -31,6 +31,8 @@ import { cmdUse } from './use.js';
 import { cmdEvaluar } from './evaluar-cmd.js';
 import { cmdOrden } from './orden.js';
 import { cmdCuota } from './cuota.js';
+import { cmdCuenta } from './cuenta-cmd.js';
+import { quotaIdCuenta } from './cuentas.js';
 import { canOpenBrowser } from './platform.js';
 import { createOutput } from './output.js';
 import { isOrphaned, lastActivityMs } from './orphans.js';
@@ -65,6 +67,8 @@ Uso:
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
   agentrelay cuota [--json]         Cuánto queda de cada IA gratuita (Luna, Gemini) y cuándo se renueva
+  agentrelay cuenta [luna|gemini [add|use|remove <nombre>]]
+                                    Varias cuentas gratuitas de Luna y Gemini (OpenCode no se toca)
   agentrelay providers [--json]     Muestra los proveedores conectados y cómo conectar otros
   agentrelay orden [gratis <modelos> | pago <nombres> | reset]
                                     Muestra o cambia el orden del enrutado (Luna, Gemini, otros gratuitos, pago)
@@ -449,7 +453,7 @@ async function cmdDoctor(values, rerun = false) {
           : 'Respaldo por API de pago: desactivado (executor.apiFallback = false)'
         : 'Respaldo por API de pago: no configurado (para tenerlo: agentrelay login --api)');
       const quota = loadQuota(agentrelayHome());
-      const quotaId = 'codex:chatgpt';
+      const quotaId = quotaIdCuenta('luna');
       if (quotaIsExhausted(quota, quotaId)) {
         const until = new Date(quota.exhausted[quotaId].until);
         const hour = `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}`;
@@ -1615,6 +1619,7 @@ export async function main(argv, runtime = {}) {
       case 'evaluar': return await cmdEvaluar(rest, values);
       case 'orden': return cmdOrden(rest, values);
       case 'cuota': return await cmdCuota(rest, values);
+      case 'cuenta': return await cmdCuenta(rest, values);
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
       case 'set': return await cmdSet(rest, values);
       case 'unset': return await cmdUnset(rest, values);

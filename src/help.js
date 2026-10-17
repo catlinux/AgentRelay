@@ -303,6 +303,21 @@ const COMMANDS = {
       ['agentrelay evaluar --revert', 'Deshace el último cambio aplicado.'],
     ],
   },
+  cuenta: {
+    summary: 'Muestra, añade y cambia las cuentas gratuitas de Luna y Gemini.',
+    usage: ['agentrelay cuenta', 'agentrelay cuenta <luna|gemini> add|use|remove <nombre>'],
+    description: 'Permite tener varias cuentas de ChatGPT (Luna) y de Google (Gemini), cada una con su propia sesión en una carpeta de AgentRelay, y elegir cuál se usa. «principal» es la cuenta de siempre (~/.codex y ~/.gemini). Cada cuenta lleva su propio registro de cuota. Las sesiones de OpenCode no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.',
+    options: [
+      ['--device', 'Con luna add, inicia sesión con el código de dispositivo.'],
+      ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
+      ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
+    ],
+    examples: [
+      ['agentrelay cuenta', 'Lista las cuentas de Luna y Gemini, cuál está activa y su sesión.'],
+      ['agentrelay cuenta gemini add trabajo', 'Inicia sesión con otra cuenta de Google y la deja activa.'],
+      ['agentrelay cuenta luna use principal', 'Vuelve a la cuenta de ChatGPT de siempre.'],
+    ],
+  },
   cuota: {
     summary: 'Muestra cuánto queda de cada IA gratuita y cuándo se renueva.',
     usage: ['agentrelay cuota [--json]'],
