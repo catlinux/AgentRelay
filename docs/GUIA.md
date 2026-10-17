@@ -25,7 +25,7 @@ Se cambia con `agentrelay use` (interactivo) o, por ejemplo, `agentrelay use ant
 
 1. Una vez por equipo:
    - `agentrelay login`: cuenta de ChatGPT para Luna.
-   - `curl -fsSL https://antigravity.google/cli/install.sh | bash` (Linux y macOS) y `agentrelay login antigravity`: cuenta de Google. Elige «Google OAuth» y sal con `/quit`.
+   - Instala Antigravity con su instalador: en Linux y macOS `curl -fsSL https://antigravity.google/cli/install.sh | bash`; en Windows, en PowerShell, `irm https://antigravity.google/cli/install.ps1 | iex`. Abre una terminal nueva y ejecuta `agentrelay login antigravity` (cuenta de Google): elige «Google OAuth» y sal con `/quit`.
 2. Activa el enrutado: `agentrelay set routing auto`. Cada tarea va a **Luna**; si se agota, a **Antigravity con Gemini**; si también, a **Antigravity con Claude Sonnet**; y si todo eso falla, a la IA de pago. Si la de pago también falla, se te pregunta.
 3. Para saber cuánto queda: `agentrelay cuota` (en el chat, `/ar:cuota`). De Luna da el porcentaje y la hora de renovación sin gastar peticiones. De Antigravity dice si está agotada; el porcentaje exacto solo se ve con `/usage` dentro de `agy`.
 4. ¿Se acabó la cuota de Luna? `agentrelay cuenta` muestra tus cuentas de ChatGPT numeradas, con su correo y lo que les queda, y te pregunta cuál usar. Para añadir otra: `agentrelay cuenta nueva`. OpenCode y Antigravity no se tocan. Revisa las condiciones de OpenAI antes de usar varias cuentas.
@@ -91,7 +91,7 @@ Tras actualizar, abre una conversación nueva de Claude Code para que cargue las
 
 | Síntoma | Qué mirar |
 |---|---|
-| «Antigravity CLI no está instalado» | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` y abre una terminal nueva |
+| «Antigravity CLI no está instalado» | Linux y macOS: `curl -fsSL https://antigravity.google/cli/install.sh \| bash`; Windows (PowerShell): `irm https://antigravity.google/cli/install.ps1 \| iex`. Después abre una terminal nueva |
 | Antigravity pide confiar en una carpeta | `agentrelay login antigravity` lo abre en una carpeta vacía de AgentRelay: responde «Yes» ahí, nunca en tu carpeta personal |
 | «El modelo … no está disponible para el ejecutor» | `agentrelay use --list` muestra los modelos de cada ejecutor |
 | «El repositorio tiene cambios sin confirmar» | Confirma o guarda los cambios antes de delegar, o usa `--allow-dirty` |
