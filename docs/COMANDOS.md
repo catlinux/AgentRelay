@@ -41,8 +41,8 @@ Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code).
 Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA disponible:
 
 1. **Luna** con tu cuenta de ChatGPT (gratis, con una cuota que se renueva sola).
-2. **Antigravity** con tu cuenta de Google (gratis, cuota semanal; Gemini y, en un cupo aparte, Claude y GPT).
-3. **La IA de pago** (por defecto DeepSeek V4.1 Flash de OpenCode Go). Si también falla, la tarea se detiene y se te pregunta qué hacer.
+2. **Antigravity con Gemini** y 3. **Antigravity con Claude Sonnet 4.6**, con tu cuenta de Google (gratis; cada uno con su propio cupo semanal).
+4. **La IA de pago** (por defecto DeepSeek V4.1 Flash de OpenCode Go). Si también falla, la tarea se detiene y se te pregunta qué hacer.
 
 `agentrelay cuota` dice en cualquier momento cuánto queda de cada una y cuándo se renueva, sin gastar peticiones. Si una cuenta se agota, puedes cambiar a otra con `agentrelay cuenta` (lista numerada: escribes el número). Cada cuenta lleva su propia cuota. Las sesiones de OpenCode nunca se tocan. Revisa las condiciones de OpenAI y Google antes de usar varias cuentas.
 
