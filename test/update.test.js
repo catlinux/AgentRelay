@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import './helpers.js';
+
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 function git(cwd, ...args) { return execFileSync('git', args, { cwd, encoding: 'utf8' }); }
 function fixture() {

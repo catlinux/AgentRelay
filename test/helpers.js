@@ -1,7 +1,7 @@
 // Utilidades compartidas por los tests.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,18 @@ const gitConfigCount = Number.isFinite(parsedGitConfigCount) ? parsedGitConfigCo
 process.env.GIT_CONFIG_COUNT = String(gitConfigCount + 1);
 process.env[`GIT_CONFIG_KEY_${gitConfigCount}`] = 'safe.directory';
 process.env[`GIT_CONFIG_VALUE_${gitConfigCount}`] = '*';
+
+/**
+ * Carpeta de ejecutores con un Gemini CLI de mentira: setup instala Gemini si falta, y los tests
+ * no deben instalar nada de verdad ni tocar ~/.agentrelay del usuario.
+ */
+export function fakeExecutorsDir(dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-ex-'))) {
+  const bin = path.join(dir, 'node_modules', '.bin');
+  mkdirSync(bin, { recursive: true });
+  for (const name of ['gemini', 'gemini.cmd']) writeFileSync(path.join(bin, name), '');
+  return dir;
+}
+if (!process.env.AGENTRELAY_EXECUTORS_DIR) process.env.AGENTRELAY_EXECUTORS_DIR = fakeExecutorsDir();
 
 export function normalizeLineEndings(text) {
   return text.replace(/\r\n?/g, '\n');

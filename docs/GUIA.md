@@ -1,6 +1,6 @@
 # AgentRelay: qué hace y cómo se usa
 
-Guía corta. El detalle de cada opción está en [MANUAL.md](MANUAL.md) y las decisiones de diseño en [DISENO.md](DISENO.md).
+Guía corta. Todos los comandos, explicados y con ejemplos, en [COMANDOS.md](COMANDOS.md); el detalle de cada opción está en [MANUAL.md](MANUAL.md) y las decisiones de diseño en [DISENO.md](DISENO.md).
 
 ## Qué es
 

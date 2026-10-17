@@ -1061,10 +1061,7 @@ async function loginGemini(values) {
   const { config } = loadConfig({ cwd, configPath: values.config });
   const executor = config.executor.type === 'gemini'
     ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.gemini, type: 'gemini' };
-  if (!await isInstalled('gemini', { dir: executorsDir() })) {
-    process.stderr.write('Gemini CLI no está instalado. Instálalo con: agentrelay executors add gemini\n');
-    return 1;
-  }
+  if (!await isInstalled('gemini', { dir: executorsDir() }) && await installOptionalExecutor('gemini') !== 0) return 1;
   const adapter = getExecutor('gemini');
   const current = await adapter.authStatus(executor);
   if (current.ok) {
@@ -1151,6 +1148,13 @@ async function cmdSetup(values) {
         process.stdout.write(`${entry.title} ya está instalado en ${dir}.\n`);
       } else if (await installOptionalExecutor(name, dir) !== 0) {
         return 1;
+      }
+    }
+    // Gemini es la segunda IA gratuita del enrutado por defecto: se instala sin preguntar.
+    // Si falla (sin red), setup sigue y lo dice; login gemini lo vuelve a intentar.
+    if (!requested.includes('gemini') && !await isInstalled('gemini', { dir })) {
+      if (await installOptionalExecutor('gemini', dir) !== 0 && !values.quiet) {
+        process.stdout.write('Gemini no se pudo instalar ahora; se instalará al ejecutar: agentrelay login gemini\n');
       }
     }
     let noTtyNotice = false;

@@ -16,7 +16,7 @@
 
 </div>
 
-[Español](README.md) · **English** · [Installation guide](INSTALL.en.md) · [User manual (Spanish)](docs/MANUAL.md)
+[Español](README.md) · **English** · [Installation guide](INSTALL.en.md) · [User manual (Spanish)](docs/MANUAL.md) · [All commands (Spanish)](docs/COMANDOS.md)
 
 Cross-platform orchestrator of AI agents for software development. A powerful model (the **orchestrator**, for example Claude Code) thinks, plans and reviews; a cheaper AI (the **executor**) writes the code. AgentRelay is the bridge: it hands over the task, checks the result with your tests and returns it to the orchestrator to decide.
 

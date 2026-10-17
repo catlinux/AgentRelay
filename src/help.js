@@ -207,7 +207,7 @@ const COMMANDS = {
   setup: {
     summary: 'Instala las instrucciones globales y los comandos de Claude Code.',
     usage: ['agentrelay setup [opciones]'],
-    description: 'Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. También puede retirar la instalación o instalar ejecutores opcionales.',
+    description: 'Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Instala también Gemini CLI si falta (es la segunda IA gratuita del enrutado) y ofrece conectar las cuentas de ChatGPT y de Google. También puede retirar la instalación o instalar ejecutores opcionales.',
     options: [
       ['--uninstall', 'Retira las instrucciones, comandos y hook de Claude Code.'],
       ['--no-commands', 'No instala los comandos de Claude Code.'],
