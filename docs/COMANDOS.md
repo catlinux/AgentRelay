@@ -15,11 +15,11 @@ Referencia completa de los comandos de `agentrelay`, con ejemplos. Para entender
 | Conectar la cuenta de ChatGPT (Luna) | `agentrelay login` |
 | Conectar la cuenta de Google (Antigravity) | `agentrelay login antigravity` |
 | Saber cuánto me queda de cada IA gratuita | `agentrelay cuota` |
-| Ver mis cuentas y cambiar de una a otra | `agentrelay cuenta` |
-| Añadir otra cuenta de ChatGPT o de Google | `agentrelay cuenta nueva luna` · `agentrelay cuenta nueva gemini` |
+| Ver mis cuentas de ChatGPT y cambiar de una a otra | `agentrelay cuenta` |
+| Añadir otra cuenta de ChatGPT | `agentrelay cuenta nueva` |
 | Que AgentRelay elija solo la IA (gratis primero) | `agentrelay set routing auto` |
 | Ver en qué orden se prueban las IA | `agentrelay orden` |
-| Usar siempre una IA concreta | `agentrelay use gemini` · `agentrelay use codex` |
+| Usar siempre una IA concreta | `agentrelay use antigravity` · `agentrelay use codex` |
 | Comprobar que todo está bien | `agentrelay doctor` |
 | Ver lo que hace el ejecutor en directo | `agentrelay watch` (en otra terminal) |
 
@@ -30,11 +30,11 @@ agentrelay setup              # instrucciones y comandos /ar: de Claude Code
 agentrelay login              # cuenta de ChatGPT para Luna (se abre el navegador)
 curl -fsSL https://antigravity.google/cli/install.sh | bash   # instala Antigravity (Linux y macOS)
 agentrelay login antigravity  # cuenta de Google: elige «Google OAuth» y sal con /quit
-agentrelay set routing auto   # cada tarea va a Luna; si se agota, a Antigravity; si también, a la de pago
+agentrelay set routing auto   # Luna; si se agota, Antigravity; si también, la de pago
 agentrelay cuota              # comprueba cuánto queda
 ```
 
-Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code).
+Después, en cada proyecto: `agentrelay start` (o pídeselo a Claude Code). Tras cada `update`, abre una conversación nueva de Claude Code para que cargue las instrucciones.
 
 ## Cómo funcionan las IA gratuitas
 
@@ -44,18 +44,28 @@ Con el enrutado activo (`routing auto`) cada tarea empieza por la primera IA dis
 2. **Antigravity con Gemini** y 3. **Antigravity con Claude Sonnet 4.6**, con tu cuenta de Google (gratis; cada uno con su propio cupo semanal).
 4. **La IA de pago** (por defecto DeepSeek V4.1 Flash de OpenCode Go). Si también falla, la tarea se detiene y se te pregunta qué hacer.
 
-`agentrelay cuota` dice en cualquier momento cuánto queda de cada una y cuándo se renueva, sin gastar peticiones. Si una cuenta se agota, puedes cambiar a otra con `agentrelay cuenta` (lista numerada: escribes el número). Cada cuenta lleva su propia cuota. Las sesiones de OpenCode nunca se tocan. Revisa las condiciones de OpenAI y Google antes de usar varias cuentas.
+`agentrelay cuota` dice cuánto queda de Luna (porcentaje y hora de renovación, sin gastar peticiones) y si Antigravity está agotada; el porcentaje exacto de Antigravity solo se ve con `/usage` dentro de `agy`. Si Luna se agota, puedes cambiar a otra cuenta de ChatGPT con `agentrelay cuenta` (lista numerada: escribes el número); cada cuenta lleva su propia cuota. Las sesiones de OpenCode y Antigravity nunca se tocan. Revisa las condiciones de OpenAI antes de usar varias cuentas.
+
+## Guías del proyecto en las tareas
+
+Si un proyecto tiene reglas de diseño, estilo o convenciones, guárdalas en un archivo y el orquestador las pasará en el campo `references` de la tarea solo cuando hagan falta:
+
+```json
+{ "objective": "Añade la pantalla de login", "references": ["docs/reglas-diseno.md"], "files": ["src/Login.jsx"] }
+```
+
+El ejecutor las lee y las sigue sin que el orquestador copie su contenido; no puede modificarlas, y una ruta que no existe se rechaza antes de gastar nada.
 
 ## Problemas habituales
 
 | Mensaje | Qué hacer |
 |---|---|
-| «This client is no longer supported for Gemini Code Assist for individuals» | Google cerró Gemini CLI gratis para cuentas personales (junio de 2026); solo funciona con licencia de empresa. Usa Antigravity: `agentrelay login antigravity` |
 | «Antigravity CLI no está instalado» | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` y abre una terminal nueva |
-| «La sesión de Google … ha caducado» o `invalid_grant` | `agentrelay login gemini` y vuelve a entrar con Google |
-| Gemini pregunta «Do you trust the files in this folder?» | Elige «Don't trust»: no hace falta para iniciar sesión |
+| Antigravity pregunta si confías en una carpeta | `agentrelay login antigravity` lo abre en una carpeta vacía de AgentRelay: responde «Yes» ahí, nunca en tu carpeta personal |
 | Luna: «agotada · se renueva …» | Espera a esa hora, usa otra cuenta (`agentrelay cuenta`) o deja que el enrutado pase a Antigravity |
 | «sin sesión de ChatGPT» | `agentrelay login` |
+| «No existen estos archivos de "references"» | La ruta de una guía está mal escrita en la tarea |
+| Gemini CLI: «This client is no longer supported…» | Google cerró Gemini CLI para cuentas personales (junio de 2026); AgentRelay ya no lo usa |
 
 ---
 
@@ -269,10 +279,10 @@ Ejemplos:
 Conecta una cuenta del ejecutor o configura el respaldo por API de pago. En el chat de Claude Code: `/ar:login`.
 
 ```
-agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device]
+agentrelay login [antigravity | opencode | --api [--remove]] [--device]
 ```
 
-Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.
+Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con antigravity, abre Antigravity CLI (agy) para iniciar sesión con tu cuenta de Google: es la segunda IA gratuita del enrutado. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.
 
 | Opción | Qué hace |
 |---|---|
@@ -287,7 +297,6 @@ Ejemplos:
 
 - `agentrelay login`: Inicia sesión con el método disponible.
 - `agentrelay login antigravity`: Conecta tu cuenta de Google en Antigravity (Gemini y Claude con cuota semanal gratuita).
-- `agentrelay login gemini`: Conecta tu cuenta de Google en Gemini CLI (desde junio de 2026, solo con licencia de empresa).
 - `agentrelay login opencode`: Abre el asistente para conectar una cuenta de OpenCode.
 - `agentrelay login --device`: Inicia sesión usando el código de dispositivo.
 - `agentrelay login --api`: Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.
@@ -295,16 +304,16 @@ Ejemplos:
 
 ### `agentrelay cuenta`
 
-Muestra, añade y cambia las cuentas gratuitas de Luna y Gemini. En el chat de Claude Code: `/ar:cuenta`.
+Muestra, añade y cambia las cuentas de ChatGPT que usa Luna. En el chat de Claude Code: `/ar:cuenta`.
 
 ```
 agentrelay cuenta
 agentrelay cuenta <número>
-agentrelay cuenta nueva <luna|gemini>
+agentrelay cuenta nueva
 agentrelay cuenta quitar <número>
 ```
 
-Lista numerada de tus cuentas de ChatGPT (Luna) y de Google (Gemini), con su correo, lo que queda de cuota y cuál está en uso; en un terminal pregunta qué número usar. Elegir una cuenta con la sesión caducada abre el inicio de sesión. Cada cuenta extra guarda su sesión en una carpeta propia de AgentRelay y tiene su propio registro de cuota. Las sesiones de OpenCode no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.
+Lista numerada de tus cuentas de ChatGPT para Luna, con su correo, lo que queda de cuota y cuál está en uso; en un terminal pregunta qué número usar. Elegir una cuenta sin sesión abre el inicio de sesión. Cada cuenta extra guarda su sesión en una carpeta propia de AgentRelay y tiene su propio registro de cuota. Las sesiones de OpenCode y Antigravity no se tocan. Revisa las condiciones de cada servicio antes de usar varias cuentas.
 
 | Opción | Qué hace |
 |---|---|
@@ -316,7 +325,7 @@ Ejemplos:
 
 - `agentrelay cuenta`: Muestra las cuentas numeradas y pregunta cuál usar.
 - `agentrelay cuenta 2`: Usa la cuenta número 2.
-- `agentrelay cuenta nueva gemini`: Entra con otra cuenta de Google y la deja en uso.
+- `agentrelay cuenta nueva`: Entra con otra cuenta de ChatGPT y la deja en uso.
 
 ### `agentrelay cuota`
 
@@ -326,7 +335,7 @@ Muestra cuánto queda de cada IA gratuita y cuándo se renueva. En el chat de Cl
 agentrelay cuota [--json]
 ```
 
-Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.
+Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: sus ventanas de uso, por ejemplo 30 días en el plan gratuito) con el porcentaje que queda y la hora de renovación. De Antigravity muestra si está agotada según el último error (el porcentaje exacto solo se ve con /usage dentro de agy).
 
 | Opción | Qué hace |
 |---|---|
@@ -336,7 +345,7 @@ Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT:
 
 Ejemplos:
 
-- `agentrelay cuota`: Muestra lo que queda de Luna y Gemini y cuándo se renueva.
+- `agentrelay cuota`: Muestra lo que queda de Luna y el estado de Antigravity.
 
 ### `agentrelay orden`
 
@@ -418,54 +427,6 @@ Ejemplos:
 
 - `agentrelay executors`: Muestra cómo ver o cambiar el ejecutor.
 - `agentrelay executors add opencode`: Instala OpenCode como ejecutor opcional.
-
-### `agentrelay providers`
-
-Muestra qué proveedores de modelos están conectados. En el chat de Claude Code: `/ar:providers`.
-
-```
-agentrelay providers [--json]
-```
-
-Lista los proveedores conectados por OpenCode o mediante variables de entorno, junto con su nivel, límites y política de datos conocida. Para los demás muestra cómo conectarlos.
-
-| Opción | Qué hace |
-|---|---|
-| `--json` | Imprime la lista en JSON. |
-| `--cwd <dir>` | Indica el directorio desde el que se carga la configuración. |
-| `--config <archivo>` | Usa un archivo de configuración alternativo. |
-
-Ejemplos:
-
-- `agentrelay providers`: Muestra los proveedores y cómo conectar los que faltan.
-- `agentrelay providers --json`: Imprime los datos de proveedores en JSON.
-
-### `agentrelay evaluar`
-
-Prueba los modelos gratuitos de OpenCode Go y propone el orden de routing.freeOrder. En el chat de Claude Code: `/ar:evaluar`.
-
-```
-agentrelay evaluar [--models a,b] [--runs N] [--no-apply]
-agentrelay evaluar --revert
-```
-
-Solo se ejecuta cuando lo pides. Descubre los modelos opencode-go/*-free de tu cuenta de OpenCode Go (nunca los de pago), les hace resolver cuatro tareas pequeñas en una carpeta temporal, las corrige con pruebas que el modelo no ve y propone un ranking. Por defecto aplica el resultado reescribiendo solo routing.freeOrder en tu configuración de usuario, y guarda el valor anterior para poder deshacerlo.
-
-| Opción | Qué hace |
-|---|---|
-| `--models <a,b>` | Evalúa solo esos modelos; deben ser ids -free que estén en tu cuenta. |
-| `--runs <N>` | Repeticiones por modelo, de 1 a 3 (por defecto 1); con más de una se usa la media. |
-| `--no-apply` | Solo muestra la propuesta, sin cambiar la configuración. |
-| `--revert` | Restaura el routing.freeOrder anterior a la última evaluación aplicada. |
-| `--cwd <dir>` | Indica el directorio desde el que se carga la configuración. |
-| `--config <archivo>` | Usa un archivo de configuración alternativo. |
-
-Ejemplos:
-
-- `agentrelay evaluar --no-apply`: Evalúa y muestra la propuesta sin aplicarla.
-- `agentrelay evaluar`: Evalúa y aplica el nuevo routing.freeOrder.
-- `agentrelay evaluar --runs 2`: Repite cada tarea dos veces y usa la media.
-- `agentrelay evaluar --revert`: Deshace el último cambio aplicado.
 
 ## Delegar y revisar tareas
 
