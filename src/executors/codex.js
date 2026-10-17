@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import { runInteractive, runProcess } from '../proc.js';
 import { classifyExecutorError, clip, extractAgentReport, firstLine, instructionFor, makeLineHandler, maskSecrets, parseQuotaReset, relativize, tail } from './common.js';
 import { agentrelayHome } from '../config.js';
@@ -378,4 +379,76 @@ export async function login(executor, { device = false } = {}) {
   const [command, ...prefix] = commandParts(executor.command);
   const res = await runInteractive(command, [...prefix, 'login', ...(device ? ['--device-auth'] : [])]);
   return res.code;
+}
+
+/** Convierte una ventana de límite de Codex (camelCase del servidor o snake_case de los registros). */
+function rateWindow(window) {
+  if (!window || typeof window !== 'object') return null;
+  const used = Number(window.usedPercent ?? window.used_percent);
+  const minutes = Number(window.windowDurationMins ?? window.window_minutes);
+  const resetsAt = Number(window.resetsAt ?? window.resets_at);
+  return {
+    usedPercent: Number.isFinite(used) ? Math.round(used) : null,
+    windowMinutes: Number.isFinite(minutes) ? minutes : null,
+    resetAt: Number.isFinite(resetsAt) && resetsAt > 0 ? new Date(resetsAt * 1000).toISOString() : null,
+  };
+}
+
+/** Traduce la respuesta de account/rateLimits/read a { plan, windows: [{ usedPercent, windowMinutes, resetAt }] }. */
+export function parseRateLimits(result) {
+  const snapshot = result?.rateLimits ?? result ?? {};
+  const windows = [rateWindow(snapshot.primary), rateWindow(snapshot.secondary)].filter(Boolean);
+  return { plan: snapshot.planType ?? snapshot.plan_type ?? null, windows };
+}
+
+/**
+ * Cuota de la cuenta de ChatGPT en Codex (ventana de 5 h y semanal): porcentaje usado y hora de
+ * renovación. Pregunta al servidor local de Codex (codex app-server), sin gastar cuota.
+ */
+export async function readRateLimits(executor, { timeoutMs = 20_000, spawnImpl = spawn } = {}) {
+  let parts;
+  try { parts = commandParts(executor?.command ?? 'codex'); } catch (error) { return { ok: false, message: error.message }; }
+  const [command, ...prefix] = parts;
+  return new Promise((resolve) => {
+    let settled = false;
+    let buffer = '';
+    const options = { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true };
+    if (process.platform === 'win32' && /\.cmd$/i.test(command)) options.shell = true;
+    let child;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { child?.stdin.end(); child?.kill(); } catch { /* Ya cerrado. */ }
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish({ ok: false, message: 'Codex no respondió a tiempo' }), timeoutMs);
+    try {
+      child = spawnImpl(command, [...prefix, 'app-server'], options);
+    } catch (error) {
+      finish({ ok: false, message: error.message });
+      return;
+    }
+    child.once('error', (error) => finish({ ok: false, message: error.message }));
+    child.once('close', () => finish({ ok: false, message: 'Codex terminó sin responder' }));
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let index;
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        let message;
+        try { message = JSON.parse(line); } catch { continue; }
+        if (message.id === 0) {
+          child.stdin.write(`${JSON.stringify({ method: 'initialized' })}\n`);
+          child.stdin.write(`${JSON.stringify({ id: 1, method: 'account/rateLimits/read' })}\n`);
+        } else if (message.id === 1) {
+          if (message.error) finish({ ok: false, message: /authentication required/i.test(message.error.message) ? `sin sesión de ChatGPT. ${loginHint}` : String(message.error.message) });
+          else finish({ ok: true, ...parseRateLimits(message.result) });
+        }
+      }
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.write(`${JSON.stringify({ id: 0, method: 'initialize', params: { clientInfo: { name: 'agentrelay', version: '1' } } })}\n`);
+  });
 }

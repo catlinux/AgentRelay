@@ -185,8 +185,8 @@ const COMMANDS = {
   },
   login: {
     summary: 'Conecta una cuenta del ejecutor o configura el respaldo por API de pago.',
-    usage: ['agentrelay login [opencode | --api [--remove]] [--device]'],
-    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
+    usage: ['agentrelay login [gemini | opencode | --api [--remove]] [--device]'],
+    description: 'Sin argumento, inicia sesión con Codex usando el navegador o el código de dispositivo. Con gemini, abre Gemini CLI para iniciar sesión con tu cuenta de Google. Con opencode, abre el asistente de autenticación de OpenCode. Con --api, guarda una clave de OpenAI en un perfil separado que solo se usa si se agota la cuota gratuita de ChatGPT.',
     options: [
       ['--device', 'Usa el código de dispositivo.'],
       ['--browser', 'Fuerza el inicio de sesión con navegador.'],
@@ -197,6 +197,7 @@ const COMMANDS = {
     ],
     examples: [
       ['agentrelay login', 'Inicia sesión con el método disponible.'],
+      ['agentrelay login gemini', 'Conecta tu cuenta de Google para usar Gemini gratis.'],
       ['agentrelay login opencode', 'Abre el asistente para conectar una cuenta de OpenCode.'],
       ['agentrelay login --device', 'Inicia sesión usando el código de dispositivo.'],
       ['agentrelay login --api', 'Guarda una clave para usarla solo si se agota la cuota gratuita de ChatGPT.'],
@@ -300,6 +301,19 @@ const COMMANDS = {
       ['agentrelay evaluar', 'Evalúa y aplica el nuevo routing.freeOrder.'],
       ['agentrelay evaluar --runs 2', 'Repite cada tarea dos veces y usa la media.'],
       ['agentrelay evaluar --revert', 'Deshace el último cambio aplicado.'],
+    ],
+  },
+  cuota: {
+    summary: 'Muestra cuánto queda de cada IA gratuita y cuándo se renueva.',
+    usage: ['agentrelay cuota [--json]'],
+    description: 'Consulta en directo, sin gastar peticiones, la cuota de Luna (cuenta de ChatGPT: ventana de 5 h y semanal) y de Gemini (cuenta de Google: cuota diaria por modelo), con el porcentaje que queda y la hora de renovación. También muestra las IA marcadas como agotadas por el último error.',
+    options: [
+      ['--json', 'Imprime el estado en JSON.'],
+      ['--cwd <dir>', 'Indica el directorio desde el que se carga la configuración.'],
+      ['--config <archivo>', 'Usa un archivo de configuración alternativo.'],
+    ],
+    examples: [
+      ['agentrelay cuota', 'Muestra lo que queda de Luna y Gemini y cuándo se renueva.'],
     ],
   },
   providers: {

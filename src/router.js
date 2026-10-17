@@ -9,6 +9,7 @@ import { EXECUTOR_DEFAULTS } from './config.js';
 import { getProvider } from './free-providers.js';
 
 export const CODEX_FREE_QUOTA = 'codex:chatgpt';
+export const GEMINI_FREE_QUOTA = 'gemini:google';
 
 function providerOf(model) {
   const slash = typeof model === 'string' ? model.indexOf('/') : -1;
@@ -50,13 +51,17 @@ export function routeEntries({ config } = {}) {
   entries.push(luna);
   keys.add(luna.key);
   for (const spec of config.routing?.freeOrder ?? []) {
-    const match = /^opencode:(\S+)$/.exec(String(spec));
+    const match = /^(opencode|gemini):(\S+)$/.exec(String(spec));
     if (!match) continue;
-    const [, model] = match;
-    const key = `opencode:${model}`;
+    const [, type, model] = match;
+    const key = `${type}:${model}`;
     if (keys.has(key)) continue;
-    entries.push({
-      key, type: 'opencode', model, api: false, paid: false,
+    // Gemini con cuenta de Google: la cuota es de la cuenta, no del modelo.
+    entries.push(type === 'gemini' ? {
+      key, type, model, api: false, paid: false,
+      quotaId: GEMINI_FREE_QUOTA, tier: 'A', trainsOnData: true, label: `Gemini ${model} (cuota gratuita de Google)`,
+    } : {
+      key, type, model, api: false, paid: false,
       quotaId: model, tier: null, trainsOnData: trainsOnDataFor('opencode', model), label: `${model} (gratis)`,
     });
     keys.add(key);

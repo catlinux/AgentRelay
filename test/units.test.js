@@ -382,7 +382,7 @@ test('config: rechaza un ejecutor no soportado', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-config-executor-'));
   try {
     writeFileSync(path.join(dir, CONFIG_FILE), JSON.stringify({ executor: { type: 'foo' } }));
-    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: codex, opencode\)/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /Ejecutor no soportado: foo \(disponibles: codex, gemini, opencode\)/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

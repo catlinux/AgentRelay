@@ -121,7 +121,7 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     const defaults = loadConfig({ cwd: dir, home: path.join(dir, 'home') }).config.routing;
     assert.deepEqual(defaults, {
       mode: 'off',
-      freeOrder: ['opencode:opencode-go/cat-jam-free', 'opencode:opencode-go/longcat-2.5-preview-free'],
+      freeOrder: ['gemini:auto'],
       paidOrder: ['opencode:opencode-go/deepseek-v4.1-flash'],
       maxSwitches: 5,
     });
@@ -132,7 +132,7 @@ test('routing tiene valores predeterminados y acepta valores válidos', () => {
     });
     assert.ok(!result.warnings.some((warning) => warning.includes('routing')));
     writeFileSync(file, JSON.stringify({ routing: { freeOrder: ['codex:model'] } }));
-    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.freeOrder debe ser una lista de entradas opencode:modelo válidas/);
+    assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.freeOrder debe ser una lista de entradas gemini:modelo u opencode:modelo válidas/);
     writeFileSync(file, JSON.stringify({ routing: { paidOrder: ['cline:deepseek/model'] } }));
     assert.throws(() => loadConfig({ cwd: dir, home: path.join(dir, 'home') }), /routing\.paidOrder debe ser una lista de entradas tipo:modelo válidas/);
   } finally { rmSync(dir, { recursive: true, force: true }); }

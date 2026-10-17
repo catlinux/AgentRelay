@@ -1,0 +1,124 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildArgs, parseOutput, readQuota, toActivity } from '../src/executors/gemini.js';
+import { parseRateLimits } from '../src/executors/codex.js';
+import { classifyExecutorError, parseQuotaReset } from '../src/executors/common.js';
+import { collectQuotas, formatReset, renderQuotas } from '../src/cuota.js';
+import { GEMINI_FREE_QUOTA, routeEntries } from '../src/router.js';
+import { DEFAULT_CONFIG } from '../src/config.js';
+
+const config = (routing = {}) => ({ ...DEFAULT_CONFIG, executor: { ...DEFAULT_CONFIG.executor }, routing: { ...DEFAULT_CONFIG.routing, ...routing } });
+
+test('gemini: argumentos del modo no interactivo; "auto" no fija modelo', () => {
+  assert.deepEqual(buildArgs({ model: 'auto' }, 'lee x'), ['-p', 'lee x', '-o', 'stream-json', '--approval-mode', 'yolo', '--skip-trust']);
+  assert.deepEqual(buildArgs({ model: 'gemini-2.5-pro' }, 'lee x').slice(-2), ['-m', 'gemini-2.5-pro']);
+});
+
+test('gemini: parseOutput junta el texto del asistente, herramientas, tokens y errores', () => {
+  const lines = [
+    { type: 'init', model: 'gemini-2.5-pro' },
+    { type: 'message', role: 'user', content: 'no cuenta' },
+    { type: 'message', role: 'assistant', content: 'Hecho. ', delta: true },
+    { type: 'tool_use', tool_name: 'write_file', parameters: { file_path: '/r/a.js' } },
+    { type: 'message', role: 'assistant', content: '{"status":"done"}', delta: true },
+    { type: 'result', status: 'success', stats: { input_tokens: 10, output_tokens: 5, cached: 2 } },
+  ].map((e) => JSON.stringify(e)).join('\n');
+  const parsed = parseOutput(lines);
+  assert.equal(parsed.text, 'Hecho. {"status":"done"}');
+  assert.equal(parsed.toolCalls, 1);
+  assert.equal(parsed.model, 'gemini-2.5-pro');
+  assert.deepEqual(parsed.usage, { inputTokens: 10, outputTokens: 5, cacheReadTokens: 2 });
+  const failed = parseOutput(JSON.stringify({ type: 'result', status: 'error', error: { message: 'Quota exceeded' } }));
+  assert.equal(failed.status, 'error');
+  assert.deepEqual(failed.errors, ['Quota exceeded']);
+  assert.deepEqual(toActivity({ type: 'tool_use', tool_name: 'run_shell_command', parameters: { command: 'npm test' } }, '/r'), { kind: 'tool', tool: 'command', detail: 'npm test' });
+});
+
+test('gemini: el error de cuota se clasifica como cuota y se lee cuándo se renueva', () => {
+  const text = 'You have exhausted your capacity on this model. Your quota will reset after 2h17m3s.';
+  assert.equal(classifyExecutorError(text), 'quota');
+  const now = new Date('2026-10-17T10:00:00Z');
+  assert.equal(parseQuotaReset(text, now).toISOString(), '2026-10-17T12:17:03.000Z');
+  assert.equal(classifyExecutorError('Error authenticating: FatalAuthenticationError: Manual authorization is required but the current session is non-interactive'), 'credentials');
+});
+
+test('gemini: readQuota consulta la API con el token guardado y no reescribe las credenciales', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-gemini-'));
+  try {
+    const now = new Date('2026-10-17T10:00:00Z');
+    writeFileSync(path.join(dir, 'oauth_creds.json'), JSON.stringify({ access_token: 'tok', refresh_token: 'r', expiry_date: now.getTime() + 3600_000 }));
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+      calls.push({ url, auth: options.headers.Authorization, body: JSON.parse(options.body) });
+      if (url.endsWith(':loadCodeAssist')) return { ok: true, json: async () => ({ cloudaicompanionProject: 'proj-1', currentTier: { id: 'free-tier' } }) };
+      return { ok: true, json: async () => ({ buckets: [
+        { modelId: 'gemini-2.5-pro', remainingFraction: 0.25, remainingAmount: '250', resetTime: '2026-10-18T07:00:00Z' },
+        { modelId: 'gemini-2.5-flash', remainingFraction: 1, resetTime: '2026-10-18T07:00:00Z' },
+      ] }) };
+    };
+    const quota = await readQuota({ dir, env: {}, fetchImpl, now, client: null });
+    assert.equal(quota.ok, true);
+    assert.equal(quota.tier, 'free-tier');
+    assert.deepEqual(quota.models[0], { model: 'gemini-2.5-pro', remainingPercent: 25, remaining: 250, limit: 1000, resetAt: '2026-10-18T07:00:00Z' });
+    assert.equal(quota.models[1].remaining, null);
+    assert.equal(calls[1].body.project, 'proj-1');
+    assert.ok(calls.every((call) => call.auth === 'Bearer tok'));
+    const expired = path.join(dir, 'caducado');
+    mkdirSync(expired);
+    writeFileSync(path.join(expired, 'oauth_creds.json'), JSON.stringify({ access_token: 'old', refresh_token: 'r', expiry_date: 1 }));
+    const noClient = await readQuota({ dir: expired, env: {}, fetchImpl, now, client: null });
+    assert.equal(noClient.ok, false);
+    assert.match(noClient.message, /no se encuentra Gemini CLI/);
+    const none = await readQuota({ dir: path.join(dir, 'nada'), env: {}, fetchImpl, now });
+    assert.match(none.message, /sin sesión de Google/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('codex: parseRateLimits traduce la ventana de 5 h y la semanal', () => {
+  const parsed = parseRateLimits({ rateLimits: {
+    planType: 'free',
+    primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1792240000 },
+    secondary: { usedPercent: 100, windowDurationMins: 10080, resetsAt: 1792600000 },
+  } });
+  assert.equal(parsed.plan, 'free');
+  assert.deepEqual(parsed.windows[0], { usedPercent: 40, windowMinutes: 300, resetAt: new Date(1792240000 * 1000).toISOString() });
+  assert.equal(parsed.windows[1].usedPercent, 100);
+});
+
+test('enrutado: Gemini va detrás de Luna con la cuota de la cuenta de Google', () => {
+  const entries = routeEntries({ config: config({ freeOrder: ['gemini:auto', 'opencode:opencode-go/x-free'] }) });
+  assert.deepEqual(entries.map((e) => e.key).slice(0, 3), ['codex:gpt-6-luna', 'gemini:auto', 'opencode:opencode-go/x-free']);
+  assert.equal(entries[1].quotaId, GEMINI_FREE_QUOTA);
+  assert.equal(entries[1].paid, false);
+});
+
+test('cuota: muestra lo que queda y cuándo se renueva de cada IA gratuita', async (t) => {
+  const home = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-cuota-'));
+  const previous = process.env.AGENTRELAY_HOME;
+  process.env.AGENTRELAY_HOME = home;
+  t.after(() => {
+    if (previous === undefined) delete process.env.AGENTRELAY_HOME; else process.env.AGENTRELAY_HOME = previous;
+    rmSync(home, { recursive: true, force: true });
+  });
+  const now = new Date(2026, 9, 17, 10, 0);
+  const quotas = await collectQuotas({
+    config: config({ freeOrder: ['gemini:auto'] }),
+    now,
+    readers: {
+      luna: async () => ({ ok: true, plan: 'free', windows: [
+        { usedPercent: 30, windowMinutes: 300, resetAt: new Date(2026, 9, 17, 14, 5).toISOString() },
+        { usedPercent: 100, windowMinutes: 10080, resetAt: new Date(2026, 9, 20, 9, 0).toISOString() },
+      ] }),
+      geminiInstalled: async () => true,
+      gemini: async () => ({ ok: true, tier: null, models: [{ model: 'gemini-2.5-pro', remainingPercent: 90, remaining: 900, limit: 1000, resetAt: new Date(2026, 9, 18, 9, 0).toISOString() }] }),
+    },
+  });
+  const text = renderQuotas(quotas, now);
+  assert.match(text, /✔ 5 h: queda 70 %, se renueva hoy 14:05/);
+  assert.match(text, /✖ semanal: queda 0 %, se renueva mar 20\/10 09:00/);
+  assert.match(text, /✔ gemini-2\.5-pro: queda 90 % \(900 de 1000\), se renueva mañana 09:00/);
+  assert.equal(formatReset('no es fecha', now), null);
+});
