@@ -37,6 +37,19 @@ export function commandParts(command, { exists = existsSync, home = os.homedir()
   return parts;
 }
 
+/** Modelos de la cuenta (`agy models`: "id   Nombre" por línea). Nunca falla. */
+export async function listModels(executor, { run = runProcess } = {}) {
+  try {
+    const [command, ...prefix] = commandParts(executor.command);
+    const res = await run(command, [...prefix, 'models'], { timeoutMs: 60_000 });
+    if (res.code !== 0) return [];
+    return res.stdout.split(/\r?\n/).map((line) => line.trim().split(/\s+/)[0]).filter((id) => /^[\w.-]+$/.test(id ?? ''))
+      .map((id) => ({ id, efforts: null, defaultEffort: null }));
+  } catch {
+    return [];
+  }
+}
+
 /** Grupo de cuota de un modelo: los Claude y GPT comparten un cupo; el resto es el de Gemini. */
 export function quotaGroup(model) {
   return /claude|gpt|opus|sonnet/i.test(String(model ?? '')) ? 'claude' : 'gemini';

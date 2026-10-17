@@ -177,3 +177,18 @@ test('antigravity: mientras trabaja avisa de los archivos nuevos que cambia y, s
   assert.ok(events.slice(1).some((e) => e.kind === 'thinking' && /sigue trabajando \(\d+ min\)/.test(e.text)));
   assert.ok(!events.some((e) => e.detail === 'ya.txt'), 'los cambios que ya había antes no se anuncian');
 });
+
+test('antigravity: listModels lee la salida real de agy models', async () => {
+  const { listModels } = await import('../src/executors/antigravity.js');
+  const stdout = 'gemini-3.8-flash-high     Gemini 3.8 Flash (High)\nclaude-sonnet-4-6         Claude Sonnet 4.6 (Thinking)\ngpt-oss-120b-medium       GPT-OSS 120B (Medium)\n';
+  const models = await listModels({ command: 'agy' }, { run: async () => ({ code: 0, stdout }) });
+  assert.deepEqual(models.map((m) => m.id), ['gemini-3.8-flash-high', 'claude-sonnet-4-6', 'gpt-oss-120b-medium']);
+});
+
+test('antigravity: la comprobación del modelo acepta auto y los ids de agy models, y rechaza otros', async () => {
+  const { checkExecutorModel } = await import('../src/executor-check.js');
+  const adapter = { listModels: async () => [{ id: 'gemini-3.8-flash-high' }, { id: 'claude-sonnet-4-6' }] };
+  assert.equal((await checkExecutorModel({ type: 'antigravity', model: 'auto' }, { adapter })).ok, true);
+  assert.equal((await checkExecutorModel({ type: 'antigravity', model: 'claude-sonnet-4-6' }, { adapter })).ok, true);
+  assert.equal((await checkExecutorModel({ type: 'antigravity', model: 'claude-sonnet' }, { adapter })).ok, false);
+});
