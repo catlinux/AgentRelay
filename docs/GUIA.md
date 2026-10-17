@@ -25,7 +25,8 @@ Se cambia con `agentrelay use` (interactivo) o, por ejemplo, `agentrelay use ope
 
 1. Una vez por equipo: `agentrelay login` (cuenta de ChatGPT, para Luna), `agentrelay executors add gemini` y `agentrelay login gemini` (cuenta de Google).
 2. Activa el enrutado: `agentrelay set routing auto`. Cada tarea va a **Luna**; si se agota, a **Gemini**; si también, a la IA de pago, y si esa falla se te pregunta.
-3. Para saber en cualquier momento cuánto queda: `agentrelay cuota` (en el chat, `/ar:cuota`). Muestra el porcentaje que queda de Luna (ventana de 5 h y semanal) y de Gemini (diaria, por modelo) y cuándo se renueva cada una. La consulta no gasta peticiones.
+3. ¿Se acabó la cuota de una cuenta? Puedes tener otras: `agentrelay cuenta luna add trabajo` o `agentrelay cuenta gemini add trabajo` inicia sesión con otra cuenta y la deja activa; `agentrelay cuenta luna use principal` vuelve a la de siempre y `agentrelay cuenta` lo muestra todo. OpenCode no se toca. Revisa las condiciones de OpenAI y Google sobre usar varias cuentas.
+4. Para saber en cualquier momento cuánto queda: `agentrelay cuota` (en el chat, `/ar:cuota`). Muestra el porcentaje que queda de Luna (ventana de 5 h y semanal) y de Gemini (diaria, por modelo) y cuándo se renueva cada una. La consulta no gasta peticiones.
 
 ## Uso del día a día
 

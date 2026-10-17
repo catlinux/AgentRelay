@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { runInteractive, runProcess } from '../proc.js';
 import { executorsDir as defaultExecutorsDir } from './catalog.js';
+import { entornoCuenta, geminiDirCuenta } from '../cuentas.js';
 import { clip, extractAgentReport, instructionFor, makeLineHandler, relativize, tail } from './common.js';
 
 export const name = 'gemini';
@@ -115,7 +116,7 @@ export async function run({ executor, cwd, promptFile, onActivity }) {
   const timeoutMs = executor.timeoutSeconds ? executor.timeoutSeconds * 1000 : undefined;
   const res = await runProcess(command, args, {
     cwd,
-    env: GOOGLE_LOGIN_ENV,
+    env: { ...GOOGLE_LOGIN_ENV, ...entornoCuenta('gemini') },
     timeoutMs,
     onStdout: onActivity ? makeLineHandler(toActivity, cwd, onActivity) : undefined,
   });
@@ -162,7 +163,7 @@ export async function version(executor) {
 }
 
 /** Lee las credenciales OAuth que guarda Gemini CLI al iniciar sesión con Google. */
-export function readCredentials({ dir = geminiDir() } = {}) {
+export function readCredentials({ dir = geminiDirCuenta() } = {}) {
   try {
     const creds = JSON.parse(readFileSync(path.join(dir, 'oauth_creds.json'), 'utf8'));
     return creds && (creds.refresh_token || creds.access_token) ? creds : null;
@@ -172,7 +173,7 @@ export function readCredentials({ dir = geminiDir() } = {}) {
 }
 
 /** Comprueba si hay sesión de Google guardada (no la valida contra Google). */
-export async function authStatus(executor, { dir = geminiDir() } = {}) {
+export async function authStatus(executor, { dir = geminiDirCuenta() } = {}) {
   if (readCredentials({ dir })) {
     let account = '';
     try { account = JSON.parse(readFileSync(path.join(dir, 'google_accounts.json'), 'utf8')).active || ''; } catch { /* Sin cuenta visible. */ }
@@ -182,9 +183,9 @@ export async function authStatus(executor, { dir = geminiDir() } = {}) {
 }
 
 /** Abre Gemini CLI para iniciar sesión con Google; se cierra con /quit al terminar. */
-export async function login(executor) {
+export async function login(executor, { env = entornoCuenta('gemini') } = {}) {
   const [command, ...prefix] = commandParts(executor.command);
-  const res = await runInteractive(command, prefix, { env: GOOGLE_LOGIN_ENV });
+  const res = await runInteractive(command, prefix, { env: { ...GOOGLE_LOGIN_ENV, ...env } });
   return res.code;
 }
 
@@ -239,7 +240,13 @@ async function accessToken(creds, fetchImpl, now, client) {
     }),
     signal: AbortSignal.timeout(20_000),
   });
-  if (!res.ok) throw new Error(`no se pudo renovar la sesión de Google (HTTP ${res.status})`);
+  if (!res.ok) {
+    // Google explica el motivo en el cuerpo (p. ej. invalid_grant: sesión revocada o caducada).
+    let detail = '';
+    try { const body = await res.json(); detail = [body.error, body.error_description].filter(Boolean).join(': '); } catch { /* Sin cuerpo JSON. */ }
+    const hint = /invalid_grant/.test(detail) ? '; vuelve a iniciar sesión con: agentrelay login gemini' : '';
+    throw new Error(`no se pudo renovar la sesión de Google (HTTP ${res.status}${detail ? `, ${detail}` : ''})${hint}`);
+  }
   return (await res.json()).access_token;
 }
 
@@ -247,7 +254,7 @@ async function accessToken(creds, fetchImpl, now, client) {
  * Cuota de la cuenta gratuita por modelo: [{ model, remainingPercent, remaining, limit, resetAt }].
  * No gasta peticiones del modelo. Devuelve { ok: false, message } si no se puede consultar.
  */
-export async function readQuota({ dir = geminiDir(), env = process.env, fetchImpl = fetch, now = new Date(), client = oauthClient() } = {}) {
+export async function readQuota({ dir = geminiDirCuenta(), env = process.env, fetchImpl = fetch, now = new Date(), client = oauthClient() } = {}) {
   const creds = readCredentials({ dir });
   if (!creds) return { ok: false, message: `sin sesión de Google (${loginHint})` };
   try {

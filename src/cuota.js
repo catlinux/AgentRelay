@@ -7,9 +7,9 @@
 import { loadConfig } from './config.js';
 import { isInstalled } from './executors/catalog.js';
 import { readRateLimits } from './executors/codex.js';
+import { cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
 import { authStatus as geminiAuth, readQuota as readGeminiQuota } from './executors/gemini.js';
 import { getQuotaState } from './quota-state.js';
-import { CODEX_FREE_QUOTA, GEMINI_FREE_QUOTA } from './router.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -46,37 +46,48 @@ function recordedState(quotaId, now) {
  * `readers` permite sustituir las consultas en las pruebas.
  */
 export async function collectQuotas({ config, now = new Date(), readers = {} } = {}) {
-  const readLuna = readers.luna ?? (() => readRateLimits(config.executor.type === 'codex' ? config.executor : { command: 'codex' }));
+  const readLuna = readers.luna ?? ((cuenta) => readRateLimits(config.executor.type === 'codex' ? config.executor : { command: 'codex' }, { env: entornoCuenta('luna', cuenta) }));
   const geminiInstalled = readers.geminiInstalled ?? (() => isInstalled('gemini'));
-  const readGemini = readers.gemini ?? (() => readGeminiQuota());
+  const readGemini = readers.gemini ?? ((cuenta) => readGeminiQuota({ dir: geminiDirCuenta(cuenta) }));
+  const cuentas = readers.cuentas ?? ((servicio) => listarCuentas(servicio));
+  const activa = readers.activa ?? ((servicio) => cuentaActiva(servicio));
+  const etiqueta = (servicio, cuenta) => {
+    const varias = cuentas(servicio).length > 1;
+    if (!varias) return '';
+    return ` [${cuenta}${cuenta === activa(servicio) ? ', activa' : ''}]`;
+  };
   const result = [];
 
-  const luna = await readLuna();
-  result.push({
-    id: 'luna',
-    nombre: 'Luna · cuenta de ChatGPT (Codex)',
-    ok: luna.ok,
-    mensaje: luna.ok ? (luna.plan ? `plan ${luna.plan}` : '') : luna.message,
-    ventanas: luna.ok ? luna.windows.map((w) => ({
-      nombre: windowName(w.windowMinutes), quedaPct: w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent), resetAt: w.resetAt,
-    })) : [],
-    registro: recordedState(CODEX_FREE_QUOTA, now),
-  });
+  for (const cuenta of cuentas('luna')) {
+    const luna = await readLuna(cuenta);
+    result.push({
+      id: cuenta === PRINCIPAL ? 'luna' : `luna@${cuenta}`,
+      nombre: `Luna · cuenta de ChatGPT (Codex)${etiqueta('luna', cuenta)}`,
+      ok: luna.ok,
+      mensaje: luna.ok ? (luna.plan ? `plan ${luna.plan}` : '') : luna.message,
+      ventanas: luna.ok ? luna.windows.map((w) => ({
+        nombre: windowName(w.windowMinutes), quedaPct: w.usedPercent == null ? null : Math.max(0, 100 - w.usedPercent), resetAt: w.resetAt,
+      })) : [],
+      registro: recordedState(quotaIdCuenta('luna', cuenta), now),
+    });
+  }
 
   const usesGemini = (config.routing?.freeOrder ?? []).some((spec) => spec.startsWith('gemini:')) || config.executor.type === 'gemini';
   if (usesGemini || await geminiInstalled()) {
     const installed = await geminiInstalled();
-    const gemini = installed ? await readGemini() : { ok: false, message: 'no instalado (agentrelay executors add gemini)' };
-    result.push({
-      id: 'gemini',
-      nombre: 'Gemini · cuenta de Google',
-      ok: gemini.ok,
-      mensaje: gemini.ok ? (gemini.tier ? `plan ${gemini.tier}` : '') : gemini.message,
-      ventanas: gemini.ok ? gemini.models.map((m) => ({
-        nombre: m.model, quedaPct: m.remainingPercent, quedan: m.remaining, limite: m.limit, resetAt: m.resetAt,
-      })) : [],
-      registro: recordedState(GEMINI_FREE_QUOTA, now),
-    });
+    for (const cuenta of cuentas('gemini')) {
+      const gemini = installed ? await readGemini(cuenta) : { ok: false, message: 'no instalado (agentrelay executors add gemini)' };
+      result.push({
+        id: cuenta === PRINCIPAL ? 'gemini' : `gemini@${cuenta}`,
+        nombre: `Gemini · cuenta de Google${etiqueta('gemini', cuenta)}`,
+        ok: gemini.ok,
+        mensaje: gemini.ok ? (gemini.tier ? `plan ${gemini.tier}` : '') : gemini.message,
+        ventanas: gemini.ok ? gemini.models.map((m) => ({
+          nombre: m.model, quedaPct: m.remainingPercent, quedan: m.remaining, limite: m.limit, resetAt: m.resetAt,
+        })) : [],
+        registro: recordedState(quotaIdCuenta('gemini', cuenta), now),
+      });
+    }
   }
 
   for (const spec of config.routing?.freeOrder ?? []) {

@@ -19,7 +19,9 @@ Necesitan al usuario en casa o una clave:
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores en tareas reales (con `DEEPSEEK_API_KEY` definida también se consulta el saldo en el informe).
 
 - [ ] **Probar Gemini en casa** (integrado sin cuenta de Google: solo probado con simulados y hasta el paso de autenticación). `agentrelay executors add gemini`, `agentrelay login gemini`, `agentrelay cuota` (comprobar que salen los modelos, el porcentaje y la hora de renovación) y una tarea real con `agentrelay use gemini`. Confirmar el texto real del error de cuota agotada.
-- [ ] **Probar `agentrelay cuota` con Luna** con sesión de ChatGPT real: confirmar que salen la ventana de 5 h y la semanal con su hora de renovación.
+- [ ] **Gemini en Windows: `cuota` da HTTP 400 al renovar el token** (la sesión existe). Repetir con la versión que muestra el motivo de Google y arreglarlo según lo que diga.
+- [ ] Probar `agentrelay cuenta luna add` y `cuenta gemini add` con una segunda cuenta real y comprobar que `cuota` y el enrutado usan la activa sin tocar OpenCode. Más adelante: decidir si el enrutado debe pasar solo a la siguiente cuenta cuando se agota la activa.
+- [x] **Probar `agentrelay cuota` con Luna** con sesión de ChatGPT real: confirmar que salen la ventana de 5 h y la semanal con su hora de renovación.
 - [ ] Prueba que ya fallaba antes de integrar Gemini: `ejecutarTarea sin cambios suspende con fallo modelo` (test/evaluar.test.js:273).
 
 Mejoras acordadas:
