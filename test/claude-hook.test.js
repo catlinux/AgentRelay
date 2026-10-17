@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hookCommand, hookStatus, installHook, removeHook } from '../src/claude-hook.js';
+import './helpers.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 

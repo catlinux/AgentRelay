@@ -16,7 +16,7 @@
 
 </div>
 
-**Español** · [English](README.en.md) · [Instalación](INSTALL.md) · [Manual de uso](docs/MANUAL.md)
+**Español** · [English](README.en.md) · [Instalación](INSTALL.md) · [Manual de uso](docs/MANUAL.md) · [Todos los comandos](docs/COMANDOS.md)
 
 Orquestador multiplataforma de agentes de IA para desarrollo de software. Un modelo potente (el **orquestador**, por ejemplo Claude Code) piensa, planifica y revisa; una IA más barata (el **ejecutor**) escribe el código. AgentRelay hace de puente: entrega la tarea, comprueba el resultado con tus pruebas y se lo devuelve al orquestador para que decida.
 
@@ -78,7 +78,7 @@ Para cambiar de IA: `agentrelay use`. Para ver dónde estás: `agentrelay status
 
 **Los mismos comandos en el terminal y en el chat de Claude Code:** `agentrelay status` ↔ `/ar:status`, `agentrelay use opencode` ↔ `/ar:use opencode`, `agentrelay evaluar` ↔ `/ar:evaluar`… (todos menos `watch`). `agentrelay help` los lista.
 
-**Todo lo demás, con ejemplos: [Manual de uso](docs/MANUAL.md).**
+**Todo lo demás, con ejemplos: [Manual de uso](docs/MANUAL.md) y [todos los comandos explicados](docs/COMANDOS.md).**
 
 ## Seguridad
 

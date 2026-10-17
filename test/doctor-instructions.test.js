@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blockStatus, GLOBAL_BLOCK, PROJECT_BLOCK } from '../src/instructions.js';
+import { fakeExecutorsDir } from './helpers.js';
 
 const BIN = fileURLToPath(new URL('../bin/agentrelay.js', import.meta.url));
 
@@ -98,7 +99,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     assert.match(missing.stdout, /\[aviso\] Las instrucciones globales del orquestador no están instaladas\. Ejecuta "agentrelay setup"/);
     assert.match(missing.stdout, /\[aviso\] Este proyecto no tiene las instrucciones de AgentRelay\. Ejecuta "agentrelay init"/);
 
-    spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex') } });
+    spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: fakeExecutorsDir(path.join(dir, 'ex')) } });
     writeFileSync(path.join(dir, 'CLAUDE.md'), `${PROJECT_BLOCK.replace('## Delegación con AgentRelay', '## Delegación (versión anterior)')}\n`);
 
     writeFileSync(path.join(claudeDir, 'commands', 'ar', 'status.md'), 'anterior\n<!-- agentrelay:managed -->');
@@ -113,7 +114,7 @@ test('doctor avisa cuando las instrucciones del orquestador faltan o están desa
     assert.match(outdated.stdout, /Instrucciones globales del orquestador: al día/);
     assert.match(outdated.stdout, /\[aviso\] Las instrucciones de AgentRelay de este proyecto están desactualizadas\. Ejecuta "agentrelay init"/);
 
-    spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: path.join(dir, 'ex') } });
+    spawnSync(process.execPath, [BIN, 'setup', '--yes', '--claude-dir', claudeDir], { cwd: dir, encoding: 'utf8', env: { ...process.env, AGENTRELAY_EXECUTORS_DIR: fakeExecutorsDir(path.join(dir, 'ex')) } });
     spawnSync(process.execPath, [BIN, 'init', '--yes'], { cwd: dir, encoding: 'utf8' });
     const current = doctor(dir, claudeDir);
     assert.match(current.stdout, /Comandos de Claude Code .*al d[aí]a/);
