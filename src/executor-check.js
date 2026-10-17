@@ -26,7 +26,7 @@ export async function checkExecutorModel(executor, { adapter, timeoutMs = 20_000
   }
 
   if (!Array.isArray(models) || models.length === 0) return { ok: true, unknown: true };
-  // "auto" deja que el ejecutor elija su modelo por defecto (Antigravity, Gemini): siempre vale.
+  // "auto" deja que el ejecutor elija su modelo por defecto (Antigravity): siempre vale.
   if (executor.model === null || executor.model === undefined || executor.model === 'auto') return { ok: true };
 
   const ids = models.map((model) => model?.id).filter((id) => typeof id === 'string');

@@ -1,8 +1,7 @@
-// Varias cuentas gratuitas para Luna (cuenta de ChatGPT en Codex) y Gemini (cuenta de Google).
+// Varias cuentas gratuitas de Luna (cuenta de ChatGPT en Codex).
 //
-// Cada cuenta extra vive en su propia carpeta (~/.agentrelay/cuentas/<servicio>/<nombre>) y se
-// usa apuntando CODEX_HOME o GEMINI_CLI_HOME a ella; la cuenta «principal» son las carpetas
-// normales de cada CLI (~/.codex, ~/.gemini). La cuenta activa se guarda en
+// Cada cuenta extra vive en su propia carpeta (~/.agentrelay/cuentas/luna/<nombre>) y se usa
+// apuntando CODEX_HOME a ella; la cuenta «principal» es la carpeta normal de Codex (~/.codex). La cuenta activa se guarda en
 // ~/.agentrelay/cuentas.json. OpenCode no se toca nunca.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -10,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { agentrelayHome } from './config.js';
 
-export const SERVICIOS = ['luna', 'gemini'];
+export const SERVICIOS = ['luna'];
 export const PRINCIPAL = 'principal';
 const NOMBRE_VALIDO = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 
@@ -89,20 +88,13 @@ export function borrarCuenta(servicio, nombre, home = agentrelayHome()) {
 export function entornoCuenta(servicio, nombre = cuentaActiva(servicio), home = agentrelayHome()) {
   const dir = carpetaCuenta(servicio, nombre, home);
   if (!dir) return {};
-  return servicio === 'luna' ? { CODEX_HOME: dir } : { GEMINI_CLI_HOME: dir };
-}
-
-/** Carpeta ~/.gemini de una cuenta de Gemini. */
-export function geminiDirCuenta(nombre = cuentaActiva('gemini'), home = agentrelayHome()) {
-  const dir = carpetaCuenta('gemini', nombre, home);
-  return path.join(dir ?? (process.env.GEMINI_CLI_HOME || os.homedir()), '.gemini');
+  return { CODEX_HOME: dir };
 }
 
 /** Clave de quota-state de la cuota gratuita de una cuenta: cada cuenta se agota por separado. */
 export function quotaIdCuenta(servicio, nombre = cuentaActiva(servicio)) {
   comprobarServicio(servicio);
-  const base = servicio === 'luna' ? 'codex:chatgpt' : 'gemini:google';
-  return nombre === PRINCIPAL ? base : `${base}@${nombre}`;
+  return nombre === PRINCIPAL ? 'codex:chatgpt' : `codex:chatgpt@${nombre}`;
 }
 
 /** Primer nombre libre para una cuenta nueva: cuenta-2, cuenta-3… */

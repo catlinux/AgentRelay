@@ -53,7 +53,6 @@ export const DEFAULT_CONFIG = Object.freeze({
 export const EXECUTOR_DEFAULTS = Object.freeze({
   codex: { command: 'codex', provider: null, model: 'gpt-6-luna' },
   antigravity: { command: 'agy', provider: null, model: 'auto' },
-  gemini: { command: 'gemini', provider: null, model: 'auto' },
   opencode: { command: 'opencode', provider: null, model: 'opencode/nemotron-3-ultra-free' },
 });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -95,6 +94,15 @@ function migrateLayer(layer, warnings) {
       if (profileModel && !model) model = profileModel;
       data.profiles[name] = migrated;
     }
+  }
+  // Gemini CLI se retiró (Google lo cerró para cuentas personales): se ignora con un aviso en lugar de fallar.
+  if (isObject(data.executor) && data.executor.type === 'gemini') {
+    data.executor = { ...data.executor, type: 'codex', command: 'codex', model: EXECUTOR_DEFAULTS.codex.model };
+    warnings.push(`Gemini CLI se ha retirado (Google ya no lo admite con cuentas personales): ${layer.origin} usaba executor.type "gemini" y se lee como Codex. Usa Antigravity: agentrelay use antigravity`);
+  }
+  if (isObject(data.routing) && Array.isArray(data.routing.freeOrder) && data.routing.freeOrder.some((spec) => String(spec).startsWith('gemini:'))) {
+    data.routing = { ...data.routing, freeOrder: data.routing.freeOrder.filter((spec) => !String(spec).startsWith('gemini:')) };
+    warnings.push(`Gemini CLI se ha retirado: se ignoran sus entradas de routing.freeOrder en ${layer.origin}. Para quitar el aviso: agentrelay orden reset`);
   }
   layer.data = data;
   if (model) warnings.push(`Cline se ha retirado: tu configuración se ha leído como OpenCode con ${model}. Cambia el archivo ${layer.origin} (agentrelay use opencode ${model}) para quitar este aviso.`);
@@ -267,7 +275,7 @@ export function loadConfig({ cwd = process.cwd(), configPath, overrides, home } 
   if (typeof config.executor.apiFallback !== 'boolean') invalid('executor.apiFallback', 'debe ser booleano');
   if (!(typeof config.executor.command === 'string' || (Array.isArray(config.executor.command) && config.executor.command.every((v) => typeof v === 'string')))) invalid('executor.command', 'debe ser un texto o una lista de textos');
   if (!['off', 'auto'].includes(config.routing.mode)) invalid('routing.mode', 'debe ser off o auto');
-  if (!Array.isArray(config.routing.freeOrder) || !config.routing.freeOrder.every((v) => typeof v === 'string' && /^(opencode|gemini|antigravity):\S+$/.test(v))) invalid('routing.freeOrder', 'debe ser una lista de entradas antigravity:modelo, gemini:modelo u opencode:modelo válidas');
+  if (!Array.isArray(config.routing.freeOrder) || !config.routing.freeOrder.every((v) => typeof v === 'string' && /^(opencode|antigravity):\S+$/.test(v))) invalid('routing.freeOrder', 'debe ser una lista de entradas antigravity:modelo u opencode:modelo válidas');
   if (!Array.isArray(config.routing.paidOrder) || !config.routing.paidOrder.every((v) => typeof v === 'string' && /^(opencode|codex|codex-api):\S+$/.test(v))) invalid('routing.paidOrder', 'debe ser una lista de entradas tipo:modelo válidas');
   if (!Number.isInteger(config.routing.maxSwitches) || config.routing.maxSwitches < 0 || config.routing.maxSwitches > 20) invalid('routing.maxSwitches', 'debe ser un entero entre 0 y 20');
   for (const key of ['report.maxDiffChars', 'report.maxOutputChars']) { const n = config.report[key.split('.')[1]]; if (!Number.isInteger(n) || n <= 0) invalid(key, 'debe ser un entero positivo'); }

@@ -64,15 +64,15 @@ Uso:
   agentrelay start [--yes]          Prepara el proyecto y deja todo listo para trabajar
   agentrelay recover [id]           Recupera ejecuciones interrumpidas
   agentrelay watch [id]             Sigue en directo una ejecución (sin id, sigue todas las nuevas)
-  agentrelay cuota [--json]         Cuánto queda de cada IA gratuita (Luna, Gemini) y cuándo se renueva
-  agentrelay cuenta [luna|gemini [add|use|remove <nombre>]]
+  agentrelay cuota [--json]         Cuánto queda de cada IA gratuita y cuándo se renueva
+  agentrelay cuenta [<número> | nueva | quitar <número>]
                                     Varias cuentas gratuitas de Luna (OpenCode no se toca)
   agentrelay orden [gratis <modelos> | pago <nombres> | reset]
                                     Muestra o cambia el orden del enrutado (Luna, Antigravity, pago)
   agentrelay doctor [--fix]         Comprueba el entorno y puede arreglar problemas seguros
   agentrelay help [comando]         Muestra la ayuda general o la de un comando
   agentrelay config [show|path|init|migrate [--dry-run]] Muestra, localiza, crea o migra la configuración
-  agentrelay login [antigravity | gemini | opencode | --api [--remove]] [--device] Conecta la cuenta del ejecutor o configura el respaldo por API
+  agentrelay login [antigravity | opencode | --api [--remove]] [--device] Conecta la cuenta del ejecutor o configura el respaldo por API
   agentrelay setup                  Instala el bloque global y los comandos de Claude Code
   agentrelay update [--check] [--yes]   Actualiza AgentRelay a la última versión
   agentrelay init                   Prepara el proyecto: instrucciones en CLAUDE.md y AGENTS.md si existe, y el repositorio git si hace falta
@@ -944,12 +944,11 @@ async function cmdLogin(positionals, values) {
     process.stderr.write('Uso no válido: --remove requiere --api.\n');
     return 1;
   }
-  if (positionals.length === 1 && positionals[0] === 'gemini') return loginGemini(values);
   if (positionals.length === 1 && ['antigravity', 'agy'].includes(positionals[0])) return loginAntigravity();
   if (positionals.length) {
     if (positionals.length !== 1 || positionals[0] !== 'opencode') {
       const executorName = positionals[0] === 'opencode' ? positionals.slice(1).join(' ') : positionals[0];
-      process.stderr.write(`Ejecutor no admitido para login: ${executorName}. Usa: agentrelay login [antigravity | gemini | opencode]\n`);
+      process.stderr.write(`Ejecutor no admitido para login: ${executorName}. Usa: agentrelay login [antigravity | opencode]\n`);
       return 1;
     }
     const cwd = path.resolve(values.cwd || process.cwd());
@@ -1021,30 +1020,6 @@ async function loginAntigravity() {
     return 0;
   }
   process.stderr.write(`No se pudo conectar Antigravity: ${auth.message}\n`);
-  return 1;
-}
-
-/** Abre Gemini CLI para iniciar sesión con Google y confirma que quedó guardada. */
-async function loginGemini(values) {
-  const cwd = path.resolve(values.cwd || process.cwd());
-  const { config } = loadConfig({ cwd, configPath: values.config });
-  const executor = config.executor.type === 'gemini'
-    ? config.executor : { ...config.executor, ...EXECUTOR_DEFAULTS.gemini, type: 'gemini' };
-  if (!await isInstalled('gemini', { dir: executorsDir() }) && await installOptionalExecutor('gemini') !== 0) return 1;
-  const adapter = getExecutor('gemini');
-  const current = await adapter.authStatus(executor);
-  if (current.ok) {
-    process.stdout.write(`✔ ${current.message}. Para cambiar de cuenta, abre gemini y usa /auth.\n`);
-    return 0;
-  }
-  process.stdout.write('Se abre Gemini CLI. Elige «Sign in with Google», completa el inicio de sesión en el navegador y sal con /quit.\n');
-  await adapter.login(executor);
-  const auth = await adapter.authStatus(executor);
-  if (auth.ok) {
-    process.stdout.write(`✔ ${auth.message}. Consulta tu cuota con: agentrelay cuota\n`);
-    return 0;
-  }
-  process.stderr.write(`No se pudo conectar la cuenta de Google: ${auth.message}\n`);
   return 1;
 }
 
