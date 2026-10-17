@@ -1215,18 +1215,6 @@ async function cmdSetup(values) {
         }
       }
     }
-    // Gemini es la segunda IA gratuita del enrutado: si está instalado, se ofrece conectar la cuenta de Google.
-    if (await isInstalled('gemini', { dir })) {
-      const gemini = getExecutor('gemini');
-      const current = await gemini.authStatus({ ...EXECUTOR_DEFAULTS.gemini, type: 'gemini' });
-      if (current.ok) {
-        process.stdout.write(`✔ Gemini: ${current.message}\n`);
-      } else {
-        const answer = values.yes ? null : await confirm('¿Conectar ahora tu cuenta de Google para Gemini (cuota diaria gratuita)?', { yes: false });
-        if (answer === true) await loginGemini(values);
-        else if (!values.quiet) process.stdout.write('Conecta Gemini más tarde con: agentrelay login gemini\n');
-      }
-    }
   }
   return 0;
 }

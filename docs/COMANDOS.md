@@ -69,7 +69,7 @@ Instala las instrucciones globales y los comandos de Claude Code. En el chat de 
 agentrelay setup [opciones]
 ```
 
-Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Ofrece conectar la cuenta de ChatGPT (y la de Google si Gemini CLI está instalado). También puede retirar la instalación o instalar ejecutores opcionales.
+Añade las instrucciones globales de AgentRelay a Claude Code y, por defecto, instala comandos y el hook de delegación. Ofrece conectar la cuenta de ChatGPT. También puede retirar la instalación o instalar ejecutores opcionales.
 
 | Opción | Qué hace |
 |---|---|
