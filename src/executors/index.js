@@ -1,11 +1,12 @@
 // Registro de ejecutores. Cada ejecutor exporta `name`, `run()` y `version()`;
 // los adaptadores también pueden exportar authStatus() y login() opcionales.
 
+import * as antigravity from './antigravity.js';
 import * as codex from './codex.js';
 import * as gemini from './gemini.js';
 import * as opencode from './opencode.js';
 
-const EXECUTORS = { codex, gemini, opencode };
+const EXECUTORS = { antigravity, codex, gemini, opencode };
 
 export function getExecutor(type) {
   const executor = EXECUTORS[type];

@@ -9,6 +9,7 @@ import { isInstalled } from './executors/catalog.js';
 import { readRateLimits } from './executors/codex.js';
 import { correoLuna, cuentaActiva, entornoCuenta, geminiDirCuenta, listarCuentas, PRINCIPAL, quotaIdCuenta } from './cuentas.js';
 import { accountEmail, readQuota as readGeminiQuota } from './executors/gemini.js';
+import { quotaGroup } from './executors/antigravity.js';
 import { getQuotaState } from './quota-state.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -91,6 +92,20 @@ export async function collectQuotas({ config, now = new Date(), readers = {} } =
     }
   }
 
+  // Antigravity no ofrece consulta de cuota fuera de su ventana: se muestra lo registrado y cómo verla.
+  const agyGroups = [...new Set((config.routing?.freeOrder ?? []).filter((spec) => spec.startsWith('antigravity:'))
+    .map((spec) => quotaGroup(spec.slice('antigravity:'.length))))];
+  for (const group of agyGroups) {
+    result.push({
+      id: `antigravity:${group}`,
+      nombre: `Antigravity · cuenta de Google (${group === 'claude' ? 'cupo de Claude y GPT' : 'cupo de Gemini'})`,
+      ok: false,
+      mensaje: 'cuota semanal; para ver el porcentaje exacto abre agy y escribe /usage',
+      ventanas: [],
+      registro: recordedState(`antigravity:${group}`, now),
+    });
+  }
+
   for (const spec of config.routing?.freeOrder ?? []) {
     if (!spec.startsWith('opencode:')) continue;
     const model = spec.slice('opencode:'.length);
@@ -113,7 +128,7 @@ export function renderQuotas(quotas, now = new Date()) {
       lines.push(`  ${w.quedaPct === 0 ? '✖' : '✔'} ${w.nombre}: queda ${pct}${amount}${reset}`);
     }
     if (item.registro) lines.push(`  ✖ ${item.registro.note} hasta ${formatReset(item.registro.resetAt, now)}`);
-    if (!item.ventanas.length && !item.registro && !item.ok) lines.push('  · estado desconocido');
+    if (!item.ventanas.length && !item.registro && !item.ok) lines.push(item.id.startsWith('antigravity:') ? '  ✔ sin agotar según AgentRelay' : '  · estado desconocido');
     lines.push('');
   }
   return lines.join('\n');

@@ -25,6 +25,15 @@ export const CATALOG = [
     connect: 'agentrelay login',
   },
   {
+    name: 'antigravity',
+    title: 'Antigravity CLI (Google)',
+    description: 'Gemini y Claude con tu cuenta de Google y su cuota semanal gratuita, sin clave de API. Se instala aparte: curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    bundled: false,
+    cost: 'cuenta de Google',
+    npmPackage: null,
+    connect: 'agentrelay login antigravity',
+  },
+  {
     name: 'gemini',
     title: 'Gemini CLI (Google)',
     description: 'Gemini con cuenta de Google. Desde junio de 2026 Google ya no lo admite con cuentas personales gratuitas: solo con licencia de empresa.',
@@ -70,6 +79,11 @@ export async function isInstalled(name, options = {}) {
   if (!entry) throw new Error(`Ejecutor desconocido: ${name}`);
   if (entry.bundled) return true;
   // OpenCode puede estar instalado en la carpeta gestionada o en el PATH.
+  // agy se instala con su propio instalador en ~/.local/bin, que puede no estar aún en el PATH.
+  if (name === 'antigravity') {
+    const binary = (options.platform || process.platform) === 'win32' ? 'agy.exe' : 'agy';
+    return Boolean(findOnPath('agy', options)) || (options.exists || existsSync)(path.join(options.home || os.homedir(), '.local', 'bin', binary));
+  }
   if (!entry.npmPackage) return Boolean(findOnPath(entry.name, options));
   const dir = options.dir || executorsDir(options.env, options.home);
   if (name === 'opencode' || name === 'gemini') {

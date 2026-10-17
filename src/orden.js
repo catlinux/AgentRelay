@@ -36,13 +36,14 @@ function mostrar(loaded, out, now = new Date()) {
     const tipo = entry.paid ? 'de pago' : 'gratis';
     const estado = estadoDe(entry, now);
     const spec = entry.api ? `codex-api:${entry.model}` : entry.type === 'opencode' ? `opencode:${entry.model}` : null;
-    const nombre = entry.type === 'gemini' ? `Gemini · cuenta de Google${entry.model === 'auto' ? '' : ` (${entry.model})`}`
+    const nombre = entry.type === 'antigravity' ? `Antigravity · cuenta de Google (${entry.model === 'auto' ? 'Gemini' : entry.model})`
+      : entry.type === 'gemini' ? `Gemini · cuenta de Google${entry.model === 'auto' ? '' : ` (${entry.model})`}`
       : spec && !gratis.has(entry.model) ? nombreDeRuta(spec) : (entry.type === 'codex' && !entry.api ? 'Luna · cuenta de ChatGPT (Codex)' : entry.model);
     out(`  ${index + 1}. ${nombre} · ${tipo}${estado ? ` · ${estado}` : ''}`);
   });
   out('');
   out('Cambiar:');
-  out('  agentrelay orden gratis <nombre> [<nombre> …]  gratuitos tras Luna: gemini (cuenta de Google) o modelos -free de OpenCode Go');
+  out('  agentrelay orden gratis <nombre> [<nombre> …]  gratuitos tras Luna: antigravity[:modelo] (cuenta de Google) o modelos -free de OpenCode Go');
   out('  agentrelay cuota                                cuánto queda de cada gratuita y cuándo se renueva');
   out('  agentrelay orden pago <nombre>                  la IA de pago (si falla, la tarea se detiene y se pregunta qué hacer)');
   out('  agentrelay orden pago <a> <b> …                 varias de pago, en ese orden');

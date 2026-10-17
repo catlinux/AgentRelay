@@ -72,6 +72,8 @@ export function resolverPago(texto) {
 
 /** Entrada de routing.freeOrder: solo modelos gratuitos de OpenCode Go (acepta "cat-jam", "cat-jam-free" o el id completo). */
 export function resolverGratuito(texto) {
+  const antigravity = /^(?:antigravity|agy)(?::(\S+))?$/.exec(String(texto).trim());
+  if (antigravity) return `antigravity:${antigravity[1] || 'auto'}`;
   const gemini = /^gemini(?::(\S+))?$/.exec(String(texto).trim());
   if (gemini) return `gemini:${gemini[1] || 'auto'}`;
   let valor = String(texto).trim().replace(/^opencode:/, '');
