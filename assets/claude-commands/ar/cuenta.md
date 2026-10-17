@@ -1,6 +1,6 @@
 ---
 description: Muestra y cambia las cuentas gratuitas de Luna y Gemini
-argument-hint: [luna|gemini [use|remove <nombre>]]
+argument-hint: [número | nueva luna|gemini | quitar número]
 allowed-tools: Bash(agentrelay *)
 disable-model-invocation: true
 model: haiku

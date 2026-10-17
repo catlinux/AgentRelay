@@ -104,3 +104,20 @@ export function quotaIdCuenta(servicio, nombre = cuentaActiva(servicio)) {
   const base = servicio === 'luna' ? 'codex:chatgpt' : 'gemini:google';
   return nombre === PRINCIPAL ? base : `${base}@${nombre}`;
 }
+
+/** Primer nombre libre para una cuenta nueva: cuenta-2, cuenta-3… */
+export function nombreLibre(servicio, home = agentrelayHome()) {
+  const existentes = new Set(listarCuentas(servicio, home));
+  for (let n = 2; ; n += 1) if (!existentes.has(`cuenta-${n}`)) return `cuenta-${n}`;
+}
+
+/** Correo de la cuenta de ChatGPT guardada por Codex (del id_token de auth.json), o null. */
+export function correoLuna(nombre = cuentaActiva('luna'), home = agentrelayHome()) {
+  const dir = carpetaCuenta('luna', nombre, home) ?? (process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  try {
+    const auth = JSON.parse(readFileSync(path.join(dir, 'auth.json'), 'utf8'));
+    const payload = String(auth?.tokens?.id_token ?? '').split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')).email ?? null;
+  } catch { return null; }
+}

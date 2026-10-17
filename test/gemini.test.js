@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildArgs, parseOutput, readQuota, toActivity } from '../src/executors/gemini.js';
+import { authStatus, buildArgs, checkSession, parseOutput, readQuota, toActivity } from '../src/executors/gemini.js';
 import { parseRateLimits } from '../src/executors/codex.js';
 import { classifyExecutorError, parseQuotaReset } from '../src/executors/common.js';
 import { collectQuotas, formatReset, renderQuotas } from '../src/cuota.js';
@@ -121,4 +121,20 @@ test('cuota: muestra lo que queda y cuándo se renueva de cada IA gratuita', asy
   assert.match(text, /✖ semanal: queda 0 %, se renueva mar 20\/10 09:00/);
   assert.match(text, /✔ gemini-2\.5-pro: queda 90 % \(900 de 1000\), se renueva mañana 09:00/);
   assert.equal(formatReset('no es fecha', now), null);
+});
+
+test('gemini: una sesión que Google rechaza (invalid_grant) se da por caducada, no por buena', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agentrelay-gemini-sesion-'));
+  try {
+    writeFileSync(path.join(dir, 'oauth_creds.json'), JSON.stringify({ access_token: 'old', refresh_token: 'r', expiry_date: 1 }));
+    writeFileSync(path.join(dir, 'google_accounts.json'), JSON.stringify({ active: 'yo@example.com' }));
+    const rejected = async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant', error_description: 'Bad Request' }) });
+    const session = await checkSession({ dir, fetchImpl: rejected, client: { id: 'i', secret: 's' } });
+    assert.deepEqual(session, { ok: false, expired: true, email: 'yo@example.com' });
+    const status = await authStatus({}, { dir, check: () => session });
+    assert.equal(status.ok, false);
+    assert.match(status.message, /yo@example\.com\) ha caducado/);
+    const offline = await checkSession({ dir, fetchImpl: async () => { throw new Error('fetch failed'); }, client: { id: 'i', secret: 's' } });
+    assert.equal(offline.ok, true, 'sin red no se declara caducada');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
