@@ -7,6 +7,7 @@
 // La revisión del orquestador llega después con applyReview():
 //   accept (con validación final) | fix (nuevo intento) | escalate | reject
 
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { getExecutor } from './executors/index.js';
@@ -156,7 +157,7 @@ async function evaluate(ctx) {
   const validations = await runValidations(ctx.validationCommands, {
     cwd: root, timeoutSeconds: config.validation.timeoutSeconds, maxOutputChars: config.report.maxOutputChars,
   });
-  const violations = scopeViolations(diff.files, task.doNotModify);
+  const violations = scopeViolations(diff.files, [...task.doNotModify, ...(task.references ?? [])]);
   const headMoved = (await head(root)) !== state.baseline.head;
   const passed = validations.every((v) => v.passed) && violations.length === 0;
 
@@ -472,6 +473,9 @@ async function preflight(config) {
 
 /** Inicia una ejecución nueva para una tarea. */
 export async function startRun({ root, task, config, allowDirty = false, onEvent }) {
+  // Las guías de "references" se comprueban antes de gastar nada: una ruta mal escrita es un error del orquestador.
+  const missing = (task.references ?? []).filter((file) => !existsSync(path.resolve(root, file)));
+  if (missing.length) throw new Error(`No existen estos archivos de "references": ${missing.join(', ')}`);
   const pending = await pendingChanges(root);
   if (pending.length && !allowDirty) {
     throw new Error(

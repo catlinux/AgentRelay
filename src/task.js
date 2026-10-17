@@ -3,7 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { COMPLEXITIES, SELF_REVIEW_MODES } from './policy.js';
 
-const LIST_FIELDS = ['constraints', 'files', 'acceptanceCriteria', 'validation', 'doNotModify'];
+// references: guías del proyecto (diseño, estilo…) que el ejecutor debe leer en esta tarea y no tocar.
+const LIST_FIELDS = ['constraints', 'files', 'acceptanceCriteria', 'validation', 'doNotModify', 'references'];
 const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 function toList(value) {

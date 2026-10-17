@@ -71,7 +71,7 @@ agentrelay run - <<'EOF'
 EOF
 ```
 
-   `context` debe bastar para que el ejecutor trabaje sin preguntarte: stack, convenciones y decisiones ya tomadas. Opcionalmente, `effort` (low, medium, high, xhigh) y `model` ajustan el esfuerzo y el modelo solo para esa tarea: esfuerzo bajo en las sencillas, alto en las difíciles.
+   `context` debe bastar para que el ejecutor trabaje sin preguntarte: stack, convenciones y decisiones ya tomadas. Opcionalmente, `effort` (low, medium, high, xhigh) y `model` ajustan el esfuerzo y el modelo solo para esa tarea: esfuerzo bajo en las sencillas, alto en las difíciles. Si el proyecto tiene guías (diseño, estilo, convenciones), pon sus rutas en `references` solo en las tareas que las necesiten: el ejecutor las lee sin que copies su contenido en `context`.
 
 ### Cómo revisar
 
