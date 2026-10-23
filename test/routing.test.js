@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readEvents } from '../src/events.js';
 import { isAvailable, markQuotaExhausted } from '../src/quota-state.js';
+import { resumenGasto } from '../src/gasto.js';
 import { routerHooks, startRun } from '../src/orchestrator.js';
 import { loadState } from '../src/store.js';
 import { normalizeTask } from '../src/task.js';
@@ -82,12 +83,13 @@ test('routing off no añade state.route y usa el ejecutor configurado', async ()
 
 test('routing auto empieza por la primera entrada y conserva route.first en el estado', async () => {
   const first = routeEntry('fake/free-a');
-  await withRun({ entries: [first, routeEntry('fake/free-b')] }, ({ state, repo }) => {
+  await withRun({ entries: [first, routeEntry('fake/free-b')] }, ({ state, repo, home }) => {
     assert.equal(state.route.first, first.key);
     assert.equal(loadState(repo.dir, state.id).route.first, first.key);
     assert.equal(state.route.current.key, first.key);
     assert.equal(repo.calls()[0].model, 'fake/free-a');
     assert.equal(state.attempts[0].route, first.key);
+    assert.equal(resumenGasto(first.key, { home }).hoy.intentos, 1);
   });
 });
 

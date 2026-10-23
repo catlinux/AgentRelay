@@ -29,6 +29,7 @@ import { alternativesHint } from './alternatives.js';
 import { checkExecutorModel } from './executor-check.js';
 import { agentrelayHome } from './config.js';
 import { isAvailable as quotaAvailable, markQuotaAvailable, markQuotaExhausted } from './quota-state.js';
+import { registrarGasto } from './gasto.js';
 import { executorFor, pickEntry, routeEntries } from './router.js';
 import { hasApiProfile } from './executors/codex.js';
 
@@ -133,6 +134,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     feedback: feedback || null,
   });
   addUsage(state, result.usage);
+  if (state.route) { try { registrarGasto(state.route.current.key, result.usage); } catch {} }
   saveState(root, state);
   if (result.ok && state.route) {
     state.route.strikes = 0;
