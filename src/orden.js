@@ -7,11 +7,13 @@
 //   agentrelay orden reset                    vuelve al orden por defecto
 
 import path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { agentrelayHome, loadConfig } from './config.js';
 import { CATALOGO, nombreDeRuta, resolverGratuito, resolverPago } from './catalogo-ia.js';
 import { archivoUsuario, escribirAjustesUsuario } from './config-usuario.js';
 import { hasApiProfile } from './executors/codex.js';
 import { getQuotaState } from './quota-state.js';
+import { resumenGasto } from './gasto.js';
 import { routeEntries } from './router.js';
 
 const hora = (date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -19,10 +21,19 @@ const hora = (date) => `${String(date.getHours()).padStart(2, '0')}:${String(dat
 function estadoDe(entry, now) {
   if (entry.api && !hasApiProfile()) return 'sin configurar (agentrelay login --api)';
   const quota = getQuotaState(entry.quotaId, { home: agentrelayHome(), now });
-  if (quota.state === 'available') return '';
+  if (quota.state === 'available') return 'disponible';
   const hasta = new Date(quota.state === 'unknown' ? quota.nextProbe : quota.until);
   const dia = hasta.toDateString() === now.toDateString() ? '' : `${hasta.getDate()}/${hasta.getMonth() + 1} `;
   return `agotado hasta ${dia}${hora(hasta)}`;
+}
+
+function cantidad(n) { return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1, notation: n >= 10000 ? 'compact' : 'standard' }).format(n); }
+
+function gastoTexto(route, now) {
+  const { hoy, total } = resumenGasto(route, { now });
+  if (!total.intentos) return 'sin uso registrado';
+  const parte = (dato) => `${dato.intentos} intentos, ${cantidad(dato.inputTokens + dato.outputTokens)} tokens (${cantidad(dato.inputTokens)}/${cantidad(dato.outputTokens)})${dato.coste > 0 ? `, $${dato.coste.toFixed(4)}` : ''}`;
+  return `hoy: ${parte(hoy)} · total: ${parte(total)}`;
 }
 
 function mostrar(loaded, out, now = new Date()) {
@@ -38,7 +49,7 @@ function mostrar(loaded, out, now = new Date()) {
     const spec = entry.api ? `codex-api:${entry.model}` : entry.type === 'opencode' ? `opencode:${entry.model}` : null;
     const nombre = entry.type === 'antigravity' ? `Antigravity · cuenta de Google (${entry.model === 'auto' ? 'Gemini' : entry.model})`
       : spec && !gratis.has(entry.model) ? nombreDeRuta(spec) : (entry.type === 'codex' && !entry.api ? 'Luna · cuenta de ChatGPT (Codex)' : entry.model);
-    out(`  ${index + 1}. ${nombre} · ${tipo}${estado ? ` · ${estado}` : ''}`);
+    out(`  ${index + 1}. ${nombre} · ${tipo} · ${estado} · ${gastoTexto(entry.key, now)}`);
   });
   out('');
   out('Cambiar:');
@@ -59,7 +70,7 @@ function avisarProyecto(loaded, claves, out) {
   }
 }
 
-export function cmdOrden(positionals, values, runtime = {}) {
+export async function cmdOrden(positionals, values, runtime = {}) {
   const out = runtime.out ?? ((text) => process.stdout.write(`${text}\n`));
   const err = runtime.err ?? ((text) => process.stderr.write(`${text}\n`));
   const opts = { cwd: path.resolve(values.cwd || process.cwd()), configPath: values.config };
@@ -67,7 +78,26 @@ export function cmdOrden(positionals, values, runtime = {}) {
 
   try {
     if (!accion) {
-      mostrar(loadConfig(opts), out, runtime.now);
+      let loaded = loadConfig(opts);
+      mostrar(loaded, out, runtime.now);
+      const interactivo = runtime.interactivo === true || (runtime.interactivo !== false && process.stdin.isTTY && process.stdout.isTTY);
+      if (interactivo) {
+        const opciones = CATALOGO.filter((item) => item.ruta);
+        const rl = runtime.preguntar ? null : createInterface({ input: process.stdin, output: process.stdout });
+        try {
+          opciones.forEach((item, i) => out(`  ${i + 1}. ${item.nombre} · ${item.coste}`));
+          const respuesta = (await (runtime.preguntar ?? ((prompt) => rl.question(prompt)))('Elige la IA de pago (número, o Enter para salir): ')).trim();
+          if (respuesta) {
+            const n = Number(respuesta);
+            if (!Number.isInteger(n) || n < 1 || n > opciones.length) out('Número inválido.');
+            else {
+              loaded = escribirAjustesUsuario([['routing.paidOrder', [resolverPago(opciones[n - 1].id)]]], opts);
+              mostrar(loaded, out, runtime.now);
+              avisarProyecto(loaded, ['routing.paidOrder'], out);
+            }
+          }
+        } finally { rl?.close(); }
+      }
       return 0;
     }
     let edits;
@@ -96,4 +126,3 @@ export function cmdOrden(positionals, values, runtime = {}) {
     return 1;
   }
 }
-

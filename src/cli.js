@@ -1551,7 +1551,7 @@ export async function main(argv, runtime = {}) {
       case 'doctor': return await cmdDoctor(values);
       case 'update': return await cmdUpdate(values);
       case 'config': return await cmdConfig(rest, values, migrationResult);
-      case 'orden': return cmdOrden(rest, values);
+      case 'orden': return await cmdOrden(rest, values);
       case 'cuota': return await cmdCuota(rest, values);
       case 'cuenta': return await cmdCuenta(rest, values);
       case 'use': return await cmdUse(rest, values, { resolveRoot, install: (name) => installOptionalExecutor(name) }, runtime);
