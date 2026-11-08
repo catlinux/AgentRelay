@@ -965,7 +965,8 @@ async function cmdLogin(positionals, values) {
     try {
       await new Promise((resolve, reject) => {
         const options = { stdio: 'inherit' };
-        if (process.platform === 'win32' && /\.cmd$/i.test(command)) options.shell = true;
+        // En Windows "opencode" del PATH es un shim de npm (.cmd): sin shell, spawn da ENOENT.
+        if (process.platform === 'win32' && !/\.exe$/i.test(command)) options.shell = true;
         const child = spawn(command, [...prefix, 'auth', 'login'], options);
         child.once('error', reject);
         child.once('close', resolve);
