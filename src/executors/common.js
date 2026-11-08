@@ -27,7 +27,7 @@ export function classifyExecutorError(text) {
     || /\b402\s+payment required\b/.test(value)
     || /\b(?:status|http|error|code)[^a-z0-9]{0,3}402\b/.test(value)
     || /\b(?:hit|reached)\s+your\s+usage\s+limit\b/.test(value)
-    || /\busage[\s_-]+limit[\s_-]+reached\b/.test(value)
+    || /\busage[\s_-]+limit[\s_-]+(?:reached|exceeded)\b/.test(value)
     || /\busage_limit_reached\b/.test(value)
     || /\busage[\s_-]+limit\b[\s\S]{0,120}\btry again\s+(?:in|at)\b/.test(value)
     || /\bplan\s+limit\b/.test(value)

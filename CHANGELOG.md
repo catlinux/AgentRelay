@@ -52,6 +52,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ### Corregido
 
+- El error real de OpenCode Go al acabarse el crédito («Go usage limit exceeded») no se reconocía como cuota agotada: se reintentaba como un fallo cualquiera en lugar de cambiar de cuenta o de IA.
 - **`agentrelay login opencode` en Windows** fallaba con `spawn opencode ENOENT` cuando OpenCode venía del PATH (shim `.cmd` de npm): ahora se lanza con la shell salvo que sea un `.exe`.
 - **`update` y `setup` se cortaban en Windows al ofrecer instalar Antigravity**, que no se instala con npm («no se instala con AgentRelay»). Ahora no se ofrece: si falta, se explica cómo instalarlo con el instalador oficial de cada sistema (`irm https://antigravity.google/cli/install.ps1 | iex` en Windows, `curl … install.sh | bash` en Linux y macOS) y `setup` sigue. AgentRelay encuentra `agy` también donde lo deja su instalador en Windows (`%LOCALAPPDATA%\Antigravity\agy.exe`).
 - **Al agotarse la cuota, las alternativas propuestas eran comandos inválidos** (`agentrelay use opencode antigravity:auto`) y no conocían Antigravity ni las cuentas de Luna: ahora proponen Antigravity con Gemini o con Claude según su cupo, otra cuenta de Luna y DeepSeek.
