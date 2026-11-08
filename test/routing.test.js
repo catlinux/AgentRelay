@@ -6,7 +6,7 @@ import path from 'node:path';
 import { readEvents } from '../src/events.js';
 import { isAvailable, markQuotaExhausted } from '../src/quota-state.js';
 import { resumenGasto } from '../src/gasto.js';
-import { routerHooks, startRun } from '../src/orchestrator.js';
+import { cuentaHooks, routerHooks, startRun } from '../src/orchestrator.js';
 import { loadState } from '../src/store.js';
 import { normalizeTask } from '../src/task.js';
 import { baseTask, fakePlan, makeRepo, testConfig } from './helpers.js';
@@ -29,6 +29,8 @@ afterEach(() => {
   routerHooks.entries = null;
   routerHooks.usable = null;
   routerHooks.sleep = null;
+  cuentaHooks.preparar = null;
+  cuentaHooks.rotar = null;
 });
 
 async function withRun({ entries, plan, routing = {}, task = {}, beforeStart, mode = 'auto', onEntries } = {}, check) {
@@ -60,6 +62,8 @@ async function withRun({ entries, plan, routing = {}, task = {}, beforeStart, mo
     routerHooks.entries = null;
     routerHooks.usable = null;
     routerHooks.sleep = null;
+    cuentaHooks.preparar = null;
+    cuentaHooks.rotar = null;
     for (const name of envNames) {
       if (previousEnv[name] === undefined) delete process.env[name];
       else process.env[name] = previousEnv[name];
@@ -295,5 +299,86 @@ test('un modelo fijado en la tarea desactiva routing auto', async () => {
     assert.equal(repo.calls()[0].model, 'task-model');
     assert.equal(state.attempts[0].model.id, 'task-model');
     assert.equal(entriesCalled, false);
+  });
+});
+
+test('un fallo de cuota con rotación de cuenta repite el intento con el mismo modelo sin cambiar de ruta', async () => {
+  const paid = routeEntry('fake/paid-a', true);
+  let rotaciones = 0;
+  await withRun({
+    entries: [paid],
+    plan: { byModel: { 'fake/paid-a': { implement: quotaFailure, fix: GOOD } } },
+    beforeStart: () => {
+      cuentaHooks.preparar = async () => null;
+      cuentaHooks.rotar = async () => {
+        rotaciones += 1;
+        return { integracion: 'opencode-go', from: 'Cuenta 1', to: 'Cuenta 2', total: 2 };
+      };
+    },
+  }, ({ state, repo, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(rotaciones, 1);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.kind), ['implement', 'fix']);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/paid-a', 'fake/paid-a']);
+    assert.equal(repo.calls()[1].model, 'fake/paid-a');
+    assert.deepEqual(state.route.switches, []);
+    assert.equal(state.route.strikes, 0);
+    assert.equal(state.accountSwitches.length, 1);
+    assert.equal(state.accountSwitches[0].to, 'Cuenta 2');
+    const [cuenta] = events.filter((event) => event.type === 'account_switch');
+    assert.deepEqual(
+      { integracion: cuenta.integracion, from: cuenta.from, to: cuenta.to, total: cuenta.total },
+      { integracion: 'opencode-go', from: 'Cuenta 1', to: 'Cuenta 2', total: 2 },
+    );
+  });
+});
+
+test('si no hay otra cuenta que rotar, el enrutado cambia de modelo como antes', async () => {
+  const paid = routeEntry('fake/paid-a', true);
+  const free = routeEntry('fake/free-b');
+  let rotaciones = 0;
+  await withRun({
+    entries: [paid, free],
+    plan: { byModel: { 'fake/paid-a': { implement: quotaFailure }, 'fake/free-b': { fix: GOOD } } },
+    beforeStart: () => {
+      cuentaHooks.preparar = async () => null;
+      cuentaHooks.rotar = async () => { rotaciones += 1; return null; };
+    },
+  }, ({ state, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(rotaciones, 1);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/paid-a', 'fake/free-b']);
+    assert.equal(state.route.switches.length, 1);
+    assert.equal(state.route.switches[0].to, free.key);
+    assert.equal(state.accountSwitches, undefined);
+    assert.deepEqual(events.filter((event) => event.type === 'account_switch'), []);
+  });
+});
+
+test('un límite de velocidad (429) no intenta rotar la cuenta de OpenCode', async () => {
+  const first = routeEntry('fake/free-a');
+  const second = routeEntry('fake/free-b');
+  let rotaciones = 0;
+  await withRun({
+    entries: [first, second],
+    plan: {
+      byModel: {
+        'fake/free-a': { implement: rateLimit, fix: rateLimit },
+        'fake/free-b': { fix: GOOD },
+      },
+    },
+    beforeStart: () => {
+      cuentaHooks.preparar = async () => null;
+      cuentaHooks.rotar = async () => {
+        rotaciones += 1;
+        return { integracion: 'opencode-go', from: 'A', to: 'B', total: 2 };
+      };
+    },
+  }, ({ state, events }) => {
+    assert.equal(state.status, 'awaiting_review');
+    assert.equal(rotaciones, 0);
+    assert.deepEqual(state.attempts.map((attempt) => attempt.model.id), ['fake/free-a', 'fake/free-a', 'fake/free-b']);
+    assert.equal(events.filter((event) => event.type === 'route_switch').length, 1);
+    assert.deepEqual(events.filter((event) => event.type === 'account_switch'), []);
   });
 });

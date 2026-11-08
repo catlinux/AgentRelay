@@ -87,8 +87,12 @@ export async function prepararCuenta(executor, { home = agentrelayHome(), run = 
   const credenciales = await listarCredenciales(executor, integracion, { run });
   if (credenciales.length < 2) return null;
   const disponible = (c) => quotaAvailable(quotaIdCredencial(integracion, c.id), now, { home });
+  // Se sigue con la guardada mientras tenga crédito; si no, la siguiente con cuota en orden circular
+  // (Go → Go 2 → Go 3 → Go…), para repartir el uso en lugar de volver siempre a la primera.
   const guardada = cuentaGuardada(integracion, home);
-  const elegida = credenciales.find((c) => c.id === guardada && disponible(c)) ?? credenciales.find(disponible);
+  const desde = Math.max(credenciales.findIndex((c) => c.id === guardada), 0);
+  const enRueda = credenciales.map((_, i) => credenciales[(desde + i) % credenciales.length]);
+  const elegida = enRueda.find(disponible);
   if (!elegida) return null;
   try {
     await activarCredencial(executor, integracion, elegida.id, { home, run });
