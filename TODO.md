@@ -18,7 +18,7 @@ Necesitan al usuario en casa o una clave:
 - [ ] Probar `references` en una tarea real de un proyecto web con una guía de diseño.
 - [ ] `agentrelay login` con una sesión ya abierta dice «ejecuta codex logout», pero `codex` no está en el PATH (va dentro de AgentRelay): dar la ruta completa o añadir `agentrelay logout`.
 - [ ] Comparar DeepSeek V4 Flash y Pro como ejecutores de pago en tareas reales.
-- [ ] **Varias cuentas de OpenCode (pedido por el usuario) y rotación al agotarse el crédito.** OpenCode 2 guarda varias credenciales por integración (`opencode auth login`, `auth switch <integración> <credencial>`, `auth list --format json`). Falta: añadir las 3 cuentas, ver cómo marca `auth list` la activa, diseñar la rotación (cuota por credencial) y corregir docs/DISENO.md, que hoy dice «nunca entre cuentas del mismo proveedor».
+- [ ] **Varias cuentas de OpenCode: completar.** Hecho el núcleo (`src/cuentas-opencode.js` y la rotación en el orquestador). Falta lo de `.agents/plans/cuentas-opencode/cuentas-opencode.PLAN.md`: tests, `agentrelay cuenta opencode`, `watch` e informe, documentación y corregir docs/DISENO.md. Después, comprobar con un agotamiento real el texto del error de OpenCode Go.
 - [ ] El test de `alternatives` «sin Antigravity instalado explica cómo instalarlo…» falla en Windows: espera la orden de Linux (`install.sh | bash`).
 
 Mejoras acordadas:

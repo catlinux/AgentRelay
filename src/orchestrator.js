@@ -32,6 +32,7 @@ import { isAvailable as quotaAvailable, markQuotaAvailable, markQuotaExhausted }
 import { registrarGasto } from './gasto.js';
 import { executorFor, pickEntry, routeEntries } from './router.js';
 import { hasApiProfile } from './executors/codex.js';
+import { prepararCuenta, rotarCuenta } from './cuentas-opencode.js';
 
 export const DECISIONS = ['accept', 'fix', 'escalate', 'reject'];
 const FINAL_STATUSES = ['accepted', 'rejected'];
@@ -101,7 +102,9 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     model: state.route ? configured.model : task.model ?? configured.model,
   };
   const { provider, model } = executor;
-  ctx.emit({ type: 'attempt_start', attempt: n, kind, provider, model });
+  // Con varias cuentas de la integración de OpenCode, AgentRelay deja activa la que toca antes de cada intento.
+  const cuenta = await (cuentaHooks.preparar ?? prepararCuenta)(executor);
+  ctx.emit({ type: 'attempt_start', attempt: n, kind, provider, model, ...(cuenta ? { account: cuenta.label } : {}) });
 
   const startedAt = new Date().toISOString();
   const result = await getExecutor(executor.type).run({
@@ -122,6 +125,7 @@ async function attempt(ctx, kind, { feedback, check } = {}) {
     timedOut: result.timedOut,
     error: result.error ? maskSecrets(result.error) : result.error,
     model: result.model ?? (model ? { id: model, provider } : result.model),
+    ...(cuenta ? { account: cuenta.label } : {}),
     ...(state.route ? { route: state.route.current.key, paid: state.route.current.paid } : {}),
     iterations: result.iterations,
     toolCalls: result.toolCalls,
@@ -235,6 +239,19 @@ async function continueCycle(ctx, result) {
         result = await attempt(ctx, 'fix', { feedback: RETRY_FEEDBACK, check });
         continue;
       }
+      // Crédito o límite de uso agotado (no un 429): primero otra cuenta de la misma integración de OpenCode, con el mismo modelo.
+      if (errorKind === 'quota' && classifyExecutorError(errorText) === 'quota') {
+        const cambio = await (cuentaHooks.rotar ?? rotarCuenta)(currentExecutor(state), errorText);
+        if (cambio) {
+          const change = { at: new Date().toISOString(), ...cambio };
+          (state.accountSwitches ??= []).push(change);
+          if (state.route) state.route.strikes = 0;
+          saveState(ctx.root, state);
+          ctx.emit({ type: 'account_switch', ...change });
+          result = await attempt(ctx, 'fix', { feedback: SWITCH_FEEDBACK, check });
+          continue;
+        }
+      }
       if (errorKind && state.route && await switchRoute(ctx, result, errorKind)) {
         result = await attempt(ctx, 'fix', { feedback: SWITCH_FEEDBACK, check });
         continue;
@@ -337,6 +354,8 @@ const routeQuotaAvailable = (quotaId) => quotaAvailable(quotaId, new Date(), { h
 // Solo para tests: sustituyen la lista de entradas y la comprobación de instalación/sesión,
 // que dependen de los ejecutores reales de la máquina.
 export const routerHooks = { entries: null, usable: null, sleep: null };
+// Solo para tests: sustituyen la activación y la rotación de cuentas de OpenCode, que llaman a la CLI real.
+export const cuentaHooks = { preparar: null, rotar: null };
 const usableEntry = (entry, base) => (routerHooks.usable ?? entryUsable)(entry, base);
 
 /**
